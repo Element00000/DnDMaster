@@ -1,0 +1,305 @@
+import { useState } from 'react'
+import {
+  ENTITY_TYPES,
+  FIELD_SCHEMA,
+  RELATIONS,
+  entityMeta,
+  relationMeta,
+} from '../types'
+import type { Entity, EntityType, RelationType, Visibility } from '../types'
+import { useStore } from '../store/useStore'
+
+export function DetailPanel() {
+  const campaign = useStore((s) => s.campaigns.find((c) => c.id === s.activeCampaignId) ?? s.campaigns[0])
+  const selectedId = useStore((s) => s.selectedEntityId)
+  const playerMode = useStore((s) => s.playerMode)
+  const updateEntity = useStore((s) => s.updateEntity)
+  const setEntityField = useStore((s) => s.setEntityField)
+  const deleteEntity = useStore((s) => s.deleteEntity)
+  const selectEntity = useStore((s) => s.selectEntity)
+  const addLink = useStore((s) => s.addLink)
+  const removeLink = useStore((s) => s.removeLink)
+  const setPlacement = useStore((s) => s.setPlacement)
+  const setPlacingEntity = useStore((s) => s.setPlacingEntity)
+
+  const marker = campaign.entities.find((e) => e.id === selectedId) ?? null
+
+  if (!selectedId || !marker) {
+    return (
+      <aside className="detail detail--empty">
+        <p>Klicke ein Objekt auf der Karte oder in der Liste, um seine Details zu sehen.</p>
+      </aside>
+    )
+  }
+
+  const meta = entityMeta(marker.type)
+  const fields = FIELD_SCHEMA[marker.type]
+  const others = campaign.entities.filter((e) => e.id !== marker.id)
+  // Eingehende Verknuepfungen (andere Objekte, die auf dieses zeigen).
+  const incoming = campaign.entities
+    .filter((e) => e.id !== marker.id)
+    .flatMap((e) => e.links.filter((l) => l.targetId === marker.id).map((l) => ({ from: e, relation: l.relation })))
+
+  const readOnly = playerMode
+
+  return (
+    <aside className="detail" style={{ ['--chip-color' as string]: meta.color }}>
+      <div className="detail__header">
+        <span className="detail__icon">{meta.icon}</span>
+        <input
+          className="detail__title-input"
+          value={marker.name}
+          onChange={(e) => updateEntity(marker.id, { name: e.target.value })}
+          placeholder="Name"
+          disabled={readOnly}
+        />
+        <button className="detail__close" onClick={() => selectEntity(null)} title="Schliessen">
+          &times;
+        </button>
+      </div>
+
+      <div className="detail__body">
+        {!readOnly && (
+          <label className="field">
+            <span className="field__label">Typ</span>
+            <select
+              className="field__control"
+              value={marker.type}
+              onChange={(e) => updateEntity(marker.id, { type: e.target.value as EntityType })}
+            >
+              {ENTITY_TYPES.map((t) => (
+                <option key={t.type} value={t.type}>
+                  {t.icon} {t.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+
+        {/* Typ-spezifische Felder */}
+        {fields.map((f) => (
+          <label key={f.key} className="field">
+            <span className="field__label">{f.label}</span>
+            {f.kind === 'select' ? (
+              <select
+                className="field__control"
+                value={marker.fields[f.key] ?? ''}
+                onChange={(e) => setEntityField(marker.id, f.key, e.target.value)}
+                disabled={readOnly}
+              >
+                <option value="">&ndash;</option>
+                {f.options?.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            ) : f.kind === 'textarea' ? (
+              <textarea
+                className="field__control field__textarea"
+                value={marker.fields[f.key] ?? ''}
+                onChange={(e) => setEntityField(marker.id, f.key, e.target.value)}
+                placeholder={f.placeholder}
+                rows={3}
+                disabled={readOnly}
+              />
+            ) : (
+              <input
+                className="field__control"
+                value={marker.fields[f.key] ?? ''}
+                onChange={(e) => setEntityField(marker.id, f.key, e.target.value)}
+                placeholder={f.placeholder}
+                disabled={readOnly}
+              />
+            )}
+          </label>
+        ))}
+
+        <label className="field">
+          <span className="field__label">Beschreibung</span>
+          <textarea
+            className="field__control field__textarea"
+            value={marker.description}
+            onChange={(e) => updateEntity(marker.id, { description: e.target.value })}
+            placeholder="Beschreibung, sichtbar auch fuer Spieler wenn entdeckt ..."
+            rows={5}
+            disabled={readOnly}
+          />
+        </label>
+
+        {/* Geheimnisse: nur DM */}
+        {!playerMode && (
+          <label className="field">
+            <span className="field__label field__label--secret">Geheimnis (nur DM)</span>
+            <textarea
+              className="field__control field__textarea field__textarea--secret"
+              value={marker.secret}
+              onChange={(e) => updateEntity(marker.id, { secret: e.target.value })}
+              placeholder="Verborgene Informationen, Wendungen, verdeckte Motive ..."
+              rows={3}
+            />
+          </label>
+        )}
+
+        {/* Verknuepfungen */}
+        <div className="field">
+          <span className="field__label">Verknuepfungen</span>
+          <LinksEditor
+            entity={marker}
+            others={others}
+            incoming={incoming}
+            readOnly={readOnly}
+            onAdd={addLink}
+            onRemove={removeLink}
+            onNavigate={selectEntity}
+          />
+        </div>
+
+        {!readOnly && (
+          <>
+            <label className="field">
+              <span className="field__label">Sichtbarkeit</span>
+              <select
+                className="field__control"
+                value={marker.visibility}
+                onChange={(e) => updateEntity(marker.id, { visibility: e.target.value as Visibility })}
+              >
+                <option value="dm">Nur DM</option>
+                <option value="spieler">Fuer Spieler entdeckt</option>
+              </select>
+            </label>
+
+            <div className="field field--row">
+              <span className="field__label">Auf Karte</span>
+              {marker.placement ? (
+                <button className="btn btn--ghost btn--sm" onClick={() => setPlacement(marker.id, null)}>
+                  Von Karte entfernen
+                </button>
+              ) : (
+                <button className="btn btn--sm" onClick={() => setPlacingEntity(marker.id)}>
+                  Auf Karte platzieren
+                </button>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+
+      {!readOnly && (
+        <div className="detail__footer">
+          <button
+            className="btn btn--danger"
+            onClick={() => {
+              if (confirm(`Objekt "${marker.name}" loeschen?`)) deleteEntity(marker.id)
+            }}
+          >
+            Loeschen
+          </button>
+        </div>
+      )}
+    </aside>
+  )
+}
+
+function LinksEditor({
+  entity,
+  others,
+  incoming,
+  readOnly,
+  onAdd,
+  onRemove,
+  onNavigate,
+}: {
+  entity: Entity
+  others: Entity[]
+  incoming: { from: Entity; relation: RelationType }[]
+  readOnly: boolean
+  onAdd: (fromId: string, targetId: string, relation: RelationType) => void
+  onRemove: (fromId: string, targetId: string, relation: RelationType) => void
+  onNavigate: (id: string) => void
+}) {
+  const [relation, setRelation] = useState<RelationType>('befindet_sich_in')
+  const [targetId, setTargetId] = useState('')
+
+  const byId = (id: string) => others.find((e) => e.id === id)
+
+  return (
+    <div className="links">
+      {entity.links.length === 0 && incoming.length === 0 && (
+        <p className="links__empty">Keine Verknuepfungen.</p>
+      )}
+
+      <ul className="links__list">
+        {entity.links.map((l) => {
+          const target = byId(l.targetId)
+          if (!target) return null
+          const tMeta = entityMeta(target.type)
+          return (
+            <li key={`${l.targetId}-${l.relation}`} className="links__item">
+              <span className="links__rel">{relationMeta(l.relation).label}</span>
+              <button className="links__target" onClick={() => onNavigate(target.id)} style={{ ['--chip-color' as string]: tMeta.color }}>
+                <span>{tMeta.icon}</span>
+                {target.name}
+              </button>
+              {!readOnly && (
+                <button
+                  className="links__remove"
+                  title="Verknuepfung entfernen"
+                  onClick={() => onRemove(entity.id, l.targetId, l.relation)}
+                >
+                  &times;
+                </button>
+              )}
+            </li>
+          )
+        })}
+
+        {/* Eingehend, nur zur Anzeige */}
+        {incoming.map(({ from, relation: rel }) => {
+          const fMeta = entityMeta(from.type)
+          return (
+            <li key={`in-${from.id}-${rel}`} className="links__item links__item--incoming">
+              <span className="links__rel">{relationMeta(rel).inverseLabel}</span>
+              <button className="links__target" onClick={() => onNavigate(from.id)} style={{ ['--chip-color' as string]: fMeta.color }}>
+                <span>{fMeta.icon}</span>
+                {from.name}
+              </button>
+            </li>
+          )
+        })}
+      </ul>
+
+      {!readOnly && others.length > 0 && (
+        <div className="links__add">
+          <select className="field__control field__control--sm" value={relation} onChange={(e) => setRelation(e.target.value as RelationType)}>
+            {RELATIONS.map((r) => (
+              <option key={r.relation} value={r.relation}>
+                {r.label}
+              </option>
+            ))}
+          </select>
+          <select className="field__control field__control--sm" value={targetId} onChange={(e) => setTargetId(e.target.value)}>
+            <option value="">Objekt waehlen ...</option>
+            {others.map((e) => (
+              <option key={e.id} value={e.id}>
+                {entityMeta(e.type).icon} {e.name}
+              </option>
+            ))}
+          </select>
+          <button
+            className="btn btn--sm"
+            disabled={!targetId}
+            onClick={() => {
+              if (targetId) {
+                onAdd(entity.id, targetId, relation)
+                setTargetId('')
+              }
+            }}
+          >
+            +
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
