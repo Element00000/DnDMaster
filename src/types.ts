@@ -71,6 +71,14 @@ export interface Entity {
   links: EntityLink[]
   /** Typ-spezifische Felder (Schluessel siehe FIELD_SCHEMA). */
   fields: Record<string, string>
+  /** Verzweigter Handlungsstrang; nur bei type === 'entscheidung' gesetzt. */
+  decision: DecisionData | null
+  /** Kampagnen-Kalendertag fuer die Zeitleiste; null = ohne Datum. */
+  day: number | null
+  /** Beginn des Tageszeit-Fensters in Minuten (0..1439); null = immer sichtbar. */
+  timeStart: number | null
+  /** Ende des Tageszeit-Fensters in Minuten (0..1439). start>end = ueber Mitternacht. */
+  timeEnd: number | null
   createdAt: number
 }
 
@@ -191,4 +199,54 @@ export const RELATIONS: RelationMeta[] = [
 
 export function relationMeta(relation: RelationType): RelationMeta {
   return RELATIONS.find((r) => r.relation === relation) ?? RELATIONS[RELATIONS.length - 1]
+}
+
+// ---------- Entscheidungspunkte / verzweigte Handlungsstraenge (Phase 4) ----------
+
+/**
+ * Eine Folge, die eintritt, wenn eine Option gewaehlt wird. Alle Effekte
+ * verweisen auf vorhandene Objekte der Kampagne und werden automatisch
+ * angewendet (bzw. beim Zuruecknehmen rueckgaengig gemacht).
+ */
+export type Effect =
+  | { id: string; kind: 'set_field'; targetId: string; key: string; value: string }
+  | { id: string; kind: 'reveal'; targetId: string; value: Visibility }
+  | { id: string; kind: 'relation'; op: 'add' | 'remove'; fromId: string; toId: string; relation: RelationType }
+  | { id: string; kind: 'note'; text: string }
+
+export const EFFECT_KINDS: { kind: Effect['kind']; label: string }[] = [
+  { kind: 'set_field', label: 'Status/Feld aendern' },
+  { kind: 'reveal', label: 'Objekt auf-/zudecken' },
+  { kind: 'relation', label: 'Beziehung aendern' },
+  { kind: 'note', label: 'Notiz' },
+]
+
+/** Rueckgaengig-Information, gespeichert beim Anwenden einer Option. */
+export type UndoEntry =
+  | { kind: 'field'; targetId: string; key: string; prev?: string }
+  | { kind: 'visibility'; targetId: string; prev: Visibility }
+  | { kind: 'relation_add'; fromId: string; toId: string; relation: RelationType }
+  | { kind: 'relation_remove'; fromId: string; toId: string; relation: RelationType }
+
+export interface DecisionOption {
+  id: string
+  label: string
+  description: string
+  effects: Effect[]
+  /** Verkettung: fuehrt zu diesem naechsten Entscheidungspunkt. */
+  nextDecisionId: string | null
+  /** Beim Anwenden gefuellt, um die Folgen zuruecknehmen zu koennen. */
+  undo: UndoEntry[] | null
+}
+
+export interface DecisionData {
+  /** Situation, zu der der Punkt gehoert (Ereignis oder Quest). */
+  situationId: string | null
+  options: DecisionOption[]
+  /** Aktuell eingetretene Option; null = noch offen. */
+  chosenOptionId: string | null
+}
+
+export function emptyDecision(): DecisionData {
+  return { situationId: null, options: [], chosenOptionId: null }
 }

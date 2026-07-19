@@ -16,6 +16,8 @@ export function TopBar() {
   const resetLayerImage = useStore((s) => s.resetLayerImage)
   const playerMode = useStore((s) => s.playerMode)
   const setPlayerMode = useStore((s) => s.setPlayerMode)
+  const timelineOpen = useStore((s) => s.timelineOpen)
+  const setTimelineOpen = useStore((s) => s.setTimelineOpen)
 
   const [manageOpen, setManageOpen] = useState(false)
   const entityCount = activeCampaign.entities.length
@@ -95,6 +97,14 @@ export function TopBar() {
       <div className="topbar__meta">{entityCount} Objekte</div>
 
       <div className="topbar__actions">
+        <button
+          className={`btn${timelineOpen ? ' btn--active' : ''}`}
+          onClick={() => setTimelineOpen(!timelineOpen)}
+          title="Kampagnen-Zeitleiste ein-/ausblenden"
+        >
+          Zeitleiste
+        </button>
+
         <label className="switch" title="Spieler-Ansicht: Geheimnisse und unentdeckte Objekte ausblenden">
           <input
             type="checkbox"

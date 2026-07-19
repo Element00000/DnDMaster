@@ -48,7 +48,7 @@ button {
 .app__body {
   flex: 1;
   display: grid;
-  grid-template-columns: 260px 1fr 320px;
+  grid-template-columns: 312px 1fr 340px;
   min-height: 0;
 }
 
@@ -841,6 +841,270 @@ button {
 
 .map-pin.is-draggable:active {
   cursor: grabbing;
+}
+
+/* ---------- Uhrzeit-Regler ---------- */
+.time-slider {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 15;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: rgba(20, 15, 10, 0.9);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 14px;
+  backdrop-filter: blur(4px);
+  box-shadow: var(--shadow);
+  max-width: calc(100% - 24px);
+}
+
+.time-slider.is-enabled {
+  border-color: color-mix(in srgb, var(--gold) 45%, var(--border));
+}
+
+.time-slider__toggle,
+.time-slider__daynight {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--ink-dim);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.time-slider__toggle input,
+.time-slider__daynight input {
+  accent-color: var(--gold);
+}
+
+.time-slider__body {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.time-slider__icon {
+  font-size: 16px;
+}
+
+.time-slider__range {
+  width: 260px;
+  max-width: 40vw;
+  accent-color: var(--gold);
+}
+
+.time-slider__range:disabled {
+  opacity: 0.4;
+}
+
+.time-slider__clock {
+  font-variant-numeric: tabular-nums;
+  font-size: 15px;
+  font-family: var(--font-display);
+  color: var(--gold-soft);
+  min-width: 52px;
+  text-align: right;
+}
+
+/* ---------- Tag/Nacht-Ueberlagerung ---------- */
+.map-daynight {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  transition: background 0.3s ease;
+  mix-blend-mode: multiply;
+}
+
+/* ---------- Zeit-Felder im Detailpanel ---------- */
+.timefields {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.timefields__row {
+  display: flex;
+  gap: 8px;
+}
+
+.timefields__cell {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.timefields__mini {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--ink-faint);
+}
+
+.timefields__hint {
+  font-size: 11px;
+  color: var(--ink-faint);
+  line-height: 1.4;
+  margin: 0;
+}
+
+.timefields__clear {
+  display: block;
+  margin-top: 4px;
+  background: transparent;
+  border: none;
+  color: #d99;
+  font-size: 11px;
+  padding: 0;
+  text-decoration: underline;
+}
+
+/* ---------- Zeitleiste ---------- */
+.btn--active {
+  border-color: var(--gold);
+  background: color-mix(in srgb, var(--gold) 20%, var(--panel-2));
+  color: var(--gold-soft);
+}
+
+.timeline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 18;
+  height: 220px;
+  background: rgba(18, 13, 9, 0.96);
+  border-top: 1px solid var(--border);
+  box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  backdrop-filter: blur(4px);
+}
+
+.timeline__header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.timeline__title {
+  font-family: var(--font-display);
+  font-size: 15px;
+  color: var(--gold-soft);
+  margin: 0;
+}
+
+.timeline__filter {
+  max-width: 240px;
+}
+
+.timeline__close {
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  color: var(--ink-dim);
+  font-size: 22px;
+  line-height: 1;
+}
+
+.timeline__close:hover {
+  color: var(--ink);
+}
+
+.timeline__empty {
+  padding: 24px 16px;
+  color: var(--ink-faint);
+  font-size: 13px;
+}
+
+.timeline__track {
+  flex: 1;
+  display: flex;
+  gap: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 14px 16px;
+}
+
+.timeline__day {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-right: 18px;
+  border-right: 1px dashed var(--border);
+  margin-right: 18px;
+  min-width: 200px;
+}
+
+.timeline__day:last-child {
+  border-right: none;
+}
+
+.timeline__daymark {
+  font-family: var(--font-display);
+  font-size: 13px;
+  color: var(--gold);
+  letter-spacing: 0.5px;
+}
+
+.timeline__events {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.timeline__event {
+  text-align: left;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--chip-color, var(--border));
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: var(--ink);
+  min-width: 200px;
+  max-width: 260px;
+}
+
+.timeline__event:hover {
+  border-color: var(--chip-color, var(--gold));
+}
+
+.timeline__event-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.timeline__event-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.timeline__event-time {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--ink-dim);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.timeline__event-places {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--ink-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ---------- Scrollbars ---------- */

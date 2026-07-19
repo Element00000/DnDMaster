@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useStore } from '../store/useStore'
 import { entityMeta } from '../types'
+import { dayNightOverlay, inWindow } from '../utils/time'
 import { PlaceholderMap } from './PlaceholderMap'
 import { MapPin } from './MapPin'
 
@@ -33,15 +34,20 @@ export function MapCanvas() {
   const selectEntity = useStore((s) => s.selectEntity)
   const selectedId = useStore((s) => s.selectedEntityId)
   const setTool = useStore((s) => s.setTool)
+  const timeEnabled = useStore((s) => s.timeEnabled)
+  const timeOfDay = useStore((s) => s.timeOfDay)
+  const dayNight = useStore((s) => s.dayNight)
 
   const { width, height } = layer
 
-  // Auf der aktiven Ebene platzierte Objekte (im Spielermodus nur entdeckte).
+  // Auf der aktiven Ebene platzierte Objekte (im Spielermodus nur entdeckte,
+  // bei aktivem Tageszeit-Filter nur die zur eingestellten Uhrzeit aktiven).
   const pins = entities.filter(
     (e) =>
       e.placement &&
       e.placement.layerId === layer.id &&
-      (!playerMode || e.visibility === 'spieler'),
+      (!playerMode || e.visibility === 'spieler') &&
+      (!timeEnabled || inWindow(timeOfDay, e.timeStart, e.timeEnd)),
   )
 
   const fitToView = useCallback(() => {
@@ -173,6 +179,13 @@ export function MapCanvas() {
           <PlaceholderMap width={width} height={height} />
         )}
       </div>
+
+      {timeEnabled && dayNight && (
+        <div
+          className="map-daynight"
+          style={{ background: dayNightOverlay(timeOfDay) }}
+        />
+      )}
 
       <div className="map-markers">
         {pins.map((e) => {

@@ -8,6 +8,7 @@ import {
 } from '../types'
 import type { Entity, EntityType, RelationType, Visibility } from '../types'
 import { useStore } from '../store/useStore'
+import { formatTime, parseTime } from '../utils/time'
 
 export function DetailPanel() {
   const campaign = useStore((s) => s.campaigns.find((c) => c.id === s.activeCampaignId) ?? s.campaigns[0])
@@ -157,6 +158,8 @@ export function DetailPanel() {
 
         {!readOnly && (
           <>
+            <TimeFields entity={marker} onUpdate={(patch) => updateEntity(marker.id, patch)} />
+
             <label className="field">
               <span className="field__label">Sichtbarkeit</span>
               <select
@@ -198,6 +201,75 @@ export function DetailPanel() {
         </div>
       )}
     </aside>
+  )
+}
+
+function TimeFields({
+  entity,
+  onUpdate,
+}: {
+  entity: Entity
+  onUpdate: (patch: Partial<Entity>) => void
+}) {
+  const hasWindow = entity.timeStart != null && entity.timeEnd != null
+  return (
+    <div className="field">
+      <span className="field__label">Zeit</span>
+      <div className="timefields">
+        <div className="timefields__row">
+          <label className="timefields__cell">
+            <span className="timefields__mini">Kalendertag</span>
+            <input
+              className="field__control field__control--sm"
+              type="number"
+              min={0}
+              value={entity.day ?? ''}
+              placeholder="z.B. 12"
+              onChange={(e) =>
+                onUpdate({ day: e.target.value === '' ? null : Number(e.target.value) })
+              }
+            />
+          </label>
+        </div>
+
+        <div className="timefields__row">
+          <label className="timefields__cell">
+            <span className="timefields__mini">Von</span>
+            <input
+              className="field__control field__control--sm"
+              type="time"
+              value={entity.timeStart != null ? formatTime(entity.timeStart) : ''}
+              onChange={(e) => onUpdate({ timeStart: parseTime(e.target.value) })}
+            />
+          </label>
+          <label className="timefields__cell">
+            <span className="timefields__mini">Bis</span>
+            <input
+              className="field__control field__control--sm"
+              type="time"
+              value={entity.timeEnd != null ? formatTime(entity.timeEnd) : ''}
+              onChange={(e) => onUpdate({ timeEnd: parseTime(e.target.value) })}
+            />
+          </label>
+        </div>
+
+        <p className="timefields__hint">
+          {hasWindow
+            ? entity.timeStart! > entity.timeEnd!
+              ? 'Zeitfenster laeuft ueber Mitternacht.'
+              : 'Nur im Zeitfenster auf der Karte sichtbar.'
+            : 'Ohne Zeitfenster immer sichtbar. Beide Felder setzen zum Filtern.'}
+          {hasWindow && (
+            <button
+              className="timefields__clear"
+              onClick={() => onUpdate({ timeStart: null, timeEnd: null })}
+            >
+              Fenster loeschen
+            </button>
+          )}
+        </p>
+      </div>
+    </div>
   )
 }
 

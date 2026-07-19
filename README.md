@@ -11,7 +11,7 @@ npm run dev      # Dev-Server auf http://localhost:5173
 npm run build    # Produktions-Build nach dist/
 ```
 
-## Aktueller Stand — Phase 1 + Phase 2
+## Aktueller Stand — Phase 1 + 2 + 3
 
 **Karte (Phase 1)**
 - Pan (ziehen), Zoom (Mausrad zum Cursor, +/− Buttons), Einpassen (Doppelklick)
@@ -26,6 +26,12 @@ npm run build    # Produktions-Build nach dist/
 - **Geheimnisse** pro Objekt (nur DM sichtbar)
 - **Verknüpfungen** zwischen Objekten (z. B. „befindet sich in", „verbündet mit"), bidirektional angezeigt und klickbar zum Navigieren
 - **Spieler-Ansicht** (Schalter oben): blendet DM-Geheimnisse und noch nicht entdeckte Objekte aus – Grundlage für späteren Spielerzugang
+
+**Zeit (Phase 3)**
+- **Uhrzeit-Regler** über der Karte (24h): blendet Marker nach hinterlegtem Zeitfenster ein/aus (z. B. Markt 8–18 Uhr, Wache 22–6 Uhr über Mitternacht). Marker ohne Zeitfenster bleiben immer sichtbar
+- Optionaler **Tag/Nacht-Modus**: färbt die Karte passend zur Uhrzeit ein
+- **Kampagnen-Zeitleiste** (Button oben): Ereignisse chronologisch nach Kalendertag, filterbar nach verknüpftem Objekt, Klick springt zum Objekt auf der Karte
+- Zeit-Felder pro Objekt im Detailpanel: Kalendertag + Zeitfenster (Von/Bis)
 
 ## Technik
 
@@ -50,7 +56,6 @@ src/
 
 ## Nächste Phasen (siehe Konzeptdokument)
 
-- **Phase 3** Zeitleiste + Uhrzeit-Regler
 - **Phase 4** Verzweigte Handlungsstränge (Entscheidungspunkte)
 - **Phase 5** DM-Werkzeuge (Kampf-Tracker, Notizen, Würfel, Suche)
 - **Phase 6** Spieltischmodus, Nebel des Krieges, mehrere Kartenebenen

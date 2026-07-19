@@ -3,12 +3,17 @@ import { persist } from 'zustand/middleware'
 import type {
   AppData,
   Campaign,
+  DecisionData,
+  DecisionOption,
+  Effect,
   Entity,
   EntityType,
   MapLayer,
   Placement,
   RelationType,
+  UndoEntry,
 } from '../types'
+import { emptyDecision } from '../types'
 import { uid } from '../utils/id'
 
 function makeLayer(): MapLayer {
@@ -46,6 +51,20 @@ interface StoreState extends AppData {
   placingEntityId: string | null
   /** Spieler-Ansicht: DM-Geheimnisse und unentdeckte Objekte ausblenden. */
   playerMode: boolean
+
+  // Zeit (Phase 3)
+  /** Tageszeit-Filter aktiv? */
+  timeEnabled: boolean
+  /** Aktuelle Tageszeit in Minuten (0..1439). */
+  timeOfDay: number
+  /** Tag/Nacht-Einfaerbung der Karte. */
+  dayNight: boolean
+  /** Zeitleiste (Kalendertag) eingeblendet? */
+  timelineOpen: boolean
+  setTimeEnabled: (on: boolean) => void
+  setTimeOfDay: (minutes: number) => void
+  setDayNight: (on: boolean) => void
+  setTimelineOpen: (open: boolean) => void
 
   // Kampagnen
   activeCampaign: () => Campaign
@@ -101,6 +120,14 @@ export const useStore = create<StoreState>()(
         selectedEntityId: null,
         placingEntityId: null,
         playerMode: false,
+        timeEnabled: false,
+        timeOfDay: 12 * 60,
+        dayNight: false,
+        timelineOpen: false,
+        setTimeEnabled: (on) => set({ timeEnabled: on }),
+        setTimeOfDay: (minutes) => set({ timeOfDay: Math.max(0, Math.min(1439, Math.round(minutes))) }),
+        setDayNight: (on) => set({ dayNight: on }),
+        setTimelineOpen: (open) => set({ timelineOpen: open }),
 
         // ---------- Kampagnen ----------
         activeCampaign: () => {
@@ -176,6 +203,10 @@ export const useStore = create<StoreState>()(
             placement: placement ?? null,
             links: [],
             fields: {},
+            decision: type === 'entscheidung' ? emptyDecision() : null,
+            day: null,
+            timeStart: null,
+            timeEnd: null,
             createdAt: Date.now(),
           }
           patchActive((c) => ({ ...c, entities: [...c.entities, entity] }))
@@ -272,43 +303,50 @@ export const useStore = create<StoreState>()(
     },
     {
       name: 'dnd-weltkarte',
-      version: 2,
+      version: 3,
       // Nur Daten persistieren, keinen fluechtigen UI-Zustand.
       partialize: (s): AppData => ({
         campaigns: s.campaigns,
         activeCampaignId: s.activeCampaignId,
       }),
-      // Migration von Phase 1 (flache Marker) zu Phase 2 (Kampagnen/Entitaeten).
+      // Migration ueber alle Versionen und Normalisierung der Entitaeten.
       migrate: (persisted: unknown): AppData => {
         const state = persisted as Record<string, unknown> | undefined
+        let data: AppData
         if (state && Array.isArray(state.campaigns)) {
-          return state as unknown as AppData
+          // Bereits v2/v3
+          data = state as unknown as AppData
+        } else {
+          // Phase 1 (flache Marker) -> Kampagne mit Entitaeten
+          const layers = (state?.layers as MapLayer[]) ?? [makeLayer()]
+          const activeLayerId = (state?.activeLayerId as string) ?? layers[0].id
+          const oldMarkers = (state?.markers as OldMarker[]) ?? []
+          const entities = oldMarkers.map((m) =>
+            normalizeEntity({
+              ...m,
+              description: m.description ?? '',
+              placement: { layerId: activeLayerId, x: m.x, y: m.y },
+            }),
+          )
+          const campaign: Campaign = {
+            id: uid('camp-'),
+            name: 'Meine Kampagne',
+            description: '',
+            createdAt: Date.now(),
+            layers,
+            activeLayerId,
+            entities,
+          }
+          data = { campaigns: [campaign], activeCampaignId: campaign.id }
         }
-        const layers = (state?.layers as MapLayer[]) ?? [makeLayer()]
-        const activeLayerId = (state?.activeLayerId as string) ?? layers[0].id
-        const oldMarkers = (state?.markers as OldMarker[]) ?? []
-        const entities: Entity[] = oldMarkers.map((m) => ({
-          id: m.id,
-          type: m.type,
-          name: m.name,
-          description: m.description ?? '',
-          secret: '',
-          visibility: m.visibility ?? 'dm',
-          placement: { layerId: activeLayerId, x: m.x, y: m.y },
-          links: [],
-          fields: {},
-          createdAt: m.createdAt ?? Date.now(),
-        }))
-        const campaign: Campaign = {
-          id: uid('camp-'),
-          name: 'Meine Kampagne',
-          description: '',
-          createdAt: Date.now(),
-          layers,
-          activeLayerId,
-          entities,
+        // Entitaeten aller Kampagnen mit fehlenden Feldern auffuellen (v2 -> v3).
+        return {
+          ...data,
+          campaigns: data.campaigns.map((c) => ({
+            ...c,
+            entities: c.entities.map(normalizeEntity),
+          })),
         }
-        return { campaigns: [campaign], activeCampaignId: campaign.id }
       },
     },
   ),
@@ -323,6 +361,26 @@ interface OldMarker {
   y: number
   visibility?: 'dm' | 'spieler'
   createdAt?: number
+}
+
+/** Fuellt fehlende Felder einer (evtl. aelteren) Entitaet mit Standardwerten. */
+function normalizeEntity(e: Partial<Entity> & { id: string; type: EntityType; name: string }): Entity {
+  return {
+    id: e.id,
+    type: e.type,
+    name: e.name,
+    description: e.description ?? '',
+    secret: e.secret ?? '',
+    visibility: e.visibility ?? 'dm',
+    placement: e.placement ?? null,
+    links: e.links ?? [],
+    fields: e.fields ?? {},
+    decision: e.decision ?? (e.type === 'entscheidung' ? emptyDecision() : null),
+    day: e.day ?? null,
+    timeStart: e.timeStart ?? null,
+    timeEnd: e.timeEnd ?? null,
+    createdAt: e.createdAt ?? Date.now(),
+  }
 }
 
 function standardName(type: EntityType, existing: Entity[]): string {
