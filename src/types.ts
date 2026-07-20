@@ -91,6 +91,18 @@ export interface MapLayer {
   height: number
 }
 
+/** Sitzungsprotokoll-Eintrag (Phase 5). */
+export interface Session {
+  id: string
+  title: string
+  /** Frei eingebbares Datum in der Spielwelt, z.B. "Tag 12". */
+  inGameDate: string
+  body: string
+  /** Verweise auf vorgekommene Objekte (Entity-IDs). */
+  refs: string[]
+  createdAt: number
+}
+
 export interface Campaign {
   id: string
   name: string
@@ -99,6 +111,17 @@ export interface Campaign {
   layers: MapLayer[]
   activeLayerId: string
   entities: Entity[]
+  sessions: Session[]
+}
+
+/** Teilnehmer im Kampf-Tracker (Phase 5, nur zur Laufzeit). */
+export interface Combatant {
+  id: string
+  name: string
+  initiative: number
+  hp: number
+  maxHp: number
+  isPC: boolean
 }
 
 export interface AppData {

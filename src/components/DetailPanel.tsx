@@ -9,6 +9,7 @@ import {
 import type { Entity, EntityType, RelationType, Visibility } from '../types'
 import { useStore } from '../store/useStore'
 import { formatTime, parseTime } from '../utils/time'
+import { DecisionEditor } from './DecisionEditor'
 
 export function DetailPanel() {
   const campaign = useStore((s) => s.campaigns.find((c) => c.id === s.activeCampaignId) ?? s.campaigns[0])
@@ -140,6 +141,14 @@ export function DetailPanel() {
               rows={3}
             />
           </label>
+        )}
+
+        {/* Entscheidungspunkt: Optionen & Folgen */}
+        {marker.type === 'entscheidung' && (
+          <div className="field">
+            <span className="field__label">Entscheidungspunkt</span>
+            <DecisionEditor entity={marker} readOnly={readOnly} />
+          </div>
         )}
 
         {/* Verknuepfungen */}

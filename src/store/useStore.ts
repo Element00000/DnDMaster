@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware'
 import type {
   AppData,
   Campaign,
+  Combatant,
   DecisionData,
   DecisionOption,
   Effect,
@@ -11,6 +12,7 @@ import type {
   MapLayer,
   Placement,
   RelationType,
+  Session,
   UndoEntry,
 } from '../types'
 import { emptyDecision } from '../types'
@@ -36,11 +38,15 @@ function makeCampaign(name: string): Campaign {
     layers: [layer],
     activeLayerId: layer.id,
     entities: [],
+    sessions: [],
   }
 }
 
 /** Werkzeug-Modus der Karte. */
 export type Tool = 'select' | 'add'
+
+/** Reiter im DM-Werkzeug-Panel. */
+export type ToolTab = 'wuerfel' | 'kampf' | 'notizen' | 'zufall'
 
 interface StoreState extends AppData {
   // UI-Zustand (nicht persistiert)
@@ -61,10 +67,38 @@ interface StoreState extends AppData {
   dayNight: boolean
   /** Zeitleiste (Kalendertag) eingeblendet? */
   timelineOpen: boolean
+  /** Handlungsbaum-Ansicht eingeblendet? */
+  storyTreeOpen: boolean
   setTimeEnabled: (on: boolean) => void
   setTimeOfDay: (minutes: number) => void
   setDayNight: (on: boolean) => void
   setTimelineOpen: (open: boolean) => void
+  setStoryTreeOpen: (open: boolean) => void
+
+  // DM-Werkzeuge (Phase 5)
+  toolsOpen: boolean
+  toolsTab: ToolTab
+  setToolsOpen: (open: boolean) => void
+  setToolsTab: (tab: ToolTab) => void
+
+  // Sitzungsnotizen (persistiert, aktive Kampagne)
+  addSession: () => string
+  updateSession: (id: string, patch: Partial<Omit<Session, 'id' | 'createdAt'>>) => void
+  deleteSession: (id: string) => void
+
+  // Kampf-Tracker (nur zur Laufzeit)
+  combatants: Combatant[]
+  combatRound: number
+  combatTurn: number
+  combatPlace: string | null
+  addCombatant: (input: { name: string; initiative: number; hp: number; maxHp: number; isPC: boolean }) => void
+  updateCombatant: (id: string, patch: Partial<Omit<Combatant, 'id'>>) => void
+  removeCombatant: (id: string) => void
+  sortCombat: () => void
+  nextTurn: () => void
+  prevTurn: () => void
+  resetCombat: () => void
+  setCombatPlace: (id: string | null) => void
 
   // Kampagnen
   activeCampaign: () => Campaign
@@ -91,6 +125,22 @@ interface StoreState extends AppData {
   setPlacement: (id: string, placement: Placement | null) => void
   /** Platzierte Entitaet um ein Weltkoordinaten-Delta verschieben. */
   moveEntity: (id: string, dxWorld: number, dyWorld: number) => void
+
+  // Entscheidungspunkte (Phase 4)
+  updateDecision: (entityId: string, patch: Partial<DecisionData>) => void
+  addOption: (entityId: string) => void
+  updateOption: (
+    entityId: string,
+    optionId: string,
+    patch: Partial<Pick<DecisionOption, 'label' | 'description' | 'nextDecisionId'>>,
+  ) => void
+  removeOption: (entityId: string, optionId: string) => void
+  addEffect: (entityId: string, optionId: string, effect: Effect) => void
+  updateEffect: (entityId: string, optionId: string, effect: Effect) => void
+  removeEffect: (entityId: string, optionId: string, effectId: string) => void
+  /** Option als eingetreten markieren (Folgen anwenden). Erneut = zuruecknehmen. */
+  chooseOption: (entityId: string, optionId: string) => void
+  clearChoice: (entityId: string) => void
 
   // UI
   setTool: (t: Tool) => void
@@ -124,10 +174,94 @@ export const useStore = create<StoreState>()(
         timeOfDay: 12 * 60,
         dayNight: false,
         timelineOpen: false,
+        storyTreeOpen: false,
         setTimeEnabled: (on) => set({ timeEnabled: on }),
         setTimeOfDay: (minutes) => set({ timeOfDay: Math.max(0, Math.min(1439, Math.round(minutes))) }),
         setDayNight: (on) => set({ dayNight: on }),
         setTimelineOpen: (open) => set({ timelineOpen: open }),
+        setStoryTreeOpen: (open) => set({ storyTreeOpen: open }),
+
+        // ---------- DM-Werkzeuge ----------
+        toolsOpen: false,
+        toolsTab: 'wuerfel',
+        setToolsOpen: (open) => set({ toolsOpen: open }),
+        setToolsTab: (tab) => set({ toolsTab: tab }),
+
+        // Sitzungsnotizen
+        addSession: () => {
+          const id = uid('s-')
+          const session: Session = {
+            id,
+            title: `Sitzung ${get().activeCampaign().sessions.length + 1}`,
+            inGameDate: '',
+            body: '',
+            refs: [],
+            createdAt: Date.now(),
+          }
+          patchActive((c) => ({ ...c, sessions: [session, ...c.sessions] }))
+          return id
+        },
+
+        updateSession: (id, patch) =>
+          patchActive((c) => ({
+            ...c,
+            sessions: c.sessions.map((s) => (s.id === id ? { ...s, ...patch } : s)),
+          })),
+
+        deleteSession: (id) =>
+          patchActive((c) => ({ ...c, sessions: c.sessions.filter((s) => s.id !== id) })),
+
+        // Kampf-Tracker
+        combatants: [],
+        combatRound: 1,
+        combatTurn: 0,
+        combatPlace: null,
+
+        addCombatant: (input) =>
+          set((s) => ({
+            combatants: [...s.combatants, { id: uid('cb-'), ...input }],
+          })),
+
+        updateCombatant: (id, patch) =>
+          set((s) => ({
+            combatants: s.combatants.map((c) => (c.id === id ? { ...c, ...patch } : c)),
+          })),
+
+        removeCombatant: (id) =>
+          set((s) => {
+            const combatants = s.combatants.filter((c) => c.id !== id)
+            const combatTurn = Math.min(s.combatTurn, Math.max(0, combatants.length - 1))
+            return { combatants, combatTurn }
+          }),
+
+        sortCombat: () =>
+          set((s) => ({
+            combatants: [...s.combatants].sort((a, b) => b.initiative - a.initiative),
+            combatTurn: 0,
+          })),
+
+        nextTurn: () =>
+          set((s) => {
+            if (s.combatants.length === 0) return s
+            const atEnd = s.combatTurn >= s.combatants.length - 1
+            return {
+              combatTurn: atEnd ? 0 : s.combatTurn + 1,
+              combatRound: atEnd ? s.combatRound + 1 : s.combatRound,
+            }
+          }),
+
+        prevTurn: () =>
+          set((s) => {
+            if (s.combatants.length === 0) return s
+            const atStart = s.combatTurn <= 0
+            return {
+              combatTurn: atStart ? s.combatants.length - 1 : s.combatTurn - 1,
+              combatRound: atStart ? Math.max(1, s.combatRound - 1) : s.combatRound,
+            }
+          }),
+
+        resetCombat: () => set({ combatants: [], combatRound: 1, combatTurn: 0, combatPlace: null }),
+        setCombatPlace: (id) => set({ combatPlace: id }),
 
         // ---------- Kampagnen ----------
         activeCampaign: () => {
@@ -217,7 +351,13 @@ export const useStore = create<StoreState>()(
         updateEntity: (id, patch) =>
           patchActive((c) => ({
             ...c,
-            entities: c.entities.map((e) => (e.id === id ? { ...e, ...patch } : e)),
+            entities: c.entities.map((e) => {
+              if (e.id !== id) return e
+              const next = { ...e, ...patch }
+              // Beim Wechsel zu 'entscheidung' die Struktur anlegen.
+              if (next.type === 'entscheidung' && !next.decision) next.decision = emptyDecision()
+              return next
+            }),
           })),
 
         setEntityField: (id, key, value) =>
@@ -293,6 +433,157 @@ export const useStore = create<StoreState>()(
                 : e,
             ),
           })),
+
+        // ---------- Entscheidungspunkte ----------
+        updateDecision: (entityId, patch) =>
+          patchDecision(patchActive, entityId, (d) => ({ ...d, ...patch })),
+
+        addOption: (entityId) =>
+          patchDecision(patchActive, entityId, (d) =>
+            d.options.length >= 5
+              ? d
+              : {
+                  ...d,
+                  options: [
+                    ...d.options,
+                    {
+                      id: uid('opt-'),
+                      label: `Option ${d.options.length + 1}`,
+                      description: '',
+                      effects: [],
+                      nextDecisionId: null,
+                      undo: null,
+                    },
+                  ],
+                },
+          ),
+
+        updateOption: (entityId, optionId, patch) =>
+          patchDecision(patchActive, entityId, (d) => ({
+            ...d,
+            options: d.options.map((o) => (o.id === optionId ? { ...o, ...patch } : o)),
+          })),
+
+        removeOption: (entityId, optionId) =>
+          patchActive((c) => {
+            const dec = c.entities.find((e) => e.id === entityId)?.decision
+            if (!dec) return c
+            const opt = dec.options.find((o) => o.id === optionId)
+            let entities = c.entities
+            if (opt?.undo) entities = revertEffects(entities, opt.undo)
+            return {
+              ...c,
+              entities: entities.map((e) =>
+                e.id === entityId && e.decision
+                  ? {
+                      ...e,
+                      decision: {
+                        ...e.decision,
+                        chosenOptionId:
+                          e.decision.chosenOptionId === optionId ? null : e.decision.chosenOptionId,
+                        options: e.decision.options.filter((o) => o.id !== optionId),
+                      },
+                    }
+                  : e,
+              ),
+            }
+          }),
+
+        addEffect: (entityId, optionId, effect) =>
+          patchDecision(patchActive, entityId, (d) => ({
+            ...d,
+            options: d.options.map((o) =>
+              o.id === optionId ? { ...o, effects: [...o.effects, effect] } : o,
+            ),
+          })),
+
+        updateEffect: (entityId, optionId, effect) =>
+          patchDecision(patchActive, entityId, (d) => ({
+            ...d,
+            options: d.options.map((o) =>
+              o.id === optionId
+                ? { ...o, effects: o.effects.map((ef) => (ef.id === effect.id ? effect : ef)) }
+                : o,
+            ),
+          })),
+
+        removeEffect: (entityId, optionId, effectId) =>
+          patchDecision(patchActive, entityId, (d) => ({
+            ...d,
+            options: d.options.map((o) =>
+              o.id === optionId ? { ...o, effects: o.effects.filter((ef) => ef.id !== effectId) } : o,
+            ),
+          })),
+
+        chooseOption: (entityId, optionId) =>
+          patchActive((c) => {
+            const dec = c.entities.find((e) => e.id === entityId)?.decision
+            if (!dec) return c
+            let entities = c.entities
+            const undoUpdates: Record<string, UndoEntry[] | null> = {}
+            let chosen: string | null = dec.chosenOptionId
+
+            // Bisher gewaehlte Option zuruecknehmen.
+            if (dec.chosenOptionId) {
+              const prev = dec.options.find((o) => o.id === dec.chosenOptionId)
+              if (prev?.undo) entities = revertEffects(entities, prev.undo)
+              undoUpdates[dec.chosenOptionId] = null
+              chosen = null
+            }
+            // Neue Option anwenden (ausser man tippt dieselbe erneut an = abwaehlen).
+            if (optionId !== dec.chosenOptionId) {
+              const opt = dec.options.find((o) => o.id === optionId)
+              if (opt) {
+                const res = applyEffects(entities, opt.effects)
+                entities = res.entities
+                undoUpdates[optionId] = res.undo
+                chosen = optionId
+              }
+            }
+            return {
+              ...c,
+              entities: entities.map((e) =>
+                e.id === entityId && e.decision
+                  ? {
+                      ...e,
+                      decision: {
+                        ...e.decision,
+                        chosenOptionId: chosen,
+                        options: e.decision.options.map((o) =>
+                          o.id in undoUpdates ? { ...o, undo: undoUpdates[o.id] } : o,
+                        ),
+                      },
+                    }
+                  : e,
+              ),
+            }
+          }),
+
+        clearChoice: (entityId) =>
+          patchActive((c) => {
+            const dec = c.entities.find((e) => e.id === entityId)?.decision
+            if (!dec || !dec.chosenOptionId) return c
+            const prev = dec.options.find((o) => o.id === dec.chosenOptionId)
+            let entities = c.entities
+            if (prev?.undo) entities = revertEffects(entities, prev.undo)
+            return {
+              ...c,
+              entities: entities.map((e) =>
+                e.id === entityId && e.decision
+                  ? {
+                      ...e,
+                      decision: {
+                        ...e.decision,
+                        chosenOptionId: null,
+                        options: e.decision.options.map((o) =>
+                          o.id === prev?.id ? { ...o, undo: null } : o,
+                        ),
+                      },
+                    }
+                  : e,
+              ),
+            }
+          }),
 
         // ---------- UI ----------
         setTool: (t) => set({ tool: t }),
@@ -381,6 +672,96 @@ function normalizeEntity(e: Partial<Entity> & { id: string; type: EntityType; na
     timeEnd: e.timeEnd ?? null,
     createdAt: e.createdAt ?? Date.now(),
   }
+}
+
+/** Die decision-Struktur einer Entitaet in der aktiven Kampagne patchen. */
+function patchDecision(
+  patchActive: (fn: (c: Campaign) => Campaign) => void,
+  entityId: string,
+  fn: (d: DecisionData) => DecisionData,
+) {
+  patchActive((c) => ({
+    ...c,
+    entities: c.entities.map((e) =>
+      e.id === entityId && e.decision ? { ...e, decision: fn(e.decision) } : e,
+    ),
+  }))
+}
+
+function mapEntity(entities: Entity[], id: string, fn: (e: Entity) => Entity): Entity[] {
+  return entities.map((e) => (e.id === id ? fn(e) : e))
+}
+
+function hasLink(e: Entity, toId: string, relation: RelationType): boolean {
+  return e.links.some((l) => l.targetId === toId && l.relation === relation)
+}
+
+/** Folgen einer Option anwenden; liefert neue Entitaeten + Rueckgaengig-Info. */
+function applyEffects(entities: Entity[], effects: Effect[]): { entities: Entity[]; undo: UndoEntry[] } {
+  let out = entities
+  const undo: UndoEntry[] = []
+  for (const eff of effects) {
+    if (eff.kind === 'set_field') {
+      const target = out.find((e) => e.id === eff.targetId)
+      if (!target) continue
+      undo.push({ kind: 'field', targetId: eff.targetId, key: eff.key, prev: target.fields[eff.key] })
+      out = mapEntity(out, eff.targetId, (e) => ({ ...e, fields: { ...e.fields, [eff.key]: eff.value } }))
+    } else if (eff.kind === 'reveal') {
+      const target = out.find((e) => e.id === eff.targetId)
+      if (!target) continue
+      undo.push({ kind: 'visibility', targetId: eff.targetId, prev: target.visibility })
+      out = mapEntity(out, eff.targetId, (e) => ({ ...e, visibility: eff.value }))
+    } else if (eff.kind === 'relation') {
+      const from = out.find((e) => e.id === eff.fromId)
+      if (!from) continue
+      const exists = hasLink(from, eff.toId, eff.relation)
+      if (eff.op === 'add' && !exists) {
+        undo.push({ kind: 'relation_add', fromId: eff.fromId, toId: eff.toId, relation: eff.relation })
+        out = mapEntity(out, eff.fromId, (e) => ({
+          ...e,
+          links: [...e.links, { targetId: eff.toId, relation: eff.relation }],
+        }))
+      } else if (eff.op === 'remove' && exists) {
+        undo.push({ kind: 'relation_remove', fromId: eff.fromId, toId: eff.toId, relation: eff.relation })
+        out = mapEntity(out, eff.fromId, (e) => ({
+          ...e,
+          links: e.links.filter((l) => !(l.targetId === eff.toId && l.relation === eff.relation)),
+        }))
+      }
+    }
+    // 'note': keine Zustandsaenderung
+  }
+  return { entities: out, undo }
+}
+
+/** Angewendete Folgen anhand der Rueckgaengig-Info umkehren. */
+function revertEffects(entities: Entity[], undo: UndoEntry[]): Entity[] {
+  let out = entities
+  for (let i = undo.length - 1; i >= 0; i--) {
+    const u = undo[i]
+    if (u.kind === 'field') {
+      out = mapEntity(out, u.targetId, (e) => {
+        const fields = { ...e.fields }
+        if (u.prev === undefined) delete fields[u.key]
+        else fields[u.key] = u.prev
+        return { ...e, fields }
+      })
+    } else if (u.kind === 'visibility') {
+      out = mapEntity(out, u.targetId, (e) => ({ ...e, visibility: u.prev }))
+    } else if (u.kind === 'relation_add') {
+      out = mapEntity(out, u.fromId, (e) => ({
+        ...e,
+        links: e.links.filter((l) => !(l.targetId === u.toId && l.relation === u.relation)),
+      }))
+    } else if (u.kind === 'relation_remove') {
+      out = mapEntity(out, u.fromId, (e) =>
+        hasLink(e, u.toId, u.relation)
+          ? e
+          : { ...e, links: [...e.links, { targetId: u.toId, relation: u.relation }] },
+      )
+    }
+  }
+  return out
 }
 
 function standardName(type: EntityType, existing: Entity[]): string {

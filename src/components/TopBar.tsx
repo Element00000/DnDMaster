@@ -18,6 +18,8 @@ export function TopBar() {
   const setPlayerMode = useStore((s) => s.setPlayerMode)
   const timelineOpen = useStore((s) => s.timelineOpen)
   const setTimelineOpen = useStore((s) => s.setTimelineOpen)
+  const storyTreeOpen = useStore((s) => s.storyTreeOpen)
+  const setStoryTreeOpen = useStore((s) => s.setStoryTreeOpen)
 
   const [manageOpen, setManageOpen] = useState(false)
   const entityCount = activeCampaign.entities.length
@@ -103,6 +105,13 @@ export function TopBar() {
           title="Kampagnen-Zeitleiste ein-/ausblenden"
         >
           Zeitleiste
+        </button>
+        <button
+          className={`btn${storyTreeOpen ? ' btn--active' : ''}`}
+          onClick={() => setStoryTreeOpen(!storyTreeOpen)}
+          title="Handlungsbaum ein-/ausblenden"
+        >
+          Handlungsbaum
         </button>
 
         <label className="switch" title="Spieler-Ansicht: Geheimnisse und unentdeckte Objekte ausblenden">
