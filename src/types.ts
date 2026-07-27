@@ -68,6 +68,8 @@ export interface Entity {
   visibility: Visibility
   /** Position auf der Karte; null = existiert nur in Listen. */
   placement: Placement | null
+  /** Nur fuer Orte: verknuepfte Unterkarte (Ebene), die sich oeffnen laesst. */
+  subMapId: string | null
   links: EntityLink[]
   /** Typ-spezifische Felder (Schluessel siehe FIELD_SCHEMA). */
   fields: Record<string, string>
@@ -82,6 +84,13 @@ export interface Entity {
   createdAt: number
 }
 
+/** Aufgedeckter Kreis fuer den Nebel des Krieges (Weltkoordinaten). */
+export interface RevealCircle {
+  x: number
+  y: number
+  r: number
+}
+
 /** Eine Kartenebene (Weltkarte, Regionalkarte, Stadtplan ...). */
 export interface MapLayer {
   id: string
@@ -89,6 +98,10 @@ export interface MapLayer {
   imageUrl: string | null
   width: number
   height: number
+  /** Nebel des Krieges auf dieser Ebene aktiv? */
+  fogEnabled: boolean
+  /** Bereits aufgedeckte Bereiche. */
+  reveals: RevealCircle[]
 }
 
 /** Sitzungsprotokoll-Eintrag (Phase 5). */

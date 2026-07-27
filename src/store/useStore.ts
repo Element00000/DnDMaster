@@ -18,13 +18,15 @@ import type {
 import { emptyDecision } from '../types'
 import { uid } from '../utils/id'
 
-function makeLayer(): MapLayer {
+function makeLayer(name = 'Weltkarte'): MapLayer {
   return {
     id: uid('layer-'),
-    name: 'Weltkarte',
+    name,
     imageUrl: null,
     width: 2000,
     height: 1400,
+    fogEnabled: false,
+    reveals: [],
   }
 }
 
@@ -81,6 +83,17 @@ interface StoreState extends AppData {
   setToolsOpen: (open: boolean) => void
   setToolsTab: (tab: ToolTab) => void
 
+  // Feinschliff (Phase 6)
+  /** Spieltischmodus: aufgeraeumte Live-Ansicht. */
+  tableMode: boolean
+  /** Nebel-Pinsel aktiv (DM deckt Bereiche auf)? */
+  fogEditing: boolean
+  /** Radius des Nebel-Pinsels in Weltkoordinaten. */
+  fogBrush: number
+  setTableMode: (on: boolean) => void
+  setFogEditing: (on: boolean) => void
+  setFogBrush: (r: number) => void
+
   // Sitzungsnotizen (persistiert, aktive Kampagne)
   addSession: () => string
   updateSession: (id: string, patch: Partial<Omit<Session, 'id' | 'createdAt'>>) => void
@@ -113,6 +126,13 @@ interface StoreState extends AppData {
   setActiveLayer: (id: string) => void
   setLayerImage: (id: string, imageUrl: string, width: number, height: number) => void
   resetLayerImage: (id: string) => void
+  addLayer: (name: string) => void
+  renameLayer: (id: string, name: string) => void
+  deleteLayer: (id: string) => void
+  // Nebel des Krieges (Phase 6)
+  setLayerFog: (id: string, enabled: boolean) => void
+  addReveal: (layerId: string, x: number, y: number, r: number) => void
+  clearReveals: (layerId: string) => void
 
   // Entitaeten (der aktiven Kampagne)
   addEntity: (input: { type: EntityType; placement?: Placement; name?: string }) => string
@@ -186,6 +206,24 @@ export const useStore = create<StoreState>()(
         toolsTab: 'wuerfel',
         setToolsOpen: (open) => set({ toolsOpen: open }),
         setToolsTab: (tab) => set({ toolsTab: tab }),
+
+        // ---------- Feinschliff (Phase 6) ----------
+        tableMode: false,
+        fogEditing: false,
+        fogBrush: 160,
+        setTableMode: (on) =>
+          set({
+            tableMode: on,
+            // Im Tischmodus die Bearbeitungs-Overlays schliessen.
+            tool: 'select',
+            toolsOpen: on ? false : get().toolsOpen,
+            timelineOpen: on ? false : get().timelineOpen,
+            storyTreeOpen: on ? false : get().storyTreeOpen,
+            fogEditing: false,
+            selectedEntityId: on ? null : get().selectedEntityId,
+          }),
+        setFogEditing: (on) => set({ fogEditing: on, tool: 'select' }),
+        setFogBrush: (r) => set({ fogBrush: Math.max(30, Math.min(500, r)) }),
 
         // Sitzungsnotizen
         addSession: () => {
@@ -324,6 +362,52 @@ export const useStore = create<StoreState>()(
             ),
           })),
 
+        addLayer: (name) => {
+          const layer = makeLayer(name.trim() || 'Neue Ebene')
+          patchActive((c) => ({ ...c, layers: [...c.layers, layer], activeLayerId: layer.id }))
+          set({ selectedEntityId: null })
+        },
+
+        renameLayer: (id, name) =>
+          patchActive((c) => ({
+            ...c,
+            layers: c.layers.map((l) => (l.id === id ? { ...l, name } : l)),
+          })),
+
+        deleteLayer: (id) =>
+          patchActive((c) => {
+            if (c.layers.length <= 1) return c // letzte Ebene bleibt bestehen
+            const layers = c.layers.filter((l) => l.id !== id)
+            const activeLayerId = c.activeLayerId === id ? layers[0].id : c.activeLayerId
+            // Platzierungen und Unterkarten-Verweise auf die geloeschte Ebene bereinigen.
+            const entities = c.entities.map((e) => ({
+              ...e,
+              placement: e.placement?.layerId === id ? null : e.placement,
+              subMapId: e.subMapId === id ? null : e.subMapId,
+            }))
+            return { ...c, layers, activeLayerId, entities }
+          }),
+
+        setLayerFog: (id, enabled) =>
+          patchActive((c) => ({
+            ...c,
+            layers: c.layers.map((l) => (l.id === id ? { ...l, fogEnabled: enabled } : l)),
+          })),
+
+        addReveal: (layerId, x, y, r) =>
+          patchActive((c) => ({
+            ...c,
+            layers: c.layers.map((l) =>
+              l.id === layerId ? { ...l, reveals: [...l.reveals, { x, y, r }] } : l,
+            ),
+          })),
+
+        clearReveals: (layerId) =>
+          patchActive((c) => ({
+            ...c,
+            layers: c.layers.map((l) => (l.id === layerId ? { ...l, reveals: [] } : l)),
+          })),
+
         // ---------- Entitaeten ----------
         addEntity: ({ type, placement, name }) => {
           const id = uid('e-')
@@ -335,6 +419,7 @@ export const useStore = create<StoreState>()(
             secret: '',
             visibility: 'dm',
             placement: placement ?? null,
+            subMapId: null,
             links: [],
             fields: {},
             decision: type === 'entscheidung' ? emptyDecision() : null,
@@ -594,7 +679,7 @@ export const useStore = create<StoreState>()(
     },
     {
       name: 'dnd-weltkarte',
-      version: 3,
+      version: 5,
       // Nur Daten persistieren, keinen fluechtigen UI-Zustand.
       partialize: (s): AppData => ({
         campaigns: s.campaigns,
@@ -627,15 +712,22 @@ export const useStore = create<StoreState>()(
             layers,
             activeLayerId,
             entities,
+            sessions: [],
           }
           data = { campaigns: [campaign], activeCampaignId: campaign.id }
         }
-        // Entitaeten aller Kampagnen mit fehlenden Feldern auffuellen (v2 -> v3).
+        // Entitaeten (v3), Sitzungen (v4) und Ebenen-Nebel (v5) sicherstellen.
         return {
           ...data,
           campaigns: data.campaigns.map((c) => ({
             ...c,
             entities: c.entities.map(normalizeEntity),
+            sessions: c.sessions ?? [],
+            layers: c.layers.map((l) => ({
+              ...l,
+              fogEnabled: l.fogEnabled ?? false,
+              reveals: l.reveals ?? [],
+            })),
           })),
         }
       },
@@ -664,6 +756,7 @@ function normalizeEntity(e: Partial<Entity> & { id: string; type: EntityType; na
     secret: e.secret ?? '',
     visibility: e.visibility ?? 'dm',
     placement: e.placement ?? null,
+    subMapId: e.subMapId ?? null,
     links: e.links ?? [],
     fields: e.fields ?? {},
     decision: e.decision ?? (e.type === 'entscheidung' ? emptyDecision() : null),

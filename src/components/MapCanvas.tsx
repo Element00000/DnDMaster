@@ -25,7 +25,8 @@ export function MapCanvas() {
   const entities = campaign.entities
   const tool = useStore((s) => s.tool)
   const pendingType = useStore((s) => s.pendingEntityType)
-  const playerMode = useStore((s) => s.playerMode)
+  // Spieler-Sicht gilt im Spielermodus UND im Spieltischmodus.
+  const playerView = useStore((s) => s.playerMode || s.tableMode)
   const placingEntityId = useStore((s) => s.placingEntityId)
   const addEntity = useStore((s) => s.addEntity)
   const setPlacement = useStore((s) => s.setPlacement)
@@ -37,16 +38,19 @@ export function MapCanvas() {
   const timeEnabled = useStore((s) => s.timeEnabled)
   const timeOfDay = useStore((s) => s.timeOfDay)
   const dayNight = useStore((s) => s.dayNight)
+  const fogEditing = useStore((s) => s.fogEditing)
+  const fogBrush = useStore((s) => s.fogBrush)
+  const addReveal = useStore((s) => s.addReveal)
 
   const { width, height } = layer
 
-  // Auf der aktiven Ebene platzierte Objekte (im Spielermodus nur entdeckte,
+  // Auf der aktiven Ebene platzierte Objekte (in der Spieler-Sicht nur entdeckte,
   // bei aktivem Tageszeit-Filter nur die zur eingestellten Uhrzeit aktiven).
   const pins = entities.filter(
     (e) =>
       e.placement &&
       e.placement.layerId === layer.id &&
-      (!playerMode || e.visibility === 'spieler') &&
+      (!playerView || e.visibility === 'spieler') &&
       (!timeEnabled || inWindow(timeOfDay, e.timeStart, e.timeEnd)),
   )
 
@@ -88,6 +92,29 @@ export function MapCanvas() {
   }, [])
 
   const drag = useRef<{ startX: number; startY: number; origTx: number; origTy: number; moved: boolean } | null>(null)
+  const painting = useRef(false)
+
+  // Bildschirm- zu Weltkoordinaten der aktiven Ansicht.
+  const toWorld = useCallback(
+    (clientX: number, clientY: number) => {
+      const el = containerRef.current!
+      const rect = el.getBoundingClientRect()
+      return {
+        wx: (clientX - rect.left - view.tx) / view.scale,
+        wy: (clientY - rect.top - view.ty) / view.scale,
+      }
+    },
+    [view.tx, view.ty, view.scale],
+  )
+
+  const paintReveal = useCallback(
+    (clientX: number, clientY: number) => {
+      const { wx, wy } = toWorld(clientX, clientY)
+      if (wx < 0 || wy < 0 || wx > width || wy > height) return
+      addReveal(layer.id, wx, wy, fogBrush)
+    },
+    [toWorld, width, height, addReveal, layer.id, fogBrush],
+  )
 
   const onPointerDown = useCallback(
     (e: React.PointerEvent) => {
@@ -95,27 +122,44 @@ export function MapCanvas() {
       const el = containerRef.current
       if (!el) return
       el.setPointerCapture(e.pointerId)
+      // Nebel-Pinsel: aufdecken statt schieben.
+      if (fogEditing) {
+        painting.current = true
+        paintReveal(e.clientX, e.clientY)
+        return
+      }
       drag.current = { startX: e.clientX, startY: e.clientY, origTx: view.tx, origTy: view.ty, moved: false }
     },
-    [view.tx, view.ty],
+    [view.tx, view.ty, fogEditing, paintReveal],
   )
 
-  const onPointerMove = useCallback((e: React.PointerEvent) => {
-    const d = drag.current
-    if (!d) return
-    const dx = e.clientX - d.startX
-    const dy = e.clientY - d.startY
-    if (!d.moved && Math.hypot(dx, dy) > DRAG_THRESHOLD) d.moved = true
-    if (d.moved) setView((v) => ({ ...v, tx: d.origTx + dx, ty: d.origTy + dy }))
-  }, [])
+  const onPointerMove = useCallback(
+    (e: React.PointerEvent) => {
+      if (painting.current) {
+        paintReveal(e.clientX, e.clientY)
+        return
+      }
+      const d = drag.current
+      if (!d) return
+      const dx = e.clientX - d.startX
+      const dy = e.clientY - d.startY
+      if (!d.moved && Math.hypot(dx, dy) > DRAG_THRESHOLD) d.moved = true
+      if (d.moved) setView((v) => ({ ...v, tx: d.origTx + dx, ty: d.origTy + dy }))
+    },
+    [paintReveal],
+  )
 
   const onPointerUp = useCallback(
     (e: React.PointerEvent) => {
       const el = containerRef.current
+      if (el) el.releasePointerCapture(e.pointerId)
+      if (painting.current) {
+        painting.current = false
+        return
+      }
       const d = drag.current
       drag.current = null
       if (!el || !d) return
-      el.releasePointerCapture(e.pointerId)
       if (d.moved) return
 
       const rect = el.getBoundingClientRect()
@@ -132,7 +176,7 @@ export function MapCanvas() {
         return
       }
 
-      if (tool === 'add' && !playerMode) {
+      if (tool === 'add' && !playerView) {
         if (!inside) return
         addEntity({ type: pendingType, placement: { layerId: layer.id, x: wx, y: wy } })
         setTool('select')
@@ -140,10 +184,13 @@ export function MapCanvas() {
         selectEntity(null)
       }
     },
-    [tool, pendingType, view, width, height, layer.id, playerMode, placingEntityId, addEntity, setPlacement, setPlacingEntity, selectEntity, setTool],
+    [tool, pendingType, view, width, height, layer.id, playerView, placingEntityId, addEntity, setPlacement, setPlacingEntity, selectEntity, setTool],
   )
 
   const placingActive = placingEntityId !== null
+  // Nebel voll deckend fuer Spieler/Tisch, halbtransparent fuer den DM.
+  const fogActive = layer.fogEnabled
+  const fogOpacity = playerView ? 1 : 0.45
 
   return (
     <div
@@ -151,6 +198,7 @@ export function MapCanvas() {
       className="map-canvas"
       data-tool={tool}
       data-placing={placingActive ? 'true' : undefined}
+      data-fog={fogEditing ? 'true' : undefined}
       onWheel={onWheel}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
@@ -178,6 +226,34 @@ export function MapCanvas() {
         ) : (
           <PlaceholderMap width={width} height={height} />
         )}
+
+        {/* Nebel des Krieges: deckt unentdeckte Bereiche ab (skaliert mit der Karte). */}
+        {fogActive && (
+          <svg
+            className="map-fog"
+            width={width}
+            height={height}
+            viewBox={`0 0 ${width} ${height}`}
+            style={{ opacity: fogOpacity }}
+          >
+            <defs>
+              <mask id={`fogmask-${layer.id}`}>
+                <rect x="0" y="0" width={width} height={height} fill="white" />
+                {layer.reveals.map((rc, i) => (
+                  <circle key={i} cx={rc.x} cy={rc.y} r={rc.r} fill="black" />
+                ))}
+              </mask>
+            </defs>
+            <rect
+              x="0"
+              y="0"
+              width={width}
+              height={height}
+              fill="#05070c"
+              mask={`url(#fogmask-${layer.id})`}
+            />
+          </svg>
+        )}
       </div>
 
       {timeEnabled && dayNight && (
@@ -199,7 +275,7 @@ export function MapCanvas() {
               color={meta.color}
               label={e.name}
               selected={e.id === selectedId}
-              draggable={!playerMode}
+              draggable={!playerView && !fogEditing}
               scale={view.scale}
               onClick={() => selectEntity(e.id)}
               onMove={(dxWorld, dyWorld) => moveEntity(e.id, dxWorld, dyWorld)}

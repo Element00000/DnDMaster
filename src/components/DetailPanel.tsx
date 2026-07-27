@@ -23,6 +23,7 @@ export function DetailPanel() {
   const removeLink = useStore((s) => s.removeLink)
   const setPlacement = useStore((s) => s.setPlacement)
   const setPlacingEntity = useStore((s) => s.setPlacingEntity)
+  const setActiveLayer = useStore((s) => s.setActiveLayer)
 
   const marker = campaign.entities.find((e) => e.id === selectedId) ?? null
 
@@ -193,7 +194,35 @@ export function DetailPanel() {
                 </button>
               )}
             </div>
+
+            {marker.type === 'ort' && (
+              <label className="field">
+                <span className="field__label">Unterkarte</span>
+                <select
+                  className="field__control"
+                  value={marker.subMapId ?? ''}
+                  onChange={(e) => updateEntity(marker.id, { subMapId: e.target.value || null })}
+                >
+                  <option value="">&ndash; keine &ndash;</option>
+                  {campaign.layers.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
           </>
+        )}
+
+        {/* Unterkarte oeffnen (auch in der Spieler-/Tischsicht nutzbar) */}
+        {marker.type === 'ort' && marker.subMapId && (
+          <button
+            className="btn btn--primary btn--full"
+            onClick={() => setActiveLayer(marker.subMapId!)}
+          >
+            Unterkarte oeffnen &rarr;
+          </button>
         )}
       </div>
 

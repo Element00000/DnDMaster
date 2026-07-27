@@ -11,7 +11,7 @@ npm run dev      # Dev-Server auf http://localhost:5173
 npm run build    # Produktions-Build nach dist/
 ```
 
-## Aktueller Stand — Phase 1 + 2 + 3 + 4
+## Aktueller Stand — alle Phasen 1–6 umgesetzt
 
 **Karte (Phase 1)**
 - Pan (ziehen), Zoom (Mausrad zum Cursor, +/− Buttons), Einpassen (Doppelklick)
@@ -40,6 +40,24 @@ npm run build    # Produktions-Build nach dist/
 - Nicht gewählte Optionen bleiben grau als Notiz erhalten
 - Optionen **verkettbar** („führt zu" nächstem Entscheidungspunkt) → **Handlungsbaum**-Ansicht (Button oben) zeigt alle Punkte nach Verzweigungstiefe, gewählter Pfad hervorgehoben
 
+**DM-Werkzeuge (Phase 5)**
+- **Globale Suche** in der Kopfleiste über alle Objekte und Sitzungsnotizen; Klick springt zum Treffer
+- **Werkzeuge**-Panel (Button oben) mit vier Reitern:
+  - **Würfel** — w4 bis w100, Anzahl + Modifikator, Vorteil/Nachteil (1w20), großes Ergebnis mit kritischem Treffer/Patzer, Wurfverlauf
+  - **Kampf** — Initiative-/HP-Tracker mit Rundenzähler, aktivem Zug, Sortieren, an einen Ort bindbar
+  - **Notizen** — Sitzungsprotokoll mit Titel/Datum/Text und Verweisen auf vorgekommene Objekte
+  - **Zufall** — Generatoren für Namen, Wetter, Begegnungen und Gerüchte
+
+**Feinschliff (Phase 6)**
+- **Mehrere Kartenebenen** — Leiste oben links: zwischen Welt-, Regional-, Stadtplan wechseln, neue Ebenen anlegen, umbenennen, löschen
+- **Orte mit Unterkarte** verknüpfen — im Detailpanel eine Unterkarte wählen und per „Unterkarte öffnen" hineinspringen
+- **Nebel des Krieges** pro Ebene — einschalten, dann mit dem Pinsel Bereiche aufdecken (Pinselgröße einstellbar, „Reset" verdeckt wieder). Für den DM halbtransparent, in Spieler-/Tischsicht deckend
+- **Spieltischmodus** — aufgeräumte Live-Ansicht: Seitenleisten aus, große Karte, blendet automatisch DM-Geheimnisse und unentdeckte Objekte aus
+
+## Design
+
+Moderne, kühle Slate-Oberfläche mit Indigo als Interaktionsfarbe und Gold als warmem Akzent (Marke, „eingetreten", kritischer Wurf). Alle Farben, Radien und Schatten sind CSS-Tokens in [src/index.css](src/index.css) (`:root`) — zentral anpassbar.
+
 ## Technik
 
 - React 18 + TypeScript + Vite
@@ -66,8 +84,9 @@ src/
     TopBar.tsx           Kopfleiste, Kampagnen, Spielermodus, Werkzeuge
 ```
 
-## Nächste Phasen (siehe Konzeptdokument)
+## Mögliche Erweiterungen (über den Konzeptplan hinaus)
 
-- **Phase 5** DM-Werkzeuge (Kampf-Tracker, Notizen, Würfel, Suche)
-- **Phase 6** Spieltischmodus, Nebel des Krieges, mehrere Kartenebenen
+- Beziehungsgraph (Netzwerkansicht der Charaktere/Fraktionen)
+- Kampf-Tracker dauerhaft speichern (aktuell nur zur Laufzeit)
+- Bild-Assets in IndexedDB statt LocalStorage (für sehr große Kartenbilder)
 ```

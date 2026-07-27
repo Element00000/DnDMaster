@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import { useStore } from '../store/useStore'
+import { SearchBar } from './SearchBar'
 
 export function TopBar() {
   const fileRef = useRef<HTMLInputElement>(null)
@@ -20,6 +21,10 @@ export function TopBar() {
   const setTimelineOpen = useStore((s) => s.setTimelineOpen)
   const storyTreeOpen = useStore((s) => s.storyTreeOpen)
   const setStoryTreeOpen = useStore((s) => s.setStoryTreeOpen)
+  const toolsOpen = useStore((s) => s.toolsOpen)
+  const setToolsOpen = useStore((s) => s.setToolsOpen)
+  const tableMode = useStore((s) => s.tableMode)
+  const setTableMode = useStore((s) => s.setTableMode)
 
   const [manageOpen, setManageOpen] = useState(false)
   const entityCount = activeCampaign.entities.length
@@ -59,6 +64,24 @@ export function TopBar() {
     }
   }
 
+  // Spieltischmodus: reduzierte Live-Ansicht.
+  if (tableMode) {
+    return (
+      <header className="topbar topbar--table">
+        <div className="topbar__brand">
+          <span className="topbar__mark">&#9670;</span>
+          <div>
+            <div className="topbar__title">{activeCampaign.name}</div>
+            <div className="topbar__subtitle">{layer.name} · Spieltisch</div>
+          </div>
+        </div>
+        <button className="btn btn--primary" onClick={() => setTableMode(false)}>
+          Spieltisch verlassen
+        </button>
+      </header>
+    )
+  }
+
   return (
     <header className="topbar">
       <div className="topbar__brand">
@@ -96,6 +119,8 @@ export function TopBar() {
         )}
       </div>
 
+      <SearchBar />
+
       <div className="topbar__meta">{entityCount} Objekte</div>
 
       <div className="topbar__actions">
@@ -112,6 +137,20 @@ export function TopBar() {
           title="Handlungsbaum ein-/ausblenden"
         >
           Handlungsbaum
+        </button>
+        <button
+          className={`btn${toolsOpen ? ' btn--active' : ''}`}
+          onClick={() => setToolsOpen(!toolsOpen)}
+          title="DM-Werkzeuge ein-/ausblenden"
+        >
+          Werkzeuge
+        </button>
+        <button
+          className="btn"
+          onClick={() => setTableMode(true)}
+          title="Aufgeraeumte Live-Ansicht fuer den Spieltisch"
+        >
+          Spieltisch
         </button>
 
         <label className="switch" title="Spieler-Ansicht: Geheimnisse und unentdeckte Objekte ausblenden">
