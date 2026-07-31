@@ -5,6 +5,7 @@ import { CombatTracker } from './CombatTracker'
 import { SessionNotes } from './SessionNotes'
 import { RandomGenerators } from './RandomGenerators'
 import { AiTool } from './AiTool'
+import { MusicTool } from './MusicTool'
 
 const TABS: { tab: ToolTab; label: string; icon: string }[] = [
   { tab: 'wuerfel', label: 'Wuerfel', icon: '\u{1F3B2}' },
@@ -12,6 +13,7 @@ const TABS: { tab: ToolTab; label: string; icon: string }[] = [
   { tab: 'notizen', label: 'Notizen', icon: '\u{1F4D3}' },
   { tab: 'zufall', label: 'Zufall', icon: '\u{1F52E}' },
   { tab: 'ki', label: 'KI', icon: '\u{2728}' },
+  { tab: 'musik', label: 'Musik', icon: '\u{1F3B5}' },
 ]
 
 export function ToolsPanel() {
@@ -47,6 +49,7 @@ export function ToolsPanel() {
         {tab === 'notizen' && <SessionNotes />}
         {tab === 'zufall' && <RandomGenerators />}
         {tab === 'ki' && <AiTool />}
+        {tab === 'musik' && <MusicTool />}
       </div>
     </aside>
   )

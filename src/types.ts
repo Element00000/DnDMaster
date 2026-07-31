@@ -120,6 +120,13 @@ export interface Session {
   createdAt: number
 }
 
+/** Gespeicherte Musik (Spotify-Playlist/Track/Album) pro Kampagne. */
+export interface MusicEntry {
+  id: string
+  label: string
+  url: string
+}
+
 export interface Campaign {
   id: string
   name: string
@@ -129,6 +136,7 @@ export interface Campaign {
   activeLayerId: string
   entities: Entity[]
   sessions: Session[]
+  music: MusicEntry[]
 }
 
 /** Teilnehmer im Kampf-Tracker (Phase 5, nur zur Laufzeit). */

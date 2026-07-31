@@ -44,6 +44,7 @@ function makeCampaign(name: string): Campaign {
     activeLayerId: layer.id,
     entities: [],
     sessions: [],
+    music: [],
   }
 }
 
@@ -51,7 +52,7 @@ function makeCampaign(name: string): Campaign {
 export type Tool = 'select' | 'add'
 
 /** Reiter im DM-Werkzeug-Panel. */
-export type ToolTab = 'wuerfel' | 'kampf' | 'notizen' | 'zufall' | 'ki'
+export type ToolTab = 'wuerfel' | 'kampf' | 'notizen' | 'zufall' | 'ki' | 'musik'
 
 interface StoreState extends AppData {
   // UI-Zustand (nicht persistiert)
@@ -130,6 +131,9 @@ interface StoreState extends AppData {
   importCampaign: (campaign: Campaign) => void
   /** Alle Daten aus einem Backup ersetzen. */
   replaceAllData: (data: AppData) => void
+  /** Musik (Spotify) der aktiven Kampagne. */
+  addMusicEntry: (label: string, url: string) => void
+  removeMusicEntry: (id: string) => void
 
   // Ebenen (der aktiven Kampagne)
   activeLayer: () => MapLayer
@@ -363,6 +367,15 @@ export const useStore = create<StoreState>()(
 
         setActiveCampaign: (id) =>
           set({ activeCampaignId: id, selectedEntityId: null, tool: 'select' }),
+
+        addMusicEntry: (label, url) =>
+          patchActive((c) => ({
+            ...c,
+            music: [{ id: uid('mus-'), label: label.trim() || 'Musik', url: url.trim() }, ...c.music],
+          })),
+
+        removeMusicEntry: (id) =>
+          patchActive((c) => ({ ...c, music: c.music.filter((m) => m.id !== id) })),
 
         importCampaign: (campaign) =>
           set((s) => {
@@ -798,7 +811,7 @@ export const useStore = create<StoreState>()(
     },
     {
       name: 'dnd-weltkarte',
-      version: 7,
+      version: 8,
       // Nur Daten persistieren, keinen fluechtigen UI-Zustand.
       partialize: (s): AppData => ({
         campaigns: s.campaigns,
@@ -832,6 +845,7 @@ export const useStore = create<StoreState>()(
             activeLayerId,
             entities,
             sessions: [],
+            music: [],
           }
           data = { campaigns: [campaign], activeCampaignId: campaign.id }
         }
@@ -889,6 +903,7 @@ function normalizeCampaign(c: Campaign): Campaign {
     activeLayerId: layers.some((l) => l.id === c.activeLayerId) ? c.activeLayerId : layers[0].id,
     entities: (c.entities ?? []).map(normalizeEntity),
     sessions: c.sessions ?? [],
+    music: c.music ?? [],
   }
 }
 

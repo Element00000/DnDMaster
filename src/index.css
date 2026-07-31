@@ -3360,6 +3360,102 @@ button {
   color: var(--accent-soft);
 }
 
+/* ---------- Musik (Spotify) ---------- */
+.music {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.music__add {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.music__add-row {
+  display: flex;
+  gap: 6px;
+}
+
+.music__add-row .field__control {
+  flex: 1;
+}
+
+.music__error {
+  font-size: 11px;
+  color: var(--danger);
+}
+
+.music__list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.music__entry {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--panel-2);
+  padding: 2px 4px 2px 8px;
+}
+
+.music__entry.is-active {
+  border-color: var(--accent);
+  background: var(--accent-tint);
+}
+
+.music__pick {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--ink);
+  font-size: 13px;
+  text-align: left;
+  padding: 6px 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.music__entry.is-active .music__pick {
+  color: var(--accent-soft);
+}
+
+.music__remove {
+  background: transparent;
+  border: none;
+  color: var(--ink-faint);
+  font-size: 16px;
+  line-height: 1;
+  padding: 0 6px;
+}
+
+.music__remove:hover {
+  color: var(--danger);
+}
+
+.music__player {
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.music__player iframe {
+  display: block;
+  border: none;
+  border-radius: 12px;
+}
+
+.music__hint {
+  font-size: 12px;
+  color: var(--ink-faint);
+  line-height: 1.5;
+  margin: 0;
+}
+
 /* ---------- Scrollbars ---------- */
 ::-webkit-scrollbar {
   width: 10px;

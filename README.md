@@ -47,6 +47,8 @@ npm run build    # Produktions-Build nach dist/
   - **Kampf** — Initiative-/HP-Tracker mit Rundenzähler, aktivem Zug, Sortieren, an einen Ort bindbar
   - **Notizen** — Sitzungsprotokoll mit Titel/Datum/Text und Verweisen auf vorgekommene Objekte
   - **Zufall** — Generatoren für Namen, Wetter, Begegnungen und Gerüchte
+  - **KI** — Text/Bild (siehe unten)
+  - **Musik** — Spotify-Playlists/Tracks pro Kampagne speichern und über den eingebetteten Player abspielen (Ambience am Spieltisch)
 
 **Feinschliff (Phase 6)**
 - **Mehrere Kartenebenen** — Leiste oben links: zwischen Welt-, Regional-, Stadtplan wechseln, neue Ebenen anlegen, umbenennen, löschen
