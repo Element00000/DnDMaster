@@ -90,6 +90,9 @@ src/
 - **Export/Import** — Kampagnen/Backups als JSON sichern und laden (☰-Menü oben)
 - **Bild-Assets in IndexedDB** — Bilder liegen außerhalb des LocalStorage-Limits; Backups bleiben durch Einbetten autark
 - **Beziehungsgraph** — Netzwerkansicht der Objekte und ihrer Verknüpfungen (Button „Beziehungen"), Kraft-Layout, Zoom/Pan, Knoten ziehen/klicken
+- **KI-Assistent** (Werkzeuge → Reiter „KI"):
+  - **Text/Dialog** über Claude mit eigenem Anthropic-Key (lokal im Browser, nicht in Exporten) — Erzähltexte, Dialoge, freie Prompts auf Basis des aktuellen Projektkontexts
+  - **Bildgenerierung** (echte Rasterbilder: Porträts, Karten) über eine **serverseitige Funktion** — der Bild-Key bleibt geheim, auch bei geteilter Nutzung. Provider: Google Gemini (kostenloses Kontingent), OpenAI, oder **Pollinations.ai kostenlos ohne Key** (Standard). Einrichtung siehe [DEPLOY.md](DEPLOY.md)
 
 ## Offen / mögliche nächste Schritte
 

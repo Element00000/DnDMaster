@@ -36,6 +36,29 @@ npm i -g vercel
 vercel deploy --prebuilt dist   # oder dist/ im Vercel-Dashboard per Drag&Drop
 ```
 
+## KI-Bildgenerierung (geheimer Key, für geteilte Nutzung)
+
+Die Text-/SVG-KI (Reiter „KI") nutzt einen **Anthropic-Key im Browser** — nur für den
+Eigengebrauch gedacht. Die **Bildgenerierung** läuft dagegen über eine serverseitige
+Funktion ([api/generate-image.ts](api/generate-image.ts)), sodass der Bild-Key **geheim**
+bleibt, auch wenn mehrere Freunde die Seite nutzen.
+
+**Provider wählen (in dieser Reihenfolge genutzt):**
+
+- **Google Gemini** — kostenloses Kontingent. Key: https://aistudio.google.com/apikey
+- **OpenAI** — kostenpflichtig
+- **Pollinations.ai** — kostenlos, **kein Key nötig** (Standard, wenn keine Variable gesetzt ist)
+
+**Auf Vercel einrichten:** Project → **Settings → Environment Variables** →
+`GEMINI_API_KEY` (oder `OPENAI_API_KEY`) setzen → neu deployen. Ohne Variable funktioniert
+Pollinations automatisch.
+
+**Lokal testen:** Werte in eine `.env` schreiben (Vorlage: [.env.example](.env.example)).
+`npm run dev` bedient den Endpunkt bereits über ein Dev-Middleware; alternativ `vercel dev`.
+
+Wichtig: Die Werte in `.env` und im Vercel-Dashboard sind serverseitig und landen **nie**
+im Browser-Bundle. `.env` ist über `.gitignore` vom Commit ausgeschlossen.
+
 ## Eigene Domain
 
 Im Vercel-Dashboard unter **Settings → Domains** eine eigene Domain verbinden.

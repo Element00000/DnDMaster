@@ -4,12 +4,14 @@ import { DiceTool } from './DiceTool'
 import { CombatTracker } from './CombatTracker'
 import { SessionNotes } from './SessionNotes'
 import { RandomGenerators } from './RandomGenerators'
+import { AiTool } from './AiTool'
 
 const TABS: { tab: ToolTab; label: string; icon: string }[] = [
   { tab: 'wuerfel', label: 'Wuerfel', icon: '\u{1F3B2}' },
   { tab: 'kampf', label: 'Kampf', icon: '\u{2694}' },
   { tab: 'notizen', label: 'Notizen', icon: '\u{1F4D3}' },
   { tab: 'zufall', label: 'Zufall', icon: '\u{1F52E}' },
+  { tab: 'ki', label: 'KI', icon: '\u{2728}' },
 ]
 
 export function ToolsPanel() {
@@ -44,6 +46,7 @@ export function ToolsPanel() {
         {tab === 'kampf' && <CombatTracker />}
         {tab === 'notizen' && <SessionNotes />}
         {tab === 'zufall' && <RandomGenerators />}
+        {tab === 'ki' && <AiTool />}
       </div>
     </aside>
   )

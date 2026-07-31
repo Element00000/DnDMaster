@@ -51,7 +51,7 @@ function makeCampaign(name: string): Campaign {
 export type Tool = 'select' | 'add'
 
 /** Reiter im DM-Werkzeug-Panel. */
-export type ToolTab = 'wuerfel' | 'kampf' | 'notizen' | 'zufall'
+export type ToolTab = 'wuerfel' | 'kampf' | 'notizen' | 'zufall' | 'ki'
 
 interface StoreState extends AppData {
   // UI-Zustand (nicht persistiert)
@@ -468,6 +468,7 @@ export const useStore = create<StoreState>()(
             visibility: 'dm',
             placement: placement ?? null,
             subMapId: null,
+            imageUrl: null,
             links: [],
             fields: {},
             decision: type === 'entscheidung' ? emptyDecision() : null,
@@ -797,7 +798,7 @@ export const useStore = create<StoreState>()(
     },
     {
       name: 'dnd-weltkarte',
-      version: 6,
+      version: 7,
       // Nur Daten persistieren, keinen fluechtigen UI-Zustand.
       partialize: (s): AppData => ({
         campaigns: s.campaigns,
@@ -863,6 +864,7 @@ function normalizeEntity(e: Partial<Entity> & { id: string; type: EntityType; na
     visibility: e.visibility ?? 'dm',
     placement: e.placement ?? null,
     subMapId: e.subMapId ?? null,
+    imageUrl: e.imageUrl ?? null,
     links: e.links ?? [],
     fields: e.fields ?? {},
     decision: e.decision ?? (e.type === 'entscheidung' ? emptyDecision() : null),

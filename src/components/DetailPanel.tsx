@@ -11,6 +11,7 @@ import { useStore } from '../store/useStore'
 import { formatTime, parseTime } from '../utils/time'
 import { DecisionEditor } from './DecisionEditor'
 import { EventEditor } from './EventEditor'
+import { AssetImg } from './AssetImg'
 
 export function DetailPanel() {
   const campaign = useStore((s) => s.campaigns.find((c) => c.id === s.activeCampaignId) ?? s.campaigns[0])
@@ -25,6 +26,8 @@ export function DetailPanel() {
   const setPlacement = useStore((s) => s.setPlacement)
   const setPlacingEntity = useStore((s) => s.setPlacingEntity)
   const setActiveLayer = useStore((s) => s.setActiveLayer)
+  const setToolsOpen = useStore((s) => s.setToolsOpen)
+  const setToolsTab = useStore((s) => s.setToolsTab)
 
   const marker = campaign.entities.find((e) => e.id === selectedId) ?? null
 
@@ -63,6 +66,34 @@ export function DetailPanel() {
       </div>
 
       <div className="detail__body">
+        {marker.imageUrl && (
+          <div className="detail__portrait">
+            <AssetImg refUrl={marker.imageUrl} alt={marker.name} />
+            {!readOnly && (
+              <button
+                className="detail__portrait-x"
+                title="Bild entfernen"
+                onClick={() => updateEntity(marker.id, { imageUrl: null })}
+              >
+                &times;
+              </button>
+            )}
+          </div>
+        )}
+
+        {!readOnly && (
+          <button
+            className="btn btn--sm btn--full detail__ai"
+            onClick={() => {
+              setToolsTab('ki')
+              setToolsOpen(true)
+            }}
+            title="KI-Werkzeug fuer dieses Objekt oeffnen"
+          >
+            ✨ KI: Text, Dialog oder Portrait erzeugen
+          </button>
+        )}
+
         {!readOnly && (
           <label className="field">
             <span className="field__label">Typ</span>

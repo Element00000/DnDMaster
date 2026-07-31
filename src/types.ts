@@ -70,6 +70,8 @@ export interface Entity {
   placement: Placement | null
   /** Nur fuer Orte: verknuepfte Unterkarte (Ebene), die sich oeffnen laesst. */
   subMapId: string | null
+  /** Portraet/Bild des Objekts (Asset-Referenz oder data-URL); z.B. KI-generiert. */
+  imageUrl: string | null
   links: EntityLink[]
   /** Typ-spezifische Felder (Schluessel siehe FIELD_SCHEMA). */
   fields: Record<string, string>
