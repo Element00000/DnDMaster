@@ -10,7 +10,9 @@
     "types": ["node"],
     "strict": true,
     "noUnusedLocals": false,
-    "noUnusedParameters": false
+    "noUnusedParameters": false,
+    "outDir": "node_modules/.cache/tsnode",
+    "tsBuildInfoFile": "node_modules/.cache/tsnode/node.tsbuildinfo"
   },
   "include": ["vite.config.ts", "api/**/*.ts"]
 }

@@ -6,6 +6,13 @@ dist-ssr
 .env.*
 !.env.example
 .vercel
+
+# TypeScript-Build-Artefakte (duerfen nicht neben die Quellen / nach api/)
+*.tsbuildinfo
+vite.config.js
+vite.config.d.ts
+api/**/*.js
+api/**/*.d.ts
 .DS_Store
 .vscode/*
 !.vscode/extensions.json
