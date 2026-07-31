@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { useStore } from '../store/useStore'
 import type { Creature } from '../types'
 import { rollDie } from '../utils/tools'
+import { AssetImg } from './AssetImg'
+import { useAsset } from '../useAsset'
 
 /** Kampf-Modus: Kampfkarte links, nach Initiative sortierte Kampftabelle rechts. */
 export function FightMode() {
@@ -112,7 +114,7 @@ export function FightMode() {
       <div className="fight__body">
         <div className="fight__map">
           {ev.battleMapUrl ? (
-            <img src={ev.battleMapUrl} alt="Kampfkarte" />
+            <AssetImg refUrl={ev.battleMapUrl} alt="Kampfkarte" />
           ) : (
             <div className="fight__map-empty">Keine Kampfkarte hinterlegt.</div>
           )}
@@ -185,6 +187,7 @@ function FightRow({
   onRemove: () => void
 }) {
   const dead = creature.hp <= 0
+  const portrait = useAsset(creature.imageUrl)
   return (
     <div className={`frow${current ? ' is-current' : ''}${dead ? ' is-dead' : ''}${creature.isPC ? ' is-pc' : ''}`}>
       <div className="frow__main">
@@ -202,8 +205,8 @@ function FightRow({
           </button>
         </div>
 
-        {creature.imageUrl ? (
-          <img className="frow__portrait" src={creature.imageUrl} alt={creature.name} />
+        {portrait ? (
+          <img className="frow__portrait" src={portrait} alt={creature.name} />
         ) : (
           <div className="frow__portrait frow__portrait--empty">{creature.isPC ? '🧝' : '👹'}</div>
         )}

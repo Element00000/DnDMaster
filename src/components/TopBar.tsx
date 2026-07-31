@@ -2,6 +2,8 @@ import { useRef, useState } from 'react'
 import { useStore } from '../store/useStore'
 import { SearchBar } from './SearchBar'
 import { downloadJson, readJsonFile, slugify, todayStamp } from '../utils/backup'
+import { fileToScaledDataUrl } from '../utils/image'
+import { deleteAsset, inlineAsset, internAsset, mapCampaignAssets, putAsset } from '../utils/assets'
 import type { AppData, Campaign } from '../types'
 
 const BACKUP_APP = 'dnd-weltkarte'
@@ -29,6 +31,8 @@ export function TopBar() {
   const setTimelineOpen = useStore((s) => s.setTimelineOpen)
   const storyTreeOpen = useStore((s) => s.storyTreeOpen)
   const setStoryTreeOpen = useStore((s) => s.setStoryTreeOpen)
+  const relationGraphOpen = useStore((s) => s.relationGraphOpen)
+  const setRelationGraphOpen = useStore((s) => s.setRelationGraphOpen)
   const toolsOpen = useStore((s) => s.toolsOpen)
   const setToolsOpen = useStore((s) => s.setToolsOpen)
   const tableMode = useStore((s) => s.tableMode)
@@ -37,18 +41,15 @@ export function TopBar() {
   const [manageOpen, setManageOpen] = useState(false)
   const entityCount = activeCampaign.entities.length
 
-  function onFile(e: React.ChangeEvent<HTMLInputElement>) {
+  async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
-    if (!file) return
-    const reader = new FileReader()
-    reader.onload = () => {
-      const url = reader.result as string
-      const img = new Image()
-      img.onload = () => setLayerImage(layer.id, url, img.naturalWidth, img.naturalHeight)
-      img.src = url
-    }
-    reader.readAsDataURL(file)
     e.target.value = ''
+    if (!file) return
+    const prev = layer.imageUrl
+    const { url, width, height } = await fileToScaledDataUrl(file, { maxDim: 2400, quality: 0.85 })
+    const ref = await putAsset(url)
+    setLayerImage(layer.id, ref, width, height)
+    void deleteAsset(prev)
   }
 
   function onNewCampaign() {
@@ -72,25 +73,28 @@ export function TopBar() {
     }
   }
 
-  function onExportCampaign() {
+  async function onExportCampaign() {
+    setManageOpen(false)
+    // Bilder aus IndexedDB einbetten -> autarke Datei.
+    const campaign = await mapCampaignAssets(activeCampaign, inlineAsset)
     downloadJson(`${slugify(activeCampaign.name)}-${todayStamp()}.json`, {
       app: BACKUP_APP,
       kind: 'campaign',
       version: BACKUP_VERSION,
-      campaign: activeCampaign,
+      campaign,
     })
-    setManageOpen(false)
   }
 
-  function onExportAll() {
-    const data: AppData = { campaigns, activeCampaignId }
+  async function onExportAll() {
+    setManageOpen(false)
+    const inlined = await Promise.all(campaigns.map((c) => mapCampaignAssets(c, inlineAsset)))
+    const data: AppData = { campaigns: inlined, activeCampaignId }
     downloadJson(`${BACKUP_APP}-backup-${todayStamp()}.json`, {
       app: BACKUP_APP,
       kind: 'full',
       version: BACKUP_VERSION,
       data,
     })
-    setManageOpen(false)
   }
 
   async function onImport(e: React.ChangeEvent<HTMLInputElement>) {
@@ -100,11 +104,11 @@ export function TopBar() {
     try {
       const obj = (await readJsonFile(file)) as Record<string, unknown>
       // Einzelne Kampagne
-      const camp = (obj.campaign ?? (obj.kind === 'campaign' ? obj.campaign : undefined)) as
-        | Campaign
-        | undefined
-      if (camp && Array.isArray((camp as Campaign).entities)) {
-        importCampaign(camp)
+      const camp = obj.campaign as Campaign | undefined
+      if (camp && Array.isArray(camp.entities)) {
+        // Eingebettete Bilder wieder in IndexedDB ablegen.
+        const interned = await mapCampaignAssets(camp, internAsset)
+        importCampaign(interned)
         setManageOpen(false)
         return
       }
@@ -116,7 +120,8 @@ export function TopBar() {
             `Backup mit ${data.campaigns.length} Kampagne(n) importieren? Das ersetzt ALLE aktuellen Daten.`,
           )
         ) {
-          replaceAllData(data)
+          const interned = await Promise.all(data.campaigns.map((c) => mapCampaignAssets(c, internAsset)))
+          replaceAllData({ campaigns: interned, activeCampaignId: data.activeCampaignId })
           setManageOpen(false)
         }
         return
@@ -208,6 +213,13 @@ export function TopBar() {
           Handlungsbaum
         </button>
         <button
+          className={`btn${relationGraphOpen ? ' btn--active' : ''}`}
+          onClick={() => setRelationGraphOpen(!relationGraphOpen)}
+          title="Beziehungsgraph ein-/ausblenden"
+        >
+          Beziehungen
+        </button>
+        <button
           className={`btn${toolsOpen ? ' btn--active' : ''}`}
           onClick={() => setToolsOpen(!toolsOpen)}
           title="DM-Werkzeuge ein-/ausblenden"
@@ -239,7 +251,14 @@ export function TopBar() {
               Kartenbild
             </button>
             {layer.imageUrl && (
-              <button className="btn btn--ghost" onClick={() => resetLayerImage(layer.id)}>
+              <button
+                className="btn btn--ghost"
+                onClick={() => {
+                  const prev = layer.imageUrl
+                  resetLayerImage(layer.id)
+                  void deleteAsset(prev)
+                }}
+              >
                 Platzhalter
               </button>
             )}

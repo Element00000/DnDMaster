@@ -8,11 +8,13 @@ import { StoryTree } from './components/StoryTree'
 import { ToolsPanel } from './components/tools/ToolsPanel'
 import { LayerBar } from './components/LayerBar'
 import { FightMode } from './components/FightMode'
+import { RelationGraph } from './components/RelationGraph'
 import { useStore } from './store/useStore'
 
 export default function App() {
   const timelineOpen = useStore((s) => s.timelineOpen)
   const storyTreeOpen = useStore((s) => s.storyTreeOpen)
+  const relationGraphOpen = useStore((s) => s.relationGraphOpen)
   const toolsOpen = useStore((s) => s.toolsOpen)
   const tableMode = useStore((s) => s.tableMode)
   const fightEventId = useStore((s) => s.fightEventId)
@@ -28,6 +30,7 @@ export default function App() {
           <MapCanvas />
           {timelineOpen && <Timeline />}
           {storyTreeOpen && <StoryTree />}
+          {relationGraphOpen && <RelationGraph />}
           {toolsOpen && <ToolsPanel />}
         </main>
         {!tableMode && <DetailPanel />}

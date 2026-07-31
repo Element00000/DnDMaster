@@ -4,6 +4,8 @@ import type { Creature, Entity, EventBlock, EventKind } from '../types'
 import { useStore } from '../store/useStore'
 import { uid } from '../utils/id'
 import { fileToScaledDataUrl } from '../utils/image'
+import { deleteAsset, putAsset } from '../utils/assets'
+import { AssetImg } from './AssetImg'
 
 /** Editor fuer ein reiches Ereignis: Art, Inhaltsbloecke, Kampfkarte, Kreaturen. */
 export function EventEditor({ entity, readOnly }: { entity: Entity; readOnly: boolean }) {
@@ -125,7 +127,7 @@ function BlockView({ block }: { block: EventBlock }) {
     return (
       <div className="eblock eblock--view">
         {block.title && <div className="eblock__title">{block.title}</div>}
-        {block.url && <img className="eblock__img" src={block.url} alt={block.title || 'Bild'} />}
+        <AssetImg refUrl={block.url} className="eblock__img" alt={block.title || 'Bild'} />
       </div>
     )
   }
@@ -153,10 +155,13 @@ function BlockEditor({
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
-    if (!file || block.kind !== 'image') return
-    const { url } = await fileToScaledDataUrl(file, { maxDim: 900, quality: 0.82 })
-    onChange({ ...block, url })
     e.target.value = ''
+    if (!file || block.kind !== 'image') return
+    const prev = block.url
+    const { url } = await fileToScaledDataUrl(file, { maxDim: 900, quality: 0.82 })
+    const ref = await putAsset(url)
+    onChange({ ...block, url: ref })
+    void deleteAsset(prev)
   }
 
   return (
@@ -178,7 +183,7 @@ function BlockEditor({
 
       {block.kind === 'image' ? (
         <div className="eblock__imgedit">
-          {block.url && <img className="eblock__img" src={block.url} alt={block.title || 'Bild'} />}
+          <AssetImg refUrl={block.url} className="eblock__img" alt={block.title || 'Bild'} />
           <input ref={fileRef} type="file" accept="image/*" hidden onChange={onFile} />
           <button className="chipbtn" onClick={() => fileRef.current?.click()}>
             {block.url ? 'Bild ersetzen' : 'Bild hochladen'}
@@ -202,10 +207,12 @@ function BattleMapField({ url, onSet }: { url: string | null; onSet: (url: strin
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
+    e.target.value = ''
     if (!file) return
     const { url: dataUrl } = await fileToScaledDataUrl(file, { maxDim: 1600, quality: 0.82 })
-    onSet(dataUrl)
-    e.target.value = ''
+    const ref = await putAsset(dataUrl)
+    onSet(ref)
+    void deleteAsset(url)
   }
 
   return (
@@ -218,13 +225,19 @@ function BattleMapField({ url, onSet }: { url: string | null; onSet: (url: strin
             {url ? 'Ersetzen' : 'Hochladen'}
           </button>
           {url && (
-            <button className="chipbtn chipbtn--danger" onClick={() => onSet(null)}>
+            <button
+              className="chipbtn chipbtn--danger"
+              onClick={() => {
+                onSet(null)
+                void deleteAsset(url)
+              }}
+            >
               Entfernen
             </button>
           )}
         </div>
       </div>
-      {url && <img className="event__battlemap" src={url} alt="Kampfkarte" />}
+      <AssetImg refUrl={url} className="event__battlemap" alt="Kampfkarte" />
     </div>
   )
 }
@@ -244,10 +257,13 @@ function CreatureEditor({
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
-    if (!file) return
-    const { url } = await fileToScaledDataUrl(file, { maxDim: 400, quality: 0.82 })
-    onChange({ imageUrl: url })
     e.target.value = ''
+    if (!file) return
+    const prev = creature.imageUrl
+    const { url } = await fileToScaledDataUrl(file, { maxDim: 400, quality: 0.82 })
+    const ref = await putAsset(url)
+    onChange({ imageUrl: ref })
+    void deleteAsset(prev)
   }
 
   return (
@@ -258,7 +274,7 @@ function CreatureEditor({
           onClick={() => fileRef.current?.click()}
           title="Bild hochladen"
         >
-          {creature.imageUrl ? <img src={creature.imageUrl} alt={creature.name} /> : <span>＋</span>}
+          {creature.imageUrl ? <AssetImg refUrl={creature.imageUrl} alt={creature.name} /> : <span>＋</span>}
         </button>
         <input ref={fileRef} type="file" accept="image/*" hidden onChange={onFile} />
         <input

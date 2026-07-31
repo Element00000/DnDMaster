@@ -74,11 +74,14 @@ interface StoreState extends AppData {
   timelineOpen: boolean
   /** Handlungsbaum-Ansicht eingeblendet? */
   storyTreeOpen: boolean
+  /** Beziehungsgraph eingeblendet? */
+  relationGraphOpen: boolean
   setTimeEnabled: (on: boolean) => void
   setTimeOfDay: (minutes: number) => void
   setDayNight: (on: boolean) => void
   setTimelineOpen: (open: boolean) => void
   setStoryTreeOpen: (open: boolean) => void
+  setRelationGraphOpen: (open: boolean) => void
 
   // DM-Werkzeuge (Phase 5)
   toolsOpen: boolean
@@ -216,11 +219,13 @@ export const useStore = create<StoreState>()(
         dayNight: false,
         timelineOpen: false,
         storyTreeOpen: false,
+        relationGraphOpen: false,
         setTimeEnabled: (on) => set({ timeEnabled: on }),
         setTimeOfDay: (minutes) => set({ timeOfDay: Math.max(0, Math.min(1439, Math.round(minutes))) }),
         setDayNight: (on) => set({ dayNight: on }),
         setTimelineOpen: (open) => set({ timelineOpen: open }),
         setStoryTreeOpen: (open) => set({ storyTreeOpen: open }),
+        setRelationGraphOpen: (open) => set({ relationGraphOpen: open }),
 
         // ---------- DM-Werkzeuge ----------
         toolsOpen: false,

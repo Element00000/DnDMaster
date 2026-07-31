@@ -84,9 +84,15 @@ src/
     TopBar.tsx           Kopfleiste, Kampagnen, Spielermodus, Werkzeuge
 ```
 
-## Mögliche Erweiterungen (über den Konzeptplan hinaus)
+## Zusätzlich umgesetzt (über den Konzeptplan hinaus)
 
-- Beziehungsgraph (Netzwerkansicht der Charaktere/Fraktionen)
-- Kampf-Tracker dauerhaft speichern (aktuell nur zur Laufzeit)
-- Bild-Assets in IndexedDB statt LocalStorage (für sehr große Kartenbilder)
+- **Reiche Ereignisse / Encounter** — Ereignis-Marker mit Art, Inhaltsblöcken (Text/Loot/Bild), Kampfkarte und Kreaturen-Statblocks; **Fight-Modus** mit Kampfkarte + nach Initiative sortierter Kampftabelle (Initiative/HP editierbar, Runden, Fähigkeiten)
+- **Export/Import** — Kampagnen/Backups als JSON sichern und laden (☰-Menü oben)
+- **Bild-Assets in IndexedDB** — Bilder liegen außerhalb des LocalStorage-Limits; Backups bleiben durch Einbetten autark
+- **Beziehungsgraph** — Netzwerkansicht der Objekte und ihrer Verknüpfungen (Button „Beziehungen"), Kraft-Layout, Zoom/Pan, Knoten ziehen/klicken
+
+## Offen / mögliche nächste Schritte
+
+- Deployment auf Vercel (Config in `vercel.json`, Anleitung in `DEPLOY.md`)
+- Kampf-Tracker im Werkzeug-Panel dauerhaft speichern (aktuell nur zur Laufzeit)
 ```

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useStore } from '../store/useStore'
 import { entityMeta } from '../types'
 import { dayNightOverlay, inWindow } from '../utils/time'
+import { useAsset } from '../useAsset'
 import { PlaceholderMap } from './PlaceholderMap'
 import { MapPin } from './MapPin'
 
@@ -43,6 +44,7 @@ export function MapCanvas() {
   const addReveal = useStore((s) => s.addReveal)
 
   const { width, height } = layer
+  const mapImage = useAsset(layer.imageUrl)
 
   // Auf der aktiven Ebene platzierte Objekte (in der Spieler-Sicht nur entdeckte,
   // bei aktivem Tageszeit-Filter nur die zur eingestellten Uhrzeit aktiven).
@@ -215,14 +217,16 @@ export function MapCanvas() {
         }}
       >
         {layer.imageUrl ? (
-          <img
-            src={layer.imageUrl}
-            width={width}
-            height={height}
-            draggable={false}
-            alt={layer.name}
-            style={{ display: 'block', pointerEvents: 'none' }}
-          />
+          mapImage && (
+            <img
+              src={mapImage}
+              width={width}
+              height={height}
+              draggable={false}
+              alt={layer.name}
+              style={{ display: 'block', pointerEvents: 'none' }}
+            />
+          )
         ) : (
           <PlaceholderMap width={width} height={height} />
         )}
