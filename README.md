@@ -94,6 +94,20 @@ src/
   - **Text/Dialog** über Claude mit eigenem Anthropic-Key (lokal im Browser, nicht in Exporten) — Erzähltexte, Dialoge, freie Prompts auf Basis des aktuellen Projektkontexts
   - **Bildgenerierung** (echte Rasterbilder: Porträts, Karten) über eine **serverseitige Funktion** — der Bild-Key bleibt geheim, auch bei geteilter Nutzung. Provider: Google Gemini (kostenloses Kontingent), OpenAI, oder **Pollinations.ai kostenlos ohne Key** (Standard). Einrichtung siehe [DEPLOY.md](DEPLOY.md)
 
+## Daten & Backup
+
+Kampagnen liegen **lokal im Browser** (LocalStorage; Bilder in IndexedDB) — pro Person/Gerät
+getrennt, keine automatische Cloud-Synchronisierung. Damit nichts verloren geht:
+
+- Die App fordert beim Start **persistenten Speicher** an (`navigator.storage.persist()`), damit
+  der Browser die Daten nicht bei Speicherdruck löscht.
+- **Manuelles Backup** über das ☰-Menü oben: „Backup exportieren" (JSON). Auf einem anderen
+  Gerät bzw. nach dem Löschen der Browserdaten per „Importieren …" wiederherstellen.
+- Das Menü zeigt das **letzte Backup-Datum** und erinnert, wenn länger keins gemacht wurde.
+
+Für echte geräteübergreifende Synchronisierung mit Login wäre ein Server-Backend nötig
+(z. B. Supabase) — bewusst nicht umgesetzt, um ohne externe Infrastruktur auszukommen.
+
 ## Offen / mögliche nächste Schritte
 
 - Deployment auf Vercel (Config in `vercel.json`, Anleitung in `DEPLOY.md`)
