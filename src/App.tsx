@@ -7,6 +7,7 @@ import { Timeline } from './components/Timeline'
 import { StoryTree } from './components/StoryTree'
 import { ToolsPanel } from './components/tools/ToolsPanel'
 import { LayerBar } from './components/LayerBar'
+import { FightMode } from './components/FightMode'
 import { useStore } from './store/useStore'
 
 export default function App() {
@@ -14,6 +15,7 @@ export default function App() {
   const storyTreeOpen = useStore((s) => s.storyTreeOpen)
   const toolsOpen = useStore((s) => s.toolsOpen)
   const tableMode = useStore((s) => s.tableMode)
+  const fightEventId = useStore((s) => s.fightEventId)
 
   return (
     <div className={`app${tableMode ? ' app--table' : ''}`}>
@@ -30,6 +32,7 @@ export default function App() {
         </main>
         {!tableMode && <DetailPanel />}
       </div>
+      {fightEventId && <FightMode />}
     </div>
   )
 }

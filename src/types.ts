@@ -75,6 +75,8 @@ export interface Entity {
   fields: Record<string, string>
   /** Verzweigter Handlungsstrang; nur bei type === 'entscheidung' gesetzt. */
   decision: DecisionData | null
+  /** Reicher Ereignis-Inhalt; nur bei type === 'ereignis' gesetzt. */
+  event: EventData | null
   /** Kampagnen-Kalendertag fuer die Zeitleiste; null = ohne Datum. */
   day: number | null
   /** Beginn des Tageszeit-Fensters in Minuten (0..1439); null = immer sichtbar. */
@@ -285,4 +287,63 @@ export interface DecisionData {
 
 export function emptyDecision(): DecisionData {
   return { situationId: null, options: [], chosenOptionId: null }
+}
+
+// ---------- Reiche Ereignisse (Encounter) ----------
+
+/** Art eines Ereignisses. */
+export type EventKind = 'info' | 'kampf' | 'begegnung' | 'loot' | 'raetsel' | 'sozial'
+
+export const EVENT_KINDS: { kind: EventKind; label: string; icon: string }[] = [
+  { kind: 'info', label: 'Info / Text', icon: '\u{1F4D6}' },
+  { kind: 'kampf', label: 'Kampf', icon: '\u{2694}' },
+  { kind: 'begegnung', label: 'Begegnung', icon: '\u{1F3AD}' },
+  { kind: 'loot', label: 'Schatz / Loot', icon: '\u{1F4B0}' },
+  { kind: 'raetsel', label: 'Raetsel', icon: '\u{1F9E9}' },
+  { kind: 'sozial', label: 'Sozial', icon: '\u{1F4AC}' },
+]
+
+export function eventKindMeta(kind: EventKind) {
+  return EVENT_KINDS.find((k) => k.kind === kind) ?? EVENT_KINDS[0]
+}
+
+/** Anhaengbarer Inhaltsblock eines Ereignisses. */
+export type EventBlock =
+  | { id: string; kind: 'text'; title: string; body: string }
+  | { id: string; kind: 'loot'; title: string; body: string }
+  | { id: string; kind: 'image'; title: string; url: string }
+
+export const BLOCK_KINDS: { kind: EventBlock['kind']; label: string; icon: string }[] = [
+  { kind: 'text', label: 'Text', icon: '\u{1F4DD}' },
+  { kind: 'loot', label: 'Loot', icon: '\u{1F4B0}' },
+  { kind: 'image', label: 'Bild', icon: '\u{1F5BC}' },
+]
+
+/** Eine Kreatur (Gegner oder SC) im Kampf. */
+export interface Creature {
+  id: string
+  name: string
+  /** Gewuerfelte Initiative; null = noch nicht eingetragen. */
+  initiative: number | null
+  hp: number
+  maxHp: number
+  /** Ruestungsklasse. */
+  ac: number
+  speed: string
+  /** Faehigkeiten/Notizen auf einen Blick. */
+  abilities: string
+  imageUrl: string | null
+  isPC: boolean
+}
+
+export interface EventData {
+  kind: EventKind
+  blocks: EventBlock[]
+  /** Detailkarte fuer den Kampf (Bild als data-URL). */
+  battleMapUrl: string | null
+  creatures: Creature[]
+}
+
+export function emptyEvent(): EventData {
+  return { kind: 'info', blocks: [], battleMapUrl: null, creatures: [] }
 }

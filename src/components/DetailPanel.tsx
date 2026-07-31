@@ -10,6 +10,7 @@ import type { Entity, EntityType, RelationType, Visibility } from '../types'
 import { useStore } from '../store/useStore'
 import { formatTime, parseTime } from '../utils/time'
 import { DecisionEditor } from './DecisionEditor'
+import { EventEditor } from './EventEditor'
 
 export function DetailPanel() {
   const campaign = useStore((s) => s.campaigns.find((c) => c.id === s.activeCampaignId) ?? s.campaigns[0])
@@ -149,6 +150,14 @@ export function DetailPanel() {
           <div className="field">
             <span className="field__label">Entscheidungspunkt</span>
             <DecisionEditor entity={marker} readOnly={readOnly} />
+          </div>
+        )}
+
+        {/* Ereignis: Inhalte, Kampfkarte, Kreaturen, Kampf starten */}
+        {marker.type === 'ereignis' && (
+          <div className="field">
+            <span className="field__label">Ereignis-Inhalt</span>
+            <EventEditor entity={marker} readOnly={readOnly} />
           </div>
         )}
 

@@ -4,18 +4,21 @@ import type {
   AppData,
   Campaign,
   Combatant,
+  Creature,
   DecisionData,
   DecisionOption,
   Effect,
   Entity,
   EntityType,
+  EventBlock,
+  EventData,
   MapLayer,
   Placement,
   RelationType,
   Session,
   UndoEntry,
 } from '../types'
-import { emptyDecision } from '../types'
+import { emptyDecision, emptyEvent } from '../types'
 import { uid } from '../utils/id'
 
 function makeLayer(name = 'Weltkarte'): MapLayer {
@@ -120,6 +123,10 @@ interface StoreState extends AppData {
   updateCampaignDescription: (id: string, description: string) => void
   deleteCampaign: (id: string) => void
   setActiveCampaign: (id: string) => void
+  /** Eine importierte Kampagne hinzufuegen (neue ID bei Kollision) und aktiv setzen. */
+  importCampaign: (campaign: Campaign) => void
+  /** Alle Daten aus einem Backup ersetzen. */
+  replaceAllData: (data: AppData) => void
 
   // Ebenen (der aktiven Kampagne)
   activeLayer: () => MapLayer
@@ -161,6 +168,20 @@ interface StoreState extends AppData {
   /** Option als eingetreten markieren (Folgen anwenden). Erneut = zuruecknehmen. */
   chooseOption: (entityId: string, optionId: string) => void
   clearChoice: (entityId: string) => void
+
+  // Reiche Ereignisse / Encounter
+  updateEvent: (entityId: string, patch: Partial<EventData>) => void
+  addBlock: (entityId: string, block: EventBlock) => void
+  updateBlock: (entityId: string, block: EventBlock) => void
+  removeBlock: (entityId: string, blockId: string) => void
+  setBattleMap: (entityId: string, url: string | null) => void
+  addCreature: (entityId: string, creature?: Partial<Creature>) => void
+  updateCreature: (entityId: string, creatureId: string, patch: Partial<Omit<Creature, 'id'>>) => void
+  removeCreature: (entityId: string, creatureId: string) => void
+  duplicateCreature: (entityId: string, creatureId: string) => void
+  /** Aktiver Kampf (Fight-Modus) fuer dieses Ereignis; null = geschlossen. */
+  fightEventId: string | null
+  setFightEvent: (id: string | null) => void
 
   // UI
   setTool: (t: Tool) => void
@@ -338,6 +359,28 @@ export const useStore = create<StoreState>()(
         setActiveCampaign: (id) =>
           set({ activeCampaignId: id, selectedEntityId: null, tool: 'select' }),
 
+        importCampaign: (campaign) =>
+          set((s) => {
+            let camp = normalizeCampaign(campaign)
+            if (s.campaigns.some((c) => c.id === camp.id)) camp = { ...camp, id: uid('camp-') }
+            return {
+              campaigns: [...s.campaigns, camp],
+              activeCampaignId: camp.id,
+              selectedEntityId: null,
+              fightEventId: null,
+            }
+          }),
+
+        replaceAllData: (data) =>
+          set(() => {
+            const campaigns = (data.campaigns ?? []).map(normalizeCampaign)
+            if (campaigns.length === 0) return {}
+            const activeCampaignId = campaigns.some((c) => c.id === data.activeCampaignId)
+              ? data.activeCampaignId
+              : campaigns[0].id
+            return { campaigns, activeCampaignId, selectedEntityId: null, fightEventId: null }
+          }),
+
         // ---------- Ebenen ----------
         activeLayer: () => {
           const c = get().activeCampaign()
@@ -423,6 +466,7 @@ export const useStore = create<StoreState>()(
             links: [],
             fields: {},
             decision: type === 'entscheidung' ? emptyDecision() : null,
+            event: type === 'ereignis' ? emptyEvent() : null,
             day: null,
             timeStart: null,
             timeEnd: null,
@@ -439,8 +483,9 @@ export const useStore = create<StoreState>()(
             entities: c.entities.map((e) => {
               if (e.id !== id) return e
               const next = { ...e, ...patch }
-              // Beim Wechsel zu 'entscheidung' die Struktur anlegen.
+              // Beim Wechsel des Typs die passende Struktur anlegen.
               if (next.type === 'entscheidung' && !next.decision) next.decision = emptyDecision()
+              if (next.type === 'ereignis' && !next.event) next.event = emptyEvent()
               return next
             }),
           })),
@@ -670,6 +715,74 @@ export const useStore = create<StoreState>()(
             }
           }),
 
+        // ---------- Reiche Ereignisse / Encounter ----------
+        updateEvent: (entityId, patch) =>
+          patchEvent(patchActive, entityId, (ev) => ({ ...ev, ...patch })),
+
+        addBlock: (entityId, block) =>
+          patchEvent(patchActive, entityId, (ev) => ({ ...ev, blocks: [...ev.blocks, block] })),
+
+        updateBlock: (entityId, block) =>
+          patchEvent(patchActive, entityId, (ev) => ({
+            ...ev,
+            blocks: ev.blocks.map((b) => (b.id === block.id ? block : b)),
+          })),
+
+        removeBlock: (entityId, blockId) =>
+          patchEvent(patchActive, entityId, (ev) => ({
+            ...ev,
+            blocks: ev.blocks.filter((b) => b.id !== blockId),
+          })),
+
+        setBattleMap: (entityId, url) =>
+          patchEvent(patchActive, entityId, (ev) => ({ ...ev, battleMapUrl: url })),
+
+        addCreature: (entityId, creature) =>
+          patchEvent(patchActive, entityId, (ev) => ({
+            ...ev,
+            creatures: [
+              ...ev.creatures,
+              {
+                id: uid('cr-'),
+                name: creature?.name ?? `Kreatur ${ev.creatures.length + 1}`,
+                initiative: creature?.initiative ?? null,
+                hp: creature?.hp ?? 10,
+                maxHp: creature?.maxHp ?? creature?.hp ?? 10,
+                ac: creature?.ac ?? 12,
+                speed: creature?.speed ?? '',
+                abilities: creature?.abilities ?? '',
+                imageUrl: creature?.imageUrl ?? null,
+                isPC: creature?.isPC ?? false,
+              },
+            ],
+          })),
+
+        updateCreature: (entityId, creatureId, patch) =>
+          patchEvent(patchActive, entityId, (ev) => ({
+            ...ev,
+            creatures: ev.creatures.map((cr) => (cr.id === creatureId ? { ...cr, ...patch } : cr)),
+          })),
+
+        removeCreature: (entityId, creatureId) =>
+          patchEvent(patchActive, entityId, (ev) => ({
+            ...ev,
+            creatures: ev.creatures.filter((cr) => cr.id !== creatureId),
+          })),
+
+        duplicateCreature: (entityId, creatureId) =>
+          patchEvent(patchActive, entityId, (ev) => {
+            const src = ev.creatures.find((cr) => cr.id === creatureId)
+            if (!src) return ev
+            const copy: Creature = { ...src, id: uid('cr-'), initiative: null }
+            const idx = ev.creatures.findIndex((cr) => cr.id === creatureId)
+            const creatures = [...ev.creatures]
+            creatures.splice(idx + 1, 0, copy)
+            return { ...ev, creatures }
+          }),
+
+        fightEventId: null,
+        setFightEvent: (id) => set({ fightEventId: id }),
+
         // ---------- UI ----------
         setTool: (t) => set({ tool: t }),
         setPendingEntityType: (t) => set({ pendingEntityType: t }),
@@ -679,7 +792,7 @@ export const useStore = create<StoreState>()(
     },
     {
       name: 'dnd-weltkarte',
-      version: 5,
+      version: 6,
       // Nur Daten persistieren, keinen fluechtigen UI-Zustand.
       partialize: (s): AppData => ({
         campaigns: s.campaigns,
@@ -716,20 +829,8 @@ export const useStore = create<StoreState>()(
           }
           data = { campaigns: [campaign], activeCampaignId: campaign.id }
         }
-        // Entitaeten (v3), Sitzungen (v4) und Ebenen-Nebel (v5) sicherstellen.
-        return {
-          ...data,
-          campaigns: data.campaigns.map((c) => ({
-            ...c,
-            entities: c.entities.map(normalizeEntity),
-            sessions: c.sessions ?? [],
-            layers: c.layers.map((l) => ({
-              ...l,
-              fogEnabled: l.fogEnabled ?? false,
-              reveals: l.reveals ?? [],
-            })),
-          })),
-        }
+        // Entitaeten (v3), Sitzungen (v4), Ebenen-Nebel (v5), Events (v6) sicherstellen.
+        return { ...data, campaigns: data.campaigns.map(normalizeCampaign) }
       },
     },
   ),
@@ -760,10 +861,27 @@ function normalizeEntity(e: Partial<Entity> & { id: string; type: EntityType; na
     links: e.links ?? [],
     fields: e.fields ?? {},
     decision: e.decision ?? (e.type === 'entscheidung' ? emptyDecision() : null),
+    event: e.event ?? (e.type === 'ereignis' ? emptyEvent() : null),
     day: e.day ?? null,
     timeStart: e.timeStart ?? null,
     timeEnd: e.timeEnd ?? null,
     createdAt: e.createdAt ?? Date.now(),
+  }
+}
+
+/** Fuellt fehlende Felder einer Kampagne auf (Entitaeten, Ebenen, Sitzungen). */
+function normalizeCampaign(c: Campaign): Campaign {
+  const layers = (c.layers && c.layers.length > 0 ? c.layers : [makeLayer()]).map((l) => ({
+    ...l,
+    fogEnabled: l.fogEnabled ?? false,
+    reveals: l.reveals ?? [],
+  }))
+  return {
+    ...c,
+    layers,
+    activeLayerId: layers.some((l) => l.id === c.activeLayerId) ? c.activeLayerId : layers[0].id,
+    entities: (c.entities ?? []).map(normalizeEntity),
+    sessions: c.sessions ?? [],
   }
 }
 
@@ -777,6 +895,20 @@ function patchDecision(
     ...c,
     entities: c.entities.map((e) =>
       e.id === entityId && e.decision ? { ...e, decision: fn(e.decision) } : e,
+    ),
+  }))
+}
+
+/** Die event-Struktur einer Entitaet in der aktiven Kampagne patchen. */
+function patchEvent(
+  patchActive: (fn: (c: Campaign) => Campaign) => void,
+  entityId: string,
+  fn: (ev: EventData) => EventData,
+) {
+  patchActive((c) => ({
+    ...c,
+    entities: c.entities.map((e) =>
+      e.id === entityId && e.event ? { ...e, event: fn(e.event) } : e,
     ),
   }))
 }

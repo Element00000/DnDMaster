@@ -1,9 +1,15 @@
 import { useRef, useState } from 'react'
 import { useStore } from '../store/useStore'
 import { SearchBar } from './SearchBar'
+import { downloadJson, readJsonFile, slugify, todayStamp } from '../utils/backup'
+import type { AppData, Campaign } from '../types'
+
+const BACKUP_APP = 'dnd-weltkarte'
+const BACKUP_VERSION = 6
 
 export function TopBar() {
   const fileRef = useRef<HTMLInputElement>(null)
+  const importRef = useRef<HTMLInputElement>(null)
   const campaigns = useStore((s) => s.campaigns)
   const activeCampaignId = useStore((s) => s.activeCampaignId)
   const activeCampaign = campaigns.find((c) => c.id === activeCampaignId) ?? campaigns[0]
@@ -13,6 +19,8 @@ export function TopBar() {
   const addCampaign = useStore((s) => s.addCampaign)
   const renameCampaign = useStore((s) => s.renameCampaign)
   const deleteCampaign = useStore((s) => s.deleteCampaign)
+  const importCampaign = useStore((s) => s.importCampaign)
+  const replaceAllData = useStore((s) => s.replaceAllData)
   const setLayerImage = useStore((s) => s.setLayerImage)
   const resetLayerImage = useStore((s) => s.resetLayerImage)
   const playerMode = useStore((s) => s.playerMode)
@@ -64,6 +72,61 @@ export function TopBar() {
     }
   }
 
+  function onExportCampaign() {
+    downloadJson(`${slugify(activeCampaign.name)}-${todayStamp()}.json`, {
+      app: BACKUP_APP,
+      kind: 'campaign',
+      version: BACKUP_VERSION,
+      campaign: activeCampaign,
+    })
+    setManageOpen(false)
+  }
+
+  function onExportAll() {
+    const data: AppData = { campaigns, activeCampaignId }
+    downloadJson(`${BACKUP_APP}-backup-${todayStamp()}.json`, {
+      app: BACKUP_APP,
+      kind: 'full',
+      version: BACKUP_VERSION,
+      data,
+    })
+    setManageOpen(false)
+  }
+
+  async function onImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    try {
+      const obj = (await readJsonFile(file)) as Record<string, unknown>
+      // Einzelne Kampagne
+      const camp = (obj.campaign ?? (obj.kind === 'campaign' ? obj.campaign : undefined)) as
+        | Campaign
+        | undefined
+      if (camp && Array.isArray((camp as Campaign).entities)) {
+        importCampaign(camp)
+        setManageOpen(false)
+        return
+      }
+      // Vollbackup
+      const data = (obj.data ?? obj) as AppData
+      if (data && Array.isArray(data.campaigns) && data.campaigns.length > 0) {
+        if (
+          confirm(
+            `Backup mit ${data.campaigns.length} Kampagne(n) importieren? Das ersetzt ALLE aktuellen Daten.`,
+          )
+        ) {
+          replaceAllData(data)
+          setManageOpen(false)
+        }
+        return
+      }
+      alert('Keine gueltigen Kampagnendaten in der Datei gefunden.')
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Import fehlgeschlagen.')
+    }
+  }
+
   // Spieltischmodus: reduzierte Live-Ansicht.
   if (tableMode) {
     return (
@@ -112,11 +175,17 @@ export function TopBar() {
           <div className="campaign-menu" onMouseLeave={() => setManageOpen(false)}>
             <button onClick={onNewCampaign}>Neue Kampagne / Welt</button>
             <button onClick={onRename}>Umbenennen</button>
+            <div className="campaign-menu__sep" />
+            <button onClick={onExportCampaign}>Diese Kampagne exportieren</button>
+            <button onClick={onExportAll}>Backup exportieren (alles)</button>
+            <button onClick={() => importRef.current?.click()}>Importieren …</button>
+            <div className="campaign-menu__sep" />
             <button className="campaign-menu__danger" onClick={onDelete}>
               Loeschen
             </button>
           </div>
         )}
+        <input ref={importRef} type="file" accept="application/json,.json" hidden onChange={onImport} />
       </div>
 
       <SearchBar />
