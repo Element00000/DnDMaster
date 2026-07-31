@@ -1773,8 +1773,98 @@ button {
   box-shadow: 0 0 0 1px var(--danger) inset, 0 0 40px rgba(240, 101, 95, 0.24);
 }
 
+.dice__stage {
+  padding: 14px 10px;
+}
+
+/* Würfel-Ablage + einzelne Würfel */
+.dice__tray {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: center;
+  min-height: 60px;
+}
+
+.die {
+  width: 56px;
+  height: 56px;
+}
+
+.die.is-idle {
+  width: 64px;
+  height: 64px;
+  opacity: 0.85;
+}
+
+.die__svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  filter: drop-shadow(0 3px 5px rgba(0, 0, 0, 0.45));
+}
+
+.die__shape {
+  fill: var(--panel);
+  stroke: var(--accent);
+  stroke-width: 4;
+  stroke-linejoin: round;
+}
+
+.die__inner {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 3;
+  opacity: 0.45;
+  stroke-linejoin: round;
+}
+
+.die__num {
+  fill: var(--ink);
+  font-size: 42px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.die.is-rolling {
+  animation: die-tumble 0.35s linear infinite;
+}
+
+@keyframes die-tumble {
+  0% { transform: rotate(-14deg) translateY(0); }
+  25% { transform: rotate(12deg) translateY(-5px); }
+  50% { transform: rotate(-8deg) translateY(0); }
+  75% { transform: rotate(14deg) translateY(-4px); }
+  100% { transform: rotate(-14deg) translateY(0); }
+}
+
+.die.is-kept .die__shape {
+  stroke: var(--gold);
+}
+
+.die.is-kept {
+  filter: drop-shadow(0 0 9px rgba(227, 179, 65, 0.6));
+}
+
+.die.is-kept .die__num {
+  fill: var(--gold-soft);
+}
+
+.die.is-dropped {
+  opacity: 0.38;
+}
+
+.die.is-dropped .die__shape {
+  stroke: var(--border-strong);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .die.is-rolling { animation: none; }
+}
+
 .dice__total {
-  font-size: 58px;
+  font-size: 52px;
   font-weight: 750;
   line-height: 1;
   letter-spacing: -2px;
@@ -1875,6 +1965,12 @@ button {
 
 .dice__btn:active {
   transform: translateY(1px);
+}
+
+.dice__btn.is-active {
+  border-color: var(--accent);
+  background: var(--accent-tint);
+  color: var(--accent-soft);
 }
 
 .dice__history {
