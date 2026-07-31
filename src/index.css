@@ -676,6 +676,18 @@ button {
   margin: 2px 0;
 }
 
+.campaign-menu__backup {
+  padding: 8px 14px;
+  font-size: 11px;
+  color: var(--ink-faint);
+  border-bottom: 1px solid var(--border);
+  line-height: 1.4;
+}
+
+.campaign-menu__backup.is-stale {
+  color: var(--gold-soft);
+}
+
 /* ---------- Spieler/DM-Schalter ---------- */
 .switch {
   display: inline-flex;

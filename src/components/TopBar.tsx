@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { useStore } from '../store/useStore'
 import { SearchBar } from './SearchBar'
 import { downloadJson, readJsonFile, slugify, todayStamp } from '../utils/backup'
+import { backupHint, markBackup } from '../utils/backupReminder'
 import { fileToScaledDataUrl } from '../utils/image'
 import { deleteAsset, inlineAsset, internAsset, mapCampaignAssets, putAsset } from '../utils/assets'
 import type { AppData, Campaign } from '../types'
@@ -83,6 +84,7 @@ export function TopBar() {
       version: BACKUP_VERSION,
       campaign,
     })
+    markBackup()
   }
 
   async function onExportAll() {
@@ -95,6 +97,7 @@ export function TopBar() {
       version: BACKUP_VERSION,
       data,
     })
+    markBackup()
   }
 
   async function onImport(e: React.ChangeEvent<HTMLInputElement>) {
@@ -178,6 +181,16 @@ export function TopBar() {
         </button>
         {manageOpen && (
           <div className="campaign-menu" onMouseLeave={() => setManageOpen(false)}>
+            {(() => {
+              const h = backupHint()
+              return (
+                <div className={`campaign-menu__backup${h.stale ? ' is-stale' : ''}`}>
+                  {h.stale ? '⚠ ' : ''}
+                  {h.text}
+                  {h.stale && <span> — jetzt sichern:</span>}
+                </div>
+              )
+            })()}
             <button onClick={onNewCampaign}>Neue Kampagne / Welt</button>
             <button onClick={onRename}>Umbenennen</button>
             <div className="campaign-menu__sep" />
