@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useStore } from '../../store/useStore'
-import { AI_MODELS, useAiStore } from '../../store/useAiStore'
-import type { AiModel } from '../../store/useAiStore'
+import { AI_MODELS, IMAGE_PROVIDERS, useAiStore } from '../../store/useAiStore'
+import type { AiModel, ImageProvider } from '../../store/useAiStore'
 import { generateSvgDataUrl, generateText } from '../../utils/ai'
 import { generateImage } from '../../utils/imageGen'
 import { buildCampaignContext } from '../../utils/aiContext'
@@ -13,6 +13,10 @@ export function AiTool() {
   const model = useAiStore((s) => s.model)
   const setApiKey = useAiStore((s) => s.setApiKey)
   const setModel = useAiStore((s) => s.setModel)
+  const imageProvider = useAiStore((s) => s.imageProvider)
+  const imageKey = useAiStore((s) => s.imageKey)
+  const setImageProvider = useAiStore((s) => s.setImageProvider)
+  const setImageKey = useAiStore((s) => s.setImageKey)
 
   const campaign = useStore((s) => s.campaigns.find((c) => c.id === s.activeCampaignId) ?? s.campaigns[0])
   const layer = campaign.layers.find((l) => l.id === campaign.activeLayerId) ?? campaign.layers[0]
@@ -115,10 +119,12 @@ export function AiTool() {
     return bits.filter(Boolean).join('. ')
   }
 
+  const imgOpts = { provider: imageProvider, apiKey: imageKey }
+
   async function genPhotoPortrait() {
     if (!selected) return
     await run('imgportrait', async () => {
-      const url = await generateImage(portraitPrompt())
+      const url = await generateImage(portraitPrompt(), imgOpts)
       const ref = await putAsset(url)
       const prev = selected.imageUrl
       updateEntity(selected.id, { imageUrl: ref })
@@ -136,6 +142,7 @@ export function AiTool() {
         .join(', ')
       const url = await generateImage(
         `Top-down fantasy world map, hand-drawn parchment cartography style, coastline, mountains, forests, rivers, labeled regions. World "${campaign.name}", layer "${layer.name}".${placeNames ? ' Places: ' + placeNames + '.' : ''}`,
+        imgOpts,
       )
       const ref = await putAsset(url)
       const prev = layer.imageUrl
@@ -147,9 +154,40 @@ export function AiTool() {
 
   return (
     <div className="ai">
-      {/* Bilder ueber den Server — funktioniert auch ohne Claude-Key */}
+      {/* Bilder ueber die Serverfunktion */}
       <div className="ai__group">
-        <div className="ai__group-title">Bild (Server, geheimer Key)</div>
+        <div className="ai__group-title">Bildgenerierung</div>
+
+        <label className="field">
+          <span className="field__label">Anbieter</span>
+          <select
+            className="field__control field__control--sm"
+            value={imageProvider}
+            onChange={(e) => setImageProvider(e.target.value as ImageProvider)}
+          >
+            {IMAGE_PROVIDERS.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.label}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        {(imageProvider === 'gemini' || imageProvider === 'openai') && (
+          <label className="field">
+            <span className="field__label">
+              {imageProvider === 'gemini' ? 'Gemini API-Key' : 'OpenAI API-Key'}
+            </span>
+            <input
+              className="field__control field__control--sm"
+              type="password"
+              value={imageKey}
+              placeholder={imageProvider === 'gemini' ? 'AIza…' : 'sk-…'}
+              onChange={(e) => setImageKey(e.target.value)}
+            />
+          </label>
+        )}
+
         <div className="ai__actions">
           <button className="ai__act" disabled={!selected || !!busy} onClick={genPhotoPortrait}>
             {busy === 'imgportrait' ? '…' : '🖼'} Portrait
@@ -159,8 +197,11 @@ export function AiTool() {
           </button>
         </div>
         <p className="ai__hint">
-          Erzeugt echte Bilder ueber die serverseitige Funktion (Gemini/OpenAI/Pollinations). Der
-          API-Key bleibt geheim. Lokal via „vercel dev“ oder auf Vercel verfuegbar.
+          {imageProvider === 'auto'
+            ? 'Nutzt die serverseitig hinterlegte Einstellung (Vercel-Umgebungsvariable), sonst kostenlos Pollinations.'
+            : imageProvider === 'pollinations'
+              ? 'Kostenlos und ohne Key. Bildqualitaet variabel.'
+              : 'Dein Key wird nur an die eigene Serverfunktion gesendet (loest CORS) und lokal im Browser gespeichert. Fuer geteilte Nutzung besser die Server-Umgebungsvariable verwenden.'}
         </p>
       </div>
 

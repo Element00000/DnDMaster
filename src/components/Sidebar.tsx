@@ -1,6 +1,16 @@
 import { ENTITY_TYPES, entityMeta } from '../types'
 import type { Entity, EntityType } from '../types'
 import { useStore } from '../store/useStore'
+import type { ToolTab } from '../store/useStore'
+
+const TOOL_ITEMS: { tab: ToolTab; label: string; icon: string }[] = [
+  { tab: 'wuerfel', label: 'Wuerfel', icon: '\u{1F3B2}' },
+  { tab: 'kampf', label: 'Kampf', icon: '\u{2694}' },
+  { tab: 'notizen', label: 'Notizen', icon: '\u{1F4D3}' },
+  { tab: 'zufall', label: 'Zufall', icon: '\u{1F52E}' },
+  { tab: 'ki', label: 'KI', icon: '\u{2728}' },
+  { tab: 'musik', label: 'Musik', icon: '\u{1F3B5}' },
+]
 
 export function Sidebar() {
   const campaign = useStore((s) => s.campaigns.find((c) => c.id === s.activeCampaignId) ?? s.campaigns[0])
@@ -12,6 +22,19 @@ export function Sidebar() {
   const selectEntity = useStore((s) => s.selectEntity)
   const selectedId = useStore((s) => s.selectedEntityId)
   const addEntity = useStore((s) => s.addEntity)
+  const toolsOpen = useStore((s) => s.toolsOpen)
+  const toolsTab = useStore((s) => s.toolsTab)
+  const setToolsOpen = useStore((s) => s.setToolsOpen)
+  const setToolsTab = useStore((s) => s.setToolsTab)
+
+  function openTool(tab: ToolTab) {
+    if (toolsOpen && toolsTab === tab) {
+      setToolsOpen(false)
+    } else {
+      setToolsTab(tab)
+      setToolsOpen(true)
+    }
+  }
 
   // Im Spielermodus nur entdeckte Objekte anzeigen.
   const visible = campaign.entities.filter((e) => !playerMode || e.visibility === 'spieler')
@@ -29,6 +52,23 @@ export function Sidebar() {
 
   return (
     <aside className="sidebar">
+      <section className="sidebar__section">
+        <h2 className="sidebar__heading">Werkzeuge</h2>
+        <div className="toolbar-grid">
+          {TOOL_ITEMS.map((t) => (
+            <button
+              key={t.tab}
+              className={`toolbtn${toolsOpen && toolsTab === t.tab ? ' is-active' : ''}`}
+              onClick={() => openTool(t.tab)}
+              title={t.label}
+            >
+              <span className="toolbtn__icon">{t.icon}</span>
+              <span className="toolbtn__label">{t.label}</span>
+            </button>
+          ))}
+        </div>
+      </section>
+
       {!playerMode && (
         <section className="sidebar__section">
           <h2 className="sidebar__heading">Objekt anlegen</h2>

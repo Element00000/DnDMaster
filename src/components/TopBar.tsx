@@ -34,8 +34,6 @@ export function TopBar() {
   const setStoryTreeOpen = useStore((s) => s.setStoryTreeOpen)
   const relationGraphOpen = useStore((s) => s.relationGraphOpen)
   const setRelationGraphOpen = useStore((s) => s.setRelationGraphOpen)
-  const toolsOpen = useStore((s) => s.toolsOpen)
-  const setToolsOpen = useStore((s) => s.setToolsOpen)
   const tableMode = useStore((s) => s.tableMode)
   const setTableMode = useStore((s) => s.setTableMode)
 
@@ -231,13 +229,6 @@ export function TopBar() {
           title="Beziehungsgraph ein-/ausblenden"
         >
           Beziehungen
-        </button>
-        <button
-          className={`btn${toolsOpen ? ' btn--active' : ''}`}
-          onClick={() => setToolsOpen(!toolsOpen)}
-          title="DM-Werkzeuge ein-/ausblenden"
-        >
-          Werkzeuge
         </button>
         <button
           className="btn"

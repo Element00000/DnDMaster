@@ -21,8 +21,11 @@ function imageApiPlugin(): Plugin {
         req.on('data', (c) => (body += c))
         req.on('end', async () => {
           try {
-            const { prompt } = JSON.parse(body || '{}')
-            const dataUrl = await generateImageDataUrl(String(prompt || ''))
+            const parsed = JSON.parse(body || '{}')
+            const dataUrl = await generateImageDataUrl(String(parsed.prompt || ''), {
+              provider: parsed.provider ? String(parsed.provider) : undefined,
+              apiKey: parsed.apiKey ? String(parsed.apiKey) : undefined,
+            })
             res.setHeader('content-type', 'application/json')
             res.end(JSON.stringify({ dataUrl }))
           } catch (e) {

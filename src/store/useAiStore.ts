@@ -10,12 +10,27 @@ export const AI_MODELS = [
 
 export type AiModel = (typeof AI_MODELS)[number]['id']
 
+/** Bild-Anbieter fuer die Serverfunktion. */
+export const IMAGE_PROVIDERS = [
+  { id: 'auto', label: 'Automatisch (Server-Einstellung)' },
+  { id: 'gemini', label: 'Google Gemini (eigener Key)' },
+  { id: 'openai', label: 'OpenAI (eigener Key)' },
+  { id: 'pollinations', label: 'Pollinations (kostenlos, ohne Key)' },
+] as const
+
+export type ImageProvider = (typeof IMAGE_PROVIDERS)[number]['id']
+
 interface AiState {
   /** Anthropic API-Key (nur lokal im Browser gespeichert). */
   apiKey: string
   model: AiModel
+  /** Bildgenerierung: Anbieter + Key (an die Serverfunktion uebergeben). */
+  imageProvider: ImageProvider
+  imageKey: string
   setApiKey: (key: string) => void
   setModel: (m: AiModel) => void
+  setImageProvider: (p: ImageProvider) => void
+  setImageKey: (key: string) => void
 }
 
 /**
@@ -27,8 +42,12 @@ export const useAiStore = create<AiState>()(
     (set) => ({
       apiKey: '',
       model: 'claude-opus-5',
+      imageProvider: 'auto',
+      imageKey: '',
       setApiKey: (key) => set({ apiKey: key.trim() }),
       setModel: (m) => set({ model: m }),
+      setImageProvider: (p) => set({ imageProvider: p }),
+      setImageKey: (key) => set({ imageKey: key.trim() }),
     }),
     { name: 'dnd-weltkarte-ai' },
   ),

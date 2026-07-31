@@ -4,14 +4,29 @@
 //
 // Reihenfolge: GEMINI_API_KEY -> OPENAI_API_KEY -> Pollinations (kostenlos, ohne Key).
 
+export interface ImageOptions {
+  /** Vom Client gewaehlter Anbieter (optional). */
+  provider?: string
+  /** Vom Client uebergebener API-Key (optional; sonst Server-Env). */
+  apiKey?: string
+}
+
 /** Erzeugt ein Bild zum Prompt und liefert eine data-URL (base64). */
-export async function generateImageDataUrl(prompt: string): Promise<string> {
+export async function generateImageDataUrl(prompt: string, opts: ImageOptions = {}): Promise<string> {
   const clean = (prompt || '').trim()
   if (!clean) throw new Error('Kein Prompt angegeben.')
 
+  const provider = (opts.provider || '').trim()
+  const key = (opts.apiKey || '').trim()
+
+  // Ausdruecklich gewaehlter Anbieter (Key aus Anfrage, sonst aus Env).
+  if (provider === 'gemini') return geminiImage(clean, key || process.env.GEMINI_API_KEY || '')
+  if (provider === 'openai') return openaiImage(clean, key || process.env.OPENAI_API_KEY || '')
+  if (provider === 'pollinations') return pollinationsImage(clean)
+
+  // Automatik: erst Server-Env, sonst kostenlos ueber Pollinations.
   const gemini = process.env.GEMINI_API_KEY
   const openai = process.env.OPENAI_API_KEY
-
   if (gemini) return geminiImage(clean, gemini)
   if (openai) return openaiImage(clean, openai)
   return pollinationsImage(clean)
@@ -19,6 +34,7 @@ export async function generateImageDataUrl(prompt: string): Promise<string> {
 
 // ---------- Google Gemini (kostenloses Kontingent) ----------
 async function geminiImage(prompt: string, key: string): Promise<string> {
+  if (!key) throw new Error('Kein Gemini-API-Key hinterlegt (im KI-Werkzeug eintragen).')
   const model = process.env.GEMINI_IMAGE_MODEL || 'gemini-2.0-flash-preview-image-generation'
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`
   const res = await fetch(url, {
@@ -46,6 +62,7 @@ async function geminiImage(prompt: string, key: string): Promise<string> {
 
 // ---------- OpenAI (gpt-image-1) ----------
 async function openaiImage(prompt: string, key: string): Promise<string> {
+  if (!key) throw new Error('Kein OpenAI-API-Key hinterlegt (im KI-Werkzeug eintragen).')
   const model = process.env.OPENAI_IMAGE_MODEL || 'gpt-image-1'
   const res = await fetch('https://api.openai.com/v1/images/generations', {
     method: 'POST',

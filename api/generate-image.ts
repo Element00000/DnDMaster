@@ -12,7 +12,10 @@ export default async function handler(req: any, res: any) {
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : req.body || {}
     const prompt = String(body.prompt || '')
-    const dataUrl = await generateImageDataUrl(prompt)
+    const dataUrl = await generateImageDataUrl(prompt, {
+      provider: body.provider ? String(body.provider) : undefined,
+      apiKey: body.apiKey ? String(body.apiKey) : undefined,
+    })
     res.status(200).json({ dataUrl })
   } catch (e) {
     res.status(500).json({ error: e instanceof Error ? e.message : 'Bildgenerierung fehlgeschlagen.' })

@@ -1,11 +1,14 @@
 // Client-seitiger Aufruf des Server-Bild-Proxys. Kein API-Key im Browser —
 // der Schluessel liegt serverseitig (Vercel-Funktion / Vite-Dev-Middleware).
 
-export async function generateImage(prompt: string): Promise<string> {
+export async function generateImage(
+  prompt: string,
+  opts: { provider?: string; apiKey?: string } = {},
+): Promise<string> {
   const res = await fetch('/api/generate-image', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ prompt }),
+    body: JSON.stringify({ prompt, provider: opts.provider, apiKey: opts.apiKey }),
   })
   if (!res.ok) {
     let msg = `Bildgenerierung fehlgeschlagen (${res.status}).`
