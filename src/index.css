@@ -1215,7 +1215,7 @@ button {
   white-space: nowrap;
 }
 
-/* ---------- Entscheidungspunkt-Editor ---------- */
+/* ---------- Entscheidungs-Editor ---------- */
 .decision {
   display: flex;
   flex-direction: column;

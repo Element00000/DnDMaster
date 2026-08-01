@@ -2,7 +2,7 @@ import { entityMeta } from '../types'
 import type { Entity } from '../types'
 import { useStore } from '../store/useStore'
 
-/** Handlungsbaum: Entscheidungspunkte nach Verkettungstiefe in Spalten. */
+/** Handlungsbaum: Entscheidungen nach Verkettungstiefe in Spalten. */
 export function StoryTree() {
   const campaign = useStore((s) => s.campaigns.find((c) => c.id === s.activeCampaignId) ?? s.campaigns[0])
   const playerMode = useStore((s) => s.playerMode)
@@ -56,7 +56,7 @@ export function StoryTree() {
     <div className="storytree">
       <div className="storytree__header">
         <h2 className="storytree__title">Handlungsbaum</h2>
-        <span className="storytree__meta">{decisions.length} Entscheidungspunkte</span>
+        <span className="storytree__meta">{decisions.length} Entscheidungen</span>
         <button className="storytree__close" onClick={() => setStoryTreeOpen(false)} title="Schliessen">
           &times;
         </button>
@@ -64,7 +64,7 @@ export function StoryTree() {
 
       {decisions.length === 0 ? (
         <p className="storytree__empty">
-          Noch keine Entscheidungspunkte. Lege ein Objekt vom Typ &bdquo;Entscheidungspunkt&ldquo; an
+          Noch keine Entscheidungen. Lege ein Objekt vom Typ &bdquo;Entscheidung&ldquo; an
           und definiere Optionen, die zu weiteren Punkten fuehren.
         </p>
       ) : (

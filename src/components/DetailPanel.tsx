@@ -176,10 +176,10 @@ export function DetailPanel() {
           </label>
         )}
 
-        {/* Entscheidungspunkt: Optionen & Folgen */}
+        {/* Entscheidung: Optionen & Folgen */}
         {marker.type === 'entscheidung' && (
           <div className="field">
-            <span className="field__label">Entscheidungspunkt</span>
+            <span className="field__label">Entscheidung</span>
             <DecisionEditor entity={marker} readOnly={readOnly} />
           </div>
         )}

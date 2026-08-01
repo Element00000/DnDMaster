@@ -22,7 +22,7 @@ npm run build    # Produktions-Build nach dist/
 
 **Datenmodell & Welten (Phase 2)**
 - **Mehrere Kampagnen / Welten** – Umschalter oben, jede mit eigener Karte und Objekten
-- **Echte Objekttypen** statt Freitext: Ort, Charakter, Fraktion, Ereignis, Quest, Gegenstand, Entscheidungspunkt (+ Gefahr/Schatz), jeweils mit typ-spezifischen Feldern
+- **Echte Objekttypen** statt Freitext: Ort, Charakter, Fraktion, Ereignis, Quest, Gegenstand, Entscheidung (+ Gefahr/Schatz), jeweils mit typ-spezifischen Feldern
 - **Geheimnisse** pro Objekt (nur DM sichtbar)
 - **Verknüpfungen** zwischen Objekten (z. B. „befindet sich in", „verbündet mit"), bidirektional angezeigt und klickbar zum Navigieren
 - **Spieler-Ansicht** (Schalter oben): blendet DM-Geheimnisse und noch nicht entdeckte Objekte aus – Grundlage für späteren Spielerzugang
@@ -34,11 +34,11 @@ npm run build    # Produktions-Build nach dist/
 - Zeit-Felder pro Objekt im Detailpanel: Kalendertag + Zeitfenster (Von/Bis)
 
 **Verzweigte Handlungsstränge (Phase 4)**
-- Objekttyp **Entscheidungspunkt** mit 3–5 **Optionen** (Kurztitel + Beschreibung), optional an eine Situation (Ereignis/Quest) gebunden
+- Objekttyp **Entscheidung** mit 3–5 **Optionen** (Kurztitel + Beschreibung), optional an eine Situation (Ereignis/Quest) gebunden
 - Pro Option **Folgen** hinterlegbar: Status/Feld ändern, Objekt auf-/zudecken, Beziehung ändern, oder Freitext-Notiz
 - **„Als eingetreten markieren"** wendet die Folgen automatisch auf Karte, Objekte und Beziehungen an; erneutes Klicken oder „Wahl aufheben" macht sie sauber rückgängig
 - Nicht gewählte Optionen bleiben grau als Notiz erhalten
-- Optionen **verkettbar** („führt zu" nächstem Entscheidungspunkt) → **Handlungsbaum**-Ansicht (Button oben) zeigt alle Punkte nach Verzweigungstiefe, gewählter Pfad hervorgehoben
+- Optionen **verkettbar** („führt zu" nächster Entscheidung) → **Handlungsbaum**-Ansicht (Button oben) zeigt alle Punkte nach Verzweigungstiefe, gewählter Pfad hervorgehoben
 
 **DM-Werkzeuge (Phase 5)**
 - **Globale Suche** in der Kopfleiste über alle Objekte und Sitzungsnotizen; Klick springt zum Treffer
@@ -79,10 +79,10 @@ src/
     PlaceholderMap.tsx   Generierte Pergament-Karte
     Sidebar.tsx          Objekttypen + gruppierte Liste
     DetailPanel.tsx      Detail-/Bearbeitungsansicht
-    DecisionEditor.tsx   Entscheidungspunkt: Optionen, Folgen, Verkettung
+    DecisionEditor.tsx   Entscheidung: Optionen, Folgen, Verkettung
     TimeSlider.tsx       Uhrzeit-Regler über der Karte
     Timeline.tsx         Kampagnen-Zeitleiste (Kalendertag)
-    StoryTree.tsx        Handlungsbaum der Entscheidungspunkte
+    StoryTree.tsx        Handlungsbaum der Entscheidungen
     TopBar.tsx           Kopfleiste, Kampagnen, Spielermodus, Werkzeuge
 ```
 

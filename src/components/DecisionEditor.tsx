@@ -8,7 +8,7 @@ import type { DecisionOption, Effect, Entity, RelationType } from '../types'
 import { useStore } from '../store/useStore'
 import { uid } from '../utils/id'
 
-/** Editor fuer einen Entscheidungspunkt: Optionen, Folgen, Wahl, Verkettung. */
+/** Editor fuer eine Entscheidung: Optionen, Folgen, Wahl, Verkettung. */
 export function DecisionEditor({ entity, readOnly }: { entity: Entity; readOnly: boolean }) {
   const campaign = useStore((s) => s.campaigns.find((c) => c.id === s.activeCampaignId) ?? s.campaigns[0])
   const updateDecision = useStore((s) => s.updateDecision)

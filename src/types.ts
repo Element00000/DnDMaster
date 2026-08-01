@@ -33,7 +33,7 @@ export const ENTITY_TYPES: EntityTypeMeta[] = [
   { type: 'ereignis', label: 'Ereignis', plural: 'Ereignisse', icon: '\u{1F4C5}', color: '#3b7dd8' },
   { type: 'quest', label: 'Quest', plural: 'Quests', icon: '\u{1F4DC}', color: '#c98a1f' },
   { type: 'item', label: 'Gegenstand', plural: 'Gegenstaende', icon: '\u{1F5DD}', color: '#8e7cc3' },
-  { type: 'entscheidung', label: 'Entscheidungspunkt', plural: 'Entscheidungspunkte', icon: '\u{1F500}', color: '#d98c1f' },
+  { type: 'entscheidung', label: 'Entscheidung', plural: 'Entscheidungen', icon: '\u{1F500}', color: '#d98c1f' },
   { type: 'gefahr', label: 'Gefahr', plural: 'Gefahren', icon: '\u{2620}', color: '#c0392b' },
   { type: 'schatz', label: 'Schatz', plural: 'Schaetze', icon: '\u{1F48E}', color: '#8e44ad' },
 ]
@@ -249,7 +249,7 @@ export function relationMeta(relation: RelationType): RelationMeta {
   return RELATIONS.find((r) => r.relation === relation) ?? RELATIONS[RELATIONS.length - 1]
 }
 
-// ---------- Entscheidungspunkte / verzweigte Handlungsstraenge (Phase 4) ----------
+// ---------- Entscheidungen / verzweigte Handlungsstraenge (Phase 4) ----------
 
 /**
  * Eine Folge, die eintritt, wenn eine Option gewaehlt wird. Alle Effekte
@@ -281,7 +281,7 @@ export interface DecisionOption {
   label: string
   description: string
   effects: Effect[]
-  /** Verkettung: fuehrt zu diesem naechsten Entscheidungspunkt. */
+  /** Verkettung: fuehrt zu dieser naechsten Entscheidung. */
   nextDecisionId: string | null
   /** Beim Anwenden gefuellt, um die Folgen zuruecknehmen zu koennen. */
   undo: UndoEntry[] | null

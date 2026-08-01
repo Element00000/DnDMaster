@@ -160,7 +160,7 @@ interface StoreState extends AppData {
   /** Platzierte Entitaet um ein Weltkoordinaten-Delta verschieben. */
   moveEntity: (id: string, dxWorld: number, dyWorld: number) => void
 
-  // Entscheidungspunkte (Phase 4)
+  // Entscheidungen (Phase 4)
   updateDecision: (entityId: string, patch: Partial<DecisionData>) => void
   addOption: (entityId: string) => void
   updateOption: (
@@ -583,7 +583,7 @@ export const useStore = create<StoreState>()(
             ),
           })),
 
-        // ---------- Entscheidungspunkte ----------
+        // ---------- Entscheidungen ----------
         updateDecision: (entityId, patch) =>
           patchDecision(patchActive, entityId, (d) => ({ ...d, ...patch })),
 
@@ -1020,7 +1020,7 @@ function standardName(type: EntityType, existing: Entity[]): string {
     ereignis: 'Neues Ereignis',
     quest: 'Neue Quest',
     item: 'Neuer Gegenstand',
-    entscheidung: 'Neuer Entscheidungspunkt',
+    entscheidung: 'Neue Entscheidung',
     gefahr: 'Neue Gefahr',
     schatz: 'Neuer Schatz',
   }

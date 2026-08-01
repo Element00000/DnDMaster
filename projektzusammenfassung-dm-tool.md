@@ -29,20 +29,20 @@ Name, Ziel, Ressourcen, Beziehungen zu anderen Fraktionen (verbündet, verfeinde
 Titel, Beschreibung, Zeitpunkt oder Zeitraum, beteiligte Charaktere und Orte, Ursache und Folge (was hat dieses Ereignis ausgelöst, was löst es aus)
 
 **Quests und Handlungsstränge**
-Titel, Status (offen, aktiv, abgeschlossen, gescheitert), beteiligte Charaktere und Orte, Notizen zu möglichen Entwicklungen, optional verknüpft mit einem oder mehreren Entscheidungspunkten (siehe Abschnitt 4)
+Titel, Status (offen, aktiv, abgeschlossen, gescheitert), beteiligte Charaktere und Orte, Notizen zu möglichen Entwicklungen, optional verknüpft mit einer oder mehreren Entscheidungen (siehe Abschnitt 4)
 
 **Gegenstände**
 Name, Beschreibung, aktueller Besitzer oder Fundort, Bedeutung für die Geschichte
 
-## 4. Verzweigte Handlungsstränge (Entscheidungspunkte)
+## 4. Verzweigte Handlungsstränge (Entscheidungen)
 
-Damit sich die Geschichte tatsächlich nach den Entscheidungen der Spielgruppe entwickelt, lassen sich an ausgewählten Stellen der Kampagne Entscheidungspunkte hinterlegen, an denen die Handlung in unterschiedliche Richtungen weiterläuft.
+Damit sich die Geschichte tatsächlich nach den Entscheidungen der Spielgruppe entwickelt, lassen sich an ausgewählten Stellen der Kampagne Entscheidungen hinterlegen, an denen die Handlung in unterschiedliche Richtungen weiterläuft.
 
-* Ein Entscheidungspunkt gehört zu einer Situation (zum Beispiel einem Ereignis oder einer Quest) und enthält 3 bis 5 mögliche Optionen mit je einer kurzen Beschreibung
+* Eine Entscheidung gehört zu einer Situation (zum Beispiel einem Ereignis oder einer Quest) und enthält 3 bis 5 mögliche Optionen mit je einer kurzen Beschreibung
 * Jede Option kann eigene Folgen auslösen: neue oder veränderte Ereignisse, ein anderer Status bei Orten oder Fraktionen, neue Marker auf der Karte, ein verändertes Verhältnis zwischen NSCs
 * Sobald eine Option während des Spiels gewählt wird, markiert der DM sie als eingetreten, und die zugehörigen Folgen werden automatisch für die Karte, die Zeitleiste und die betroffenen Charaktere übernommen. Die übrigen, nicht gewählten Optionen bleiben als Notiz erhalten, falls sie später doch noch relevant werden oder man den ursprünglichen Plan nachschlagen möchte
-* Entscheidungspunkte lassen sich verketten, sodass eine gewählte Option wiederum zum nächsten Entscheidungspunkt führt. Daraus entsteht ein Handlungsbaum, der sich als eigene Baum oder Netzwerkansicht darstellen lässt, ähnlich wie der Beziehungsgraph, nur für den Verlauf der Geschichte statt für Charaktere
-* Auf der Karte selbst zeigt ein Entscheidungspunkt-Marker beim Anklicken die offenen Optionen an, sodass der DM während der Sitzung direkt am jeweiligen Ort nachsehen kann, welche Wege noch offenstehen
+* Entscheidungen lassen sich verketten, sodass eine gewählte Option wiederum zur nächsten Entscheidung führt. Daraus entsteht ein Handlungsbaum, der sich als eigene Baum oder Netzwerkansicht darstellen lässt, ähnlich wie der Beziehungsgraph, nur für den Verlauf der Geschichte statt für Charaktere
+* Auf der Karte selbst zeigt ein Entscheidungs-Marker beim Anklicken die offenen Optionen an, sodass der DM während der Sitzung direkt am jeweiligen Ort nachsehen kann, welche Wege noch offenstehen
 * Optional: mehrere parallele Handlungsstränge gleichzeitig im Blick behalten, etwa wenn verschiedene Spielergruppen oder Charaktere an unterschiedlichen Orten unterschiedliche Entscheidungen getroffen haben
 
 ## 5. Zeitliche Dimension
@@ -76,7 +76,7 @@ Zwei unterschiedliche Zeitebenen sind sinnvoll, da sie unterschiedliche Fragen b
 ## 7. Möglicher Aufbau der Oberfläche
 
 * Hauptansicht: die Karte, groß und zentral
-* Seitenleiste mit Kategorien (Orte, Charaktere, Fraktionen, Ereignisse, Quests, Entscheidungspunkte), über die man auch ohne Kartenklick navigieren kann
+* Seitenleiste mit Kategorien (Orte, Charaktere, Fraktionen, Ereignisse, Quests, Entscheidungen), über die man auch ohne Kartenklick navigieren kann
 * Detailansicht als Seitenpanel oder Modal, wenn man auf einen Marker oder Listeneintrag klickt
 * Obere Leiste mit Zugriff auf Zeitleiste, Sitzungsnotizen und Werkzeuge
 * Zwei Modi denkbar: ein Vorbereitungsmodus (volle Sicht auf alles, Bearbeitung möglich) und ein Spieltischmodus (reduzierte, aufgeräumte Ansicht für den Live-Einsatz am Tisch)
@@ -84,7 +84,7 @@ Zwei unterschiedliche Zeitebenen sind sinnvoll, da sie unterschiedliche Fragen b
 ## 8. Technischer Rahmen (Vorschlag)
 
 * Kartendarstellung: SVG oder Canvas basiert (zum Beispiel mit Leaflet für eine klassische Kartenmetapher mit Zoom und Ebenen, oder eine einfache eigene SVG Lösung für mehr Kontrolle über das Aussehen)
-* Datenmodell: zentrale Objekte (Orte, Charaktere, Fraktionen, Ereignisse, Quests, Items, Entscheidungspunkte mit ihren Optionen) mit Verknüpfungen untereinander, am besten als eigenständige Datensätze, nicht als reiner Freitext. Ein Entscheidungspunkt referenziert dabei die Ereignisse, Orte oder Statusänderungen, die jede seiner Optionen auslöst
+* Datenmodell: zentrale Objekte (Orte, Charaktere, Fraktionen, Ereignisse, Quests, Items, Entscheidungen mit ihren Optionen) mit Verknüpfungen untereinander, am besten als eigenständige Datensätze, nicht als reiner Freitext. Eine Entscheidung referenziert dabei die Ereignisse, Orte oder Statusänderungen, die jede seiner Optionen auslöst
 * Speicherung: lokale Datenbank (zum Beispiel SQLite) für ein Ein-Nutzer-Tool, mit der Möglichkeit später eine Cloud-Synchronisierung oder Mehrbenutzerfähigkeit (für Spieler-Zugriff) zu ergänzen
 * Frontend: React für die interaktiven Elemente, da sich Kartenmarker, Detailpanels und Filterlisten gut als Komponenten abbilden lassen
 
@@ -100,7 +100,7 @@ Eigene Objekttypen für Orte, Charaktere, Fraktionen, Ereignisse mit echten Verk
 Chronologische Ansicht nach Kalendertag, Verknüpfung mit der Karte, sowie der Uhrzeit-Regler, der Marker auf der Karte ein und ausblendet
 
 **Phase 4, Entscheidungsstränge**
-Entscheidungspunkte mit 3 bis 5 Optionen anlegen, Folgen je Option hinterlegen, gewählte Option markieren und Auswirkungen auf Karte und Zeitleiste automatisch übernehmen
+Entscheidungen mit 3 bis 5 Optionen anlegen, Folgen je Option hinterlegen, gewählte Option markieren und Auswirkungen auf Karte und Zeitleiste automatisch übernehmen
 
 **Phase 5, DM Werkzeuge**
 Kampf Tracker, Sitzungsnotizen, Würfelwerkzeug, Suche
@@ -115,4 +115,4 @@ Spieltischmodus, Nebel des Krieges für Spieler-Sichtbarkeit, eigene Kartenbilde
 * Wie wichtig ist der Spieltischmodus für den Liveeinsatz während der Sitzung im Vergleich zur reinen Vorbereitung zuhause
 * Soll die Karte handgezeichnet hochgeladen werden, oder wird auch eine Kartengenerierung innerhalb des Tools gewünscht
 * Soll der Uhrzeit-Regler nur für die aktuell ausgewählte Karte gelten, oder soll eine eingestellte Uhrzeit auch beim Wechsel zwischen Weltkarte, Regionalkarte und Stadtplan erhalten bleiben
-* Sollen nicht gewählte Optionen eines Entscheidungspunkts nach der Wahl weiterhin sichtbar bleiben, etwa als grau hinterlegte Notiz, oder komplett ausgeblendet werden
+* Sollen nicht gewählte Optionen einer Entscheidung nach der Wahl weiterhin sichtbar bleiben, etwa als grau hinterlegte Notiz, oder komplett ausgeblendet werden
