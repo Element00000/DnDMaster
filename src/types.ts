@@ -42,6 +42,18 @@ export function entityMeta(type: EntityType): EntityTypeMeta {
   return ENTITY_TYPES.find((m) => m.type === type) ?? ENTITY_TYPES[0]
 }
 
+/** Berufs-/Rollenkategorien fuer freundliche Charaktere (nsc, Gesinnung 'freund'). */
+export const FREUND_BERUFE: { value: string; label: string }[] = [
+  { value: 'haendler', label: 'Haendler' },
+  { value: 'wirt', label: 'Wirt' },
+  { value: 'handwerker', label: 'Handwerker' },
+  { value: 'waechter', label: 'Waechter' },
+  { value: 'adliger', label: 'Adliger' },
+  { value: 'gelehrter', label: 'Gelehrter' },
+  { value: 'heiler', label: 'Heiler' },
+  { value: 'sonstiges', label: 'Sonstiges' },
+]
+
 /** Sichtbarkeit fuer Nebel des Krieges / Spielerzugang. */
 export type Visibility = 'dm' | 'spieler'
 
@@ -86,6 +98,19 @@ export interface Entity {
   /** Ende des Tageszeit-Fensters in Minuten (0..1439). start>end = ueber Mitternacht. */
   timeEnd: number | null
   createdAt: number
+}
+
+/**
+ * Icon/Farbe fuer die Anzeige (Karte etc.), inkl. Ueberschreibung fuer
+ * Charaktere: Freund gruen, Feind rot, mit jeweils sprechendem Icon.
+ */
+export function entityDisplayMeta(entity: Entity): EntityTypeMeta {
+  const meta = entityMeta(entity.type)
+  if (entity.type === 'nsc') {
+    if (entity.fields.gesinnung === 'freund') return { ...meta, icon: '\u{1F91D}', color: '#3fa34d' }
+    if (entity.fields.gesinnung === 'feind') return { ...meta, icon: '\u{1F479}', color: '#c0392b' }
+  }
+  return meta
 }
 
 /** Aufgedeckter Kreis fuer den Nebel des Krieges (Weltkoordinaten). */

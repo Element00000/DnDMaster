@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import {
   ENTITY_TYPES,
   FIELD_SCHEMA,
+  FREUND_BERUFE,
   RELATIONS,
   entityMeta,
   relationMeta,
@@ -180,17 +181,36 @@ export function DetailPanel() {
 
         {/* Charakter: Freund-Dialog oder Feind-Begegnung, je nach Gesinnung */}
         {marker.type === 'nsc' && marker.fields.gesinnung === 'freund' && (
-          <label className="field">
-            <span className="field__label">Dialog</span>
-            <textarea
-              className="field__control field__textarea"
-              value={marker.fields.dialog ?? ''}
-              onChange={(e) => setEntityField(marker.id, 'dialog', e.target.value)}
-              placeholder="Moegliche Dialogzeilen, Anliegen, Ton der Figur ..."
-              rows={4}
-              disabled={readOnly}
-            />
-          </label>
+          <>
+            <label className="field">
+              <span className="field__label">Beruf</span>
+              <select
+                className="field__control"
+                value={marker.fields.beruf ?? ''}
+                onChange={(e) => setEntityField(marker.id, 'beruf', e.target.value)}
+                disabled={readOnly}
+              >
+                <option value="">&ndash;</option>
+                {FREUND_BERUFE.map((b) => (
+                  <option key={b.value} value={b.value}>
+                    {b.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="field">
+              <span className="field__label">Dialog</span>
+              <textarea
+                className="field__control field__textarea"
+                value={marker.fields.dialog ?? ''}
+                onChange={(e) => setEntityField(marker.id, 'dialog', e.target.value)}
+                placeholder="Moegliche Dialogzeilen, Anliegen, Ton der Figur ..."
+                rows={4}
+                disabled={readOnly}
+              />
+            </label>
+          </>
         )}
 
         {marker.type === 'nsc' && marker.fields.gesinnung === 'feind' && (

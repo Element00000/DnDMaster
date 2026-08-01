@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useStore } from '../store/useStore'
-import { entityMeta } from '../types'
+import { entityDisplayMeta } from '../types'
 import { dayNightOverlay, inWindow } from '../utils/time'
 import { useAsset } from '../useAsset'
 import { PlaceholderMap } from './PlaceholderMap'
@@ -269,7 +269,7 @@ export function MapCanvas() {
 
       <div className="map-markers">
         {pins.map((e) => {
-          const meta = entityMeta(e.type)
+          const meta = entityDisplayMeta(e)
           return (
             <MapPin
               key={e.id}
