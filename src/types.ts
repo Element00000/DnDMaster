@@ -181,6 +181,15 @@ export const FIELD_SCHEMA: Record<EntityType, FieldDef[]> = {
   nsc: [
     { key: 'rolle', label: 'Rolle', kind: 'text', placeholder: 'z.B. Wirtin, Hauptmann ...' },
     { key: 'motivation', label: 'Motivation', kind: 'textarea', placeholder: 'Was treibt die Figur an?' },
+    {
+      key: 'gesinnung',
+      label: 'Gesinnung',
+      kind: 'select',
+      options: [
+        { value: 'freund', label: 'Freund' },
+        { value: 'feind', label: 'Feind' },
+      ],
+    },
   ],
   fraktion: [
     { key: 'ziel', label: 'Ziel', kind: 'textarea', placeholder: 'Wonach strebt die Fraktion?' },
@@ -203,6 +212,18 @@ export const FIELD_SCHEMA: Record<EntityType, FieldDef[]> = {
     },
   ],
   item: [
+    {
+      key: 'art',
+      label: 'Art',
+      kind: 'select',
+      options: [
+        { value: 'ausruestung', label: 'Ausruestung' },
+        { value: 'waffe', label: 'Waffe' },
+        { value: 'verbrauchsgut', label: 'Verbrauchsgut' },
+        { value: 'artefakt', label: 'Artefakt' },
+        { value: 'schatz', label: 'Schatz' },
+      ],
+    },
     { key: 'besitzer', label: 'Besitzer / Fundort', kind: 'text' },
     { key: 'bedeutung', label: 'Bedeutung', kind: 'textarea' },
   ],

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import {
   ENTITY_TYPES,
   FIELD_SCHEMA,
@@ -9,6 +9,8 @@ import {
 import type { Entity, EntityType, RelationType, Visibility } from '../types'
 import { useStore } from '../store/useStore'
 import { formatTime, parseTime } from '../utils/time'
+import { fileToScaledDataUrl } from '../utils/image'
+import { deleteAsset, putAsset } from '../utils/assets'
 import { DecisionEditor } from './DecisionEditor'
 import { EventEditor } from './EventEditor'
 import { AssetImg } from './AssetImg'
@@ -174,6 +176,30 @@ export function DetailPanel() {
               rows={3}
             />
           </label>
+        )}
+
+        {/* Charakter: Freund-Dialog oder Feind-Begegnung, je nach Gesinnung */}
+        {marker.type === 'nsc' && marker.fields.gesinnung === 'freund' && (
+          <label className="field">
+            <span className="field__label">Dialog</span>
+            <textarea
+              className="field__control field__textarea"
+              value={marker.fields.dialog ?? ''}
+              onChange={(e) => setEntityField(marker.id, 'dialog', e.target.value)}
+              placeholder="Moegliche Dialogzeilen, Anliegen, Ton der Figur ..."
+              rows={4}
+              disabled={readOnly}
+            />
+          </label>
+        )}
+
+        {marker.type === 'nsc' && marker.fields.gesinnung === 'feind' && (
+          <FeindFields
+            entity={marker}
+            readOnly={readOnly}
+            onImageChange={(ref) => updateEntity(marker.id, { imageUrl: ref })}
+            onFieldChange={(key, value) => setEntityField(marker.id, key, value)}
+          />
         )}
 
         {/* Entscheidung: Optionen & Folgen */}
@@ -451,5 +477,56 @@ function LinksEditor({
         </div>
       )}
     </div>
+  )
+}
+
+function FeindFields({
+  entity,
+  readOnly,
+  onImageChange,
+  onFieldChange,
+}: {
+  entity: Entity
+  readOnly: boolean
+  onImageChange: (ref: string) => void
+  onFieldChange: (key: string, value: string) => void
+}) {
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    const prev = entity.imageUrl
+    const { url } = await fileToScaledDataUrl(file, { maxDim: 900, quality: 0.82 })
+    const ref = await putAsset(url)
+    onImageChange(ref)
+    void deleteAsset(prev)
+  }
+
+  return (
+    <>
+      {!readOnly && (
+        <div className="field field--row">
+          <span className="field__label">Bild</span>
+          <input ref={fileRef} type="file" accept="image/*" hidden onChange={onFile} />
+          <button className="btn btn--sm" onClick={() => fileRef.current?.click()}>
+            {entity.imageUrl ? 'Bild ersetzen' : 'Bild hochladen'}
+          </button>
+        </div>
+      )}
+
+      <label className="field">
+        <span className="field__label">Einleitungstext fuer die Begegnung</span>
+        <textarea
+          className="field__control field__textarea"
+          value={entity.fields.begegnungstext ?? ''}
+          onChange={(e) => onFieldChange('begegnungstext', e.target.value)}
+          placeholder="Wie wird die Begegnung eingeleitet? Was sieht/hoert die Gruppe zuerst?"
+          rows={4}
+          disabled={readOnly}
+        />
+      </label>
+    </>
   )
 }
