@@ -516,7 +516,7 @@ export const useStore = create<StoreState>()(
           const entity: Entity = {
             id,
             type,
-            name: name ?? standardName(type, get().activeCampaign().entities),
+            name: name ?? standardName(type, get().activeCampaign().entities, fields),
             description: '',
             secret: '',
             visibility: 'dm',
@@ -1076,7 +1076,21 @@ function revertEffects(entities: Entity[], undo: UndoEntry[]): Entity[] {
   return out
 }
 
-function standardName(type: EntityType, existing: Entity[]): string {
+const NSC_GESINNUNG_LABELS: Record<string, string> = {
+  freund: 'Freund',
+  feind: 'Feind',
+  neutral: 'Neutrale Kreatur',
+}
+
+function standardName(type: EntityType, existing: Entity[], fields?: Record<string, string>): string {
+  if (type === 'nsc') {
+    const gesinnung = fields?.gesinnung
+    const label = gesinnung ? NSC_GESINNUNG_LABELS[gesinnung] : undefined
+    if (label) {
+      const count = existing.filter((e) => e.type === 'nsc' && e.fields.gesinnung === gesinnung).length + 1
+      return `${label} ${count}`
+    }
+  }
   const count = existing.filter((e) => e.type === type).length + 1
   const labels: Record<EntityType, string> = {
     ort: 'Neuer Ort',
