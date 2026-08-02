@@ -7,7 +7,7 @@ import {
   entityMeta,
   relationMeta,
 } from '../types'
-import type { Entity, EntityType, RelationType, Visibility } from '../types'
+import type { Campaign, Entity, EntityType, RelationType, Visibility } from '../types'
 import { useStore } from '../store/useStore'
 import { formatTime, parseTime } from '../utils/time'
 import { fileToScaledDataUrl } from '../utils/image'
@@ -24,6 +24,7 @@ export function DetailPanel() {
   const setEntityField = useStore((s) => s.setEntityField)
   const deleteEntity = useStore((s) => s.deleteEntity)
   const selectEntity = useStore((s) => s.selectEntity)
+  const addEntity = useStore((s) => s.addEntity)
   const addLink = useStore((s) => s.addLink)
   const removeLink = useStore((s) => s.removeLink)
   const setPlacement = useStore((s) => s.setPlacement)
@@ -219,6 +220,19 @@ export function DetailPanel() {
             readOnly={readOnly}
             onImageChange={(ref) => updateEntity(marker.id, { imageUrl: ref })}
             onFieldChange={(key, value) => setEntityField(marker.id, key, value)}
+          />
+        )}
+
+        {/* Charakter: Fraktion waehlen oder neu anlegen */}
+        {marker.type === 'nsc' && (
+          <FactionField
+            entity={marker}
+            campaign={campaign}
+            readOnly={readOnly}
+            addEntity={addEntity}
+            addLink={addLink}
+            removeLink={removeLink}
+            selectEntity={selectEntity}
           />
         )}
 
@@ -497,6 +511,64 @@ function LinksEditor({
         </div>
       )}
     </div>
+  )
+}
+
+function FactionField({
+  entity,
+  campaign,
+  readOnly,
+  addEntity,
+  addLink,
+  removeLink,
+  selectEntity,
+}: {
+  entity: Entity
+  campaign: Campaign
+  readOnly: boolean
+  addEntity: (input: { type: EntityType; name?: string }) => string
+  addLink: (fromId: string, targetId: string, relation: RelationType) => void
+  removeLink: (fromId: string, targetId: string, relation: RelationType) => void
+  selectEntity: (id: string | null) => void
+}) {
+  const factions = campaign.entities.filter((e) => e.type === 'fraktion')
+  const currentId =
+    entity.links.find(
+      (l) => l.relation === 'gehoert_zu' && campaign.entities.find((e) => e.id === l.targetId)?.type === 'fraktion',
+    )?.targetId ?? ''
+
+  function onChange(value: string) {
+    if (currentId) removeLink(entity.id, currentId, 'gehoert_zu')
+    if (value === '__new__') {
+      const name = prompt('Name der neuen Fraktion:')
+      if (name && name.trim()) {
+        const newId = addEntity({ type: 'fraktion', name: name.trim() })
+        addLink(entity.id, newId, 'gehoert_zu')
+        selectEntity(entity.id)
+      }
+    } else if (value) {
+      addLink(entity.id, value, 'gehoert_zu')
+    }
+  }
+
+  return (
+    <label className="field">
+      <span className="field__label">Fraktion</span>
+      <select
+        className="field__control"
+        value={currentId}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={readOnly}
+      >
+        <option value="">&ndash; keine &ndash;</option>
+        {factions.map((f) => (
+          <option key={f.id} value={f.id}>
+            {f.name}
+          </option>
+        ))}
+        <option value="__new__">+ Neue Fraktion ...</option>
+      </select>
+    </label>
   )
 }
 
