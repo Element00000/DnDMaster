@@ -197,6 +197,16 @@ export const GESINNUNG_OPTIONS: { value: string; label: string }[] = [
   { value: 'neutral', label: 'Neutral / unklar' },
 ]
 
+/** Art eines Gegenstands (Auswahl beim Anlegen und im Objekt-Feld "Art"). */
+export const ITEM_ART_OPTIONS: { value: string; label: string }[] = [
+  { value: 'schatz', label: 'Schatz' },
+  { value: 'waffe', label: 'Waffe' },
+  { value: 'objekt', label: 'Objekt' },
+  { value: 'ausruestung', label: 'Ausruestung' },
+  { value: 'verbrauchsgut', label: 'Verbrauchsgut' },
+  { value: 'artefakt', label: 'Artefakt' },
+]
+
 export const FIELD_SCHEMA: Record<EntityType, FieldDef[]> = {
   ort: [
     {
@@ -238,18 +248,7 @@ export const FIELD_SCHEMA: Record<EntityType, FieldDef[]> = {
     },
   ],
   item: [
-    {
-      key: 'art',
-      label: 'Art',
-      kind: 'select',
-      options: [
-        { value: 'ausruestung', label: 'Ausruestung' },
-        { value: 'waffe', label: 'Waffe' },
-        { value: 'verbrauchsgut', label: 'Verbrauchsgut' },
-        { value: 'artefakt', label: 'Artefakt' },
-        { value: 'schatz', label: 'Schatz' },
-      ],
-    },
+    { key: 'art', label: 'Art', kind: 'select', options: ITEM_ART_OPTIONS },
     { key: 'besitzer', label: 'Besitzer / Fundort', kind: 'text' },
     { key: 'bedeutung', label: 'Bedeutung', kind: 'textarea' },
   ],

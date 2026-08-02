@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
-import { ENTITY_TYPES, GESINNUNG_OPTIONS, entityDisplayMeta } from '../types'
+import { ENTITY_TYPES, GESINNUNG_OPTIONS, ITEM_ART_OPTIONS, entityDisplayMeta } from '../types'
 import type { Entity, EntityType } from '../types'
 import { useStore } from '../store/useStore'
 import type { ToolTab } from '../store/useStore'
@@ -13,6 +13,12 @@ const TOOL_ITEMS: { tab: ToolTab; label: string; icon: string }[] = [
   { tab: 'ki', label: 'KI', icon: '\u{2728}' },
   { tab: 'musik', label: 'Musik', icon: '\u{1F3B5}' },
 ]
+
+/** Typen, die beim Anlegen erst eine Auswahl per PopUp verlangen (Feld -> Optionen). */
+const PICKER_POPUPS: Partial<Record<EntityType, { fieldKey: string; options: { value: string; label: string }[] }>> = {
+  nsc: { fieldKey: 'gesinnung', options: GESINNUNG_OPTIONS },
+  item: { fieldKey: 'art', options: ITEM_ART_OPTIONS },
+}
 
 export function Sidebar() {
   const campaign = useStore((s) => s.campaigns.find((c) => c.id === s.activeCampaignId) ?? s.campaigns[0])
@@ -31,7 +37,7 @@ export function Sidebar() {
   const setToolsOpen = useStore((s) => s.setToolsOpen)
   const setToolsTab = useStore((s) => s.setToolsTab)
 
-  const [nscPopupPos, setNscPopupPos] = useState<{ top: number; left: number } | null>(null)
+  const [popup, setPopup] = useState<{ type: EntityType; top: number; left: number } | null>(null)
 
   function openTool(tab: ToolTab) {
     if (toolsOpen && toolsTab === tab) {
@@ -46,15 +52,15 @@ export function Sidebar() {
   const visible = campaign.entities.filter((e) => !playerMode || e.visibility === 'spieler')
 
   function startAdding(type: EntityType) {
-    setNscPopupPos(null)
+    setPopup(null)
     setPendingType(type)
     setTool('add')
   }
 
-  function startAddingCharacter(gesinnung: string) {
-    setNscPopupPos(null)
-    setPendingType('nsc')
-    setPendingFields({ gesinnung })
+  function startAddingWithChoice(type: EntityType, fieldKey: string, value: string) {
+    setPopup(null)
+    setPendingType(type)
+    setPendingFields({ [fieldKey]: value })
     setTool('add')
   }
 
@@ -92,55 +98,47 @@ export function Sidebar() {
               : 'Typ waehlen, dann auf die Karte klicken.'}
           </p>
           <div className="type-grid">
-            {ENTITY_TYPES.filter((t) => t.type !== 'fraktion' && t.type !== 'quest' && t.type !== 'gefahr').map((t) =>
-              t.type === 'nsc' ? (
+            {ENTITY_TYPES.filter((t) => t.type !== 'fraktion' && t.type !== 'quest' && t.type !== 'gefahr' && t.type !== 'schatz').map((t) => {
+              const picker = PICKER_POPUPS[t.type]
+              return (
                 <button
                   key={t.type}
-                  className={`type-chip${tool === 'add' && pendingType === 'nsc' ? ' is-active' : ''}`}
+                  className={`type-chip${tool === 'add' && pendingType === t.type ? ' is-active' : ''}`}
                   style={{ ['--chip-color' as string]: t.color }}
                   onClick={(e) => {
-                    if (nscPopupPos) {
-                      setNscPopupPos(null)
+                    if (!picker) {
+                      startAdding(t.type)
+                      return
+                    }
+                    if (popup?.type === t.type) {
+                      setPopup(null)
                       return
                     }
                     const r = e.currentTarget.getBoundingClientRect()
-                    setNscPopupPos({ top: r.top, left: r.right + 8 })
+                    setPopup({ type: t.type, top: r.top, left: r.right + 8 })
                   }}
                   title={`${t.label} hinzufuegen`}
                 >
                   <span className="type-chip__icon">{t.icon}</span>
                   <span className="type-chip__label">{t.label}</span>
                 </button>
-              ) : (
-                <button
-                  key={t.type}
-                  className={`type-chip${tool === 'add' && pendingType === t.type ? ' is-active' : ''}`}
-                  style={{ ['--chip-color' as string]: t.color }}
-                  onClick={() => startAdding(t.type)}
-                  title={`${t.label} hinzufuegen`}
-                >
-                  <span className="type-chip__icon">{t.icon}</span>
-                  <span className="type-chip__label">{t.label}</span>
-                </button>
-              ),
-            )}
+              )
+            })}
           </div>
 
-          {nscPopupPos &&
+          {popup &&
+            PICKER_POPUPS[popup.type] &&
             createPortal(
               <>
-                <div className="popover-backdrop" onClick={() => setNscPopupPos(null)} />
-                <div
-                  className="gesinnung-popover"
-                  style={{ top: nscPopupPos.top, left: nscPopupPos.left }}
-                >
-                  {GESINNUNG_OPTIONS.map((g) => (
+                <div className="popover-backdrop" onClick={() => setPopup(null)} />
+                <div className="picker-popover" style={{ top: popup.top, left: popup.left }}>
+                  {PICKER_POPUPS[popup.type]!.options.map((o) => (
                     <button
-                      key={g.value}
-                      className="gesinnung-popover__opt"
-                      onClick={() => startAddingCharacter(g.value)}
+                      key={o.value}
+                      className="picker-popover__opt"
+                      onClick={() => startAddingWithChoice(popup.type, PICKER_POPUPS[popup.type]!.fieldKey, o.value)}
                     >
-                      {g.label}
+                      {o.label}
                     </button>
                   ))}
                 </div>

@@ -328,7 +328,7 @@ button {
   z-index: 30;
 }
 
-.gesinnung-popover {
+.picker-popover {
   position: fixed;
   z-index: 31;
   display: flex;
@@ -342,7 +342,7 @@ button {
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
 }
 
-.gesinnung-popover__opt {
+.picker-popover__opt {
   padding: 8px 10px;
   border-radius: var(--radius-sm);
   border: 1px solid transparent;
@@ -353,7 +353,7 @@ button {
   white-space: nowrap;
 }
 
-.gesinnung-popover__opt:hover {
+.picker-popover__opt:hover {
   border-color: var(--gold);
   background: color-mix(in srgb, var(--gold) 14%, var(--panel-2));
 }
