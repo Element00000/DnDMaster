@@ -202,6 +202,23 @@ export function TopBar() {
         <input ref={importRef} type="file" accept="application/json,.json" hidden onChange={onImport} />
       </div>
 
+      <input ref={fileRef} type="file" accept="image/*" onChange={onFile} hidden />
+      <button className="btn" onClick={() => fileRef.current?.click()}>
+        Meine Karte
+      </button>
+      {layer.imageUrl && (
+        <button
+          className="btn btn--ghost"
+          onClick={() => {
+            const prev = layer.imageUrl
+            resetLayerImage(layer.id)
+            void deleteAsset(prev)
+          }}
+        >
+          Platzhalter
+        </button>
+      )}
+
       <SearchBar />
 
       <div className="topbar__meta">{entityCount} Objekte</div>
@@ -235,23 +252,6 @@ export function TopBar() {
         >
           Spieltisch
         </button>
-
-        <input ref={fileRef} type="file" accept="image/*" onChange={onFile} hidden />
-        <button className="btn" onClick={() => fileRef.current?.click()}>
-          Kartenbild
-        </button>
-        {layer.imageUrl && (
-          <button
-            className="btn btn--ghost"
-            onClick={() => {
-              const prev = layer.imageUrl
-              resetLayerImage(layer.id)
-              void deleteAsset(prev)
-            }}
-          >
-            Platzhalter
-          </button>
-        )}
       </div>
     </header>
   )
