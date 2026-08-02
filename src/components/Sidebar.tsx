@@ -1,3 +1,5 @@
+import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { ENTITY_TYPES, GESINNUNG_OPTIONS, entityDisplayMeta } from '../types'
 import type { Entity, EntityType } from '../types'
 import { useStore } from '../store/useStore'
@@ -29,6 +31,8 @@ export function Sidebar() {
   const setToolsOpen = useStore((s) => s.setToolsOpen)
   const setToolsTab = useStore((s) => s.setToolsTab)
 
+  const [nscPopupPos, setNscPopupPos] = useState<{ top: number; left: number } | null>(null)
+
   function openTool(tab: ToolTab) {
     if (toolsOpen && toolsTab === tab) {
       setToolsOpen(false)
@@ -42,7 +46,15 @@ export function Sidebar() {
   const visible = campaign.entities.filter((e) => !playerMode || e.visibility === 'spieler')
 
   function startAdding(type: EntityType) {
+    setNscPopupPos(null)
     setPendingType(type)
+    setTool('add')
+  }
+
+  function startAddingCharacter(gesinnung: string) {
+    setNscPopupPos(null)
+    setPendingType('nsc')
+    setPendingFields({ gesinnung })
     setTool('add')
   }
 
@@ -80,33 +92,61 @@ export function Sidebar() {
               : 'Typ waehlen, dann auf die Karte klicken.'}
           </p>
           <div className="type-grid">
-            {ENTITY_TYPES.map((t) => (
-              <button
-                key={t.type}
-                className={`type-chip${tool === 'add' && pendingType === t.type ? ' is-active' : ''}`}
-                style={{ ['--chip-color' as string]: t.color }}
-                onClick={() => startAdding(t.type)}
-                title={`${t.label} hinzufuegen`}
-              >
-                <span className="type-chip__icon">{t.icon}</span>
-                <span className="type-chip__label">{t.label}</span>
-              </button>
-            ))}
-          </div>
-          {tool === 'add' && pendingType === 'nsc' && (
-            <div className="type-grid">
-              {GESINNUNG_OPTIONS.map((g) => (
+            {ENTITY_TYPES.map((t) =>
+              t.type === 'nsc' ? (
                 <button
-                  key={g.value}
-                  className={`type-chip${pendingFields.gesinnung === g.value ? ' is-active' : ''}`}
-                  onClick={() => setPendingFields({ gesinnung: g.value })}
-                  title={`Gesinnung: ${g.label}`}
+                  key={t.type}
+                  className={`type-chip${tool === 'add' && pendingType === 'nsc' ? ' is-active' : ''}`}
+                  style={{ ['--chip-color' as string]: t.color }}
+                  onClick={(e) => {
+                    if (nscPopupPos) {
+                      setNscPopupPos(null)
+                      return
+                    }
+                    const r = e.currentTarget.getBoundingClientRect()
+                    setNscPopupPos({ top: r.top, left: r.right + 8 })
+                  }}
+                  title={`${t.label} hinzufuegen`}
                 >
-                  <span className="type-chip__label">{g.label}</span>
+                  <span className="type-chip__icon">{t.icon}</span>
+                  <span className="type-chip__label">{t.label}</span>
                 </button>
-              ))}
-            </div>
-          )}
+              ) : (
+                <button
+                  key={t.type}
+                  className={`type-chip${tool === 'add' && pendingType === t.type ? ' is-active' : ''}`}
+                  style={{ ['--chip-color' as string]: t.color }}
+                  onClick={() => startAdding(t.type)}
+                  title={`${t.label} hinzufuegen`}
+                >
+                  <span className="type-chip__icon">{t.icon}</span>
+                  <span className="type-chip__label">{t.label}</span>
+                </button>
+              ),
+            )}
+          </div>
+
+          {nscPopupPos &&
+            createPortal(
+              <>
+                <div className="popover-backdrop" onClick={() => setNscPopupPos(null)} />
+                <div
+                  className="gesinnung-popover"
+                  style={{ top: nscPopupPos.top, left: nscPopupPos.left }}
+                >
+                  {GESINNUNG_OPTIONS.map((g) => (
+                    <button
+                      key={g.value}
+                      className="gesinnung-popover__opt"
+                      onClick={() => startAddingCharacter(g.value)}
+                    >
+                      {g.label}
+                    </button>
+                  ))}
+                </div>
+              </>,
+              document.body,
+            )}
           {tool === 'add' ? (
             <div className="sidebar__actions">
               <button

@@ -101,15 +101,15 @@ export interface Entity {
 }
 
 /**
- * Icon/Farbe fuer die Anzeige (Karte etc.), inkl. Ueberschreibung fuer
- * Charaktere: Freund gruen, Feind rot, mit jeweils sprechendem Icon.
+ * Farbe fuer die Anzeige (Karte etc.), inkl. Ueberschreibung fuer Charaktere:
+ * Freund gruen, Feind rot, neutral grau. Das Icon bleibt immer das Charakter-Icon.
  */
 export function entityDisplayMeta(entity: Entity): EntityTypeMeta {
   const meta = entityMeta(entity.type)
   if (entity.type === 'nsc') {
-    if (entity.fields.gesinnung === 'freund') return { ...meta, icon: '\u{1F91D}', color: '#3fa34d' }
-    if (entity.fields.gesinnung === 'feind') return { ...meta, icon: '\u{1F479}', color: '#c0392b' }
-    if (entity.fields.gesinnung === 'neutral') return { ...meta, icon: '\u{1F3AD}', color: '#8a93a8' }
+    if (entity.fields.gesinnung === 'freund') return { ...meta, color: '#3fa34d' }
+    if (entity.fields.gesinnung === 'feind') return { ...meta, color: '#c0392b' }
+    if (entity.fields.gesinnung === 'neutral') return { ...meta, color: '#8a93a8' }
   }
   return meta
 }

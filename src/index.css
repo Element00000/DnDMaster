@@ -322,6 +322,42 @@ button {
   white-space: nowrap;
 }
 
+.popover-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+}
+
+.gesinnung-popover {
+  position: fixed;
+  z-index: 31;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px;
+  min-width: 140px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.gesinnung-popover__opt {
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--ink);
+  font-size: 12px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.gesinnung-popover__opt:hover {
+  border-color: var(--gold);
+  background: color-mix(in srgb, var(--gold) 14%, var(--panel-2));
+}
+
 .marker-list {
   list-style: none;
   margin: 0;
