@@ -38,6 +38,7 @@ export function MapCanvas() {
   const selectedIds = useStore((s) => s.selectedIds)
   const setSelectedIds = useStore((s) => s.setSelectedIds)
   const toggleSelectedId = useStore((s) => s.toggleSelectedId)
+  const deleteEntity = useStore((s) => s.deleteEntity)
   const setTool = useStore((s) => s.setTool)
   const timeEnabled = useStore((s) => s.timeEnabled)
   const timeOfDay = useStore((s) => s.timeOfDay)
@@ -81,6 +82,25 @@ export function MapCanvas() {
     fitToView()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [campaign.id, layer.id])
+
+  // Entf/Ruecktaste: markierte Objekte loeschen (nicht waehrend Texteingabe).
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key !== 'Delete' && e.key !== 'Backspace') return
+      if (playerView || selectedIds.length === 0) return
+      const target = e.target as HTMLElement | null
+      const tag = target?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target?.isContentEditable) return
+      e.preventDefault()
+      const names = selectedIds.map((id) => entities.find((x) => x.id === id)?.name ?? 'Objekt')
+      const question =
+        names.length === 1 ? `Objekt "${names[0]}" loeschen?` : `${names.length} Objekte loeschen?\n\n${names.join(', ')}`
+      if (!confirm(question)) return
+      selectedIds.forEach((id) => deleteEntity(id))
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [selectedIds, playerView, entities, deleteEntity])
 
   const onWheel = useCallback((e: React.WheelEvent) => {
     const el = containerRef.current
@@ -353,7 +373,7 @@ export function MapCanvas() {
               draggable={!playerView && !fogEditing}
               scale={view.scale}
               onClick={(ev) => {
-                if (ev.ctrlKey || ev.metaKey) toggleSelectedId(e.id)
+                if (ev.ctrlKey || ev.metaKey || ev.shiftKey) toggleSelectedId(e.id)
                 else selectEntity(e.id)
               }}
               onMove={(dxWorld, dyWorld) => moveEntity(e.id, dxWorld, dyWorld)}
