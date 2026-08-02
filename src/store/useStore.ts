@@ -48,6 +48,11 @@ function makeCampaign(name: string): Campaign {
   }
 }
 
+/** Maximale Anzahl an Undo-Schritten. */
+const UNDO_LIMIT = 50
+/** Aenderungen innerhalb dieses Fensters zaehlen als ein Undo-Schritt (Tippen, Ziehen). */
+const UNDO_COALESCE_MS = 700
+
 /** Werkzeug-Modus der Karte. */
 export type Tool = 'select' | 'add'
 
@@ -67,6 +72,12 @@ interface StoreState extends AppData {
   placingEntityId: string | null
   /** Spieler-Ansicht: DM-Geheimnisse und unentdeckte Objekte ausblenden. */
   playerMode: boolean
+  /** Rueckgaengig-Verlauf der aktiven Kampagne (nicht persistiert). */
+  undoStack: Campaign[]
+  /** Zeitpunkt des letzten Undo-Snapshots, zum Zusammenfassen schneller Aenderungen. */
+  lastUndoPushAt: number
+  /** Letzte Aenderung an der aktiven Kampagne rueckgaengig machen (Strg+Z). */
+  undo: () => void
 
   // Zeit (Phase 3)
   /** Tageszeit-Filter aktiv? */
@@ -214,11 +225,23 @@ function initialData(): AppData {
 export const useStore = create<StoreState>()(
   persist(
     (set, get) => {
-      /** Aktive Kampagne unveraenderlich patchen. */
+      /**
+       * Aktive Kampagne unveraenderlich patchen. Legt dabei einen Undo-Snapshot
+       * an, fasst aber schnell aufeinanderfolgende Aenderungen (Tippen, Ziehen
+       * eines Pins) zu einem einzigen Rueckgaengig-Schritt zusammen.
+       */
       const patchActive = (fn: (c: Campaign) => Campaign) =>
-        set((s) => ({
-          campaigns: s.campaigns.map((c) => (c.id === s.activeCampaignId ? fn(c) : c)),
-        }))
+        set((s) => {
+          const current = s.campaigns.find((c) => c.id === s.activeCampaignId)
+          const now = Date.now()
+          const coalesce = now - s.lastUndoPushAt < UNDO_COALESCE_MS
+          const undoStack = current && !coalesce ? [...s.undoStack, current].slice(-UNDO_LIMIT) : s.undoStack
+          return {
+            campaigns: s.campaigns.map((c) => (c.id === s.activeCampaignId ? fn(c) : c)),
+            undoStack,
+            lastUndoPushAt: now,
+          }
+        })
 
       return {
         ...initialData(),
@@ -229,6 +252,8 @@ export const useStore = create<StoreState>()(
         selectedIds: [],
         placingEntityId: null,
         playerMode: false,
+        undoStack: [],
+        lastUndoPushAt: 0,
         timeEnabled: false,
         timeOfDay: 12 * 60,
         dayNight: false,
@@ -356,6 +381,7 @@ export const useStore = create<StoreState>()(
             activeCampaignId: c.id,
             selectedEntityId: null,
             selectedIds: [],
+            undoStack: [],
           }))
         },
 
@@ -375,11 +401,11 @@ export const useStore = create<StoreState>()(
             const campaigns = s.campaigns.filter((c) => c.id !== id)
             const activeCampaignId =
               s.activeCampaignId === id ? campaigns[0].id : s.activeCampaignId
-            return { campaigns, activeCampaignId, selectedEntityId: null, selectedIds: [] }
+            return { campaigns, activeCampaignId, selectedEntityId: null, selectedIds: [], undoStack: [] }
           }),
 
         setActiveCampaign: (id) =>
-          set({ activeCampaignId: id, selectedEntityId: null, selectedIds: [], tool: 'select' }),
+          set({ activeCampaignId: id, selectedEntityId: null, selectedIds: [], undoStack: [], tool: 'select' }),
 
         addMusicEntry: (label, url) =>
           patchActive((c) => ({
@@ -399,6 +425,7 @@ export const useStore = create<StoreState>()(
               activeCampaignId: camp.id,
               selectedEntityId: null,
               selectedIds: [],
+              undoStack: [],
               fightEventId: null,
             }
           }),
@@ -410,7 +437,7 @@ export const useStore = create<StoreState>()(
             const activeCampaignId = campaigns.some((c) => c.id === data.activeCampaignId)
               ? data.activeCampaignId
               : campaigns[0].id
-            return { campaigns, activeCampaignId, selectedEntityId: null, selectedIds: [], fightEventId: null }
+            return { campaigns, activeCampaignId, selectedEntityId: null, selectedIds: [], undoStack: [], fightEventId: null }
           }),
 
         // ---------- Ebenen ----------
@@ -832,6 +859,19 @@ export const useStore = create<StoreState>()(
         setPendingEntityFields: (fields) => set({ pendingEntityFields: fields }),
         setPlacingEntity: (id) => set({ placingEntityId: id, tool: 'select' }),
         setPlayerMode: (on) => set({ playerMode: on, tool: 'select', placingEntityId: null }),
+
+        undo: () =>
+          set((s) => {
+            if (s.undoStack.length === 0) return {}
+            const prev = s.undoStack[s.undoStack.length - 1]
+            return {
+              campaigns: s.campaigns.map((c) => (c.id === s.activeCampaignId ? prev : c)),
+              undoStack: s.undoStack.slice(0, -1),
+              // Naechste Aenderung soll sofort einen neuen Schritt anlegen, nicht mit
+              // dem Undo selbst zusammengefasst werden.
+              lastUndoPushAt: 0,
+            }
+          }),
       }
     },
     {
