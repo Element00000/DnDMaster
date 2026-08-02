@@ -376,7 +376,14 @@ export function MapCanvas() {
                 if (ev.ctrlKey || ev.metaKey || ev.shiftKey) toggleSelectedId(e.id)
                 else selectEntity(e.id)
               }}
-              onMove={(dxWorld, dyWorld) => moveEntity(e.id, dxWorld, dyWorld)}
+              onMove={(dxWorld, dyWorld) => {
+                // Ziehen eines markierten Pins bewegt die gesamte Mehrfachauswahl mit.
+                if (selectedIds.length > 1 && selectedIds.includes(e.id)) {
+                  selectedIds.forEach((id) => moveEntity(id, dxWorld, dyWorld))
+                } else {
+                  moveEntity(e.id, dxWorld, dyWorld)
+                }
+              }}
             />
           )
         })}
