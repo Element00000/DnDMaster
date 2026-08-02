@@ -25,7 +25,6 @@ export function TopBar() {
   const importCampaign = useStore((s) => s.importCampaign)
   const replaceAllData = useStore((s) => s.replaceAllData)
   const setLayerImage = useStore((s) => s.setLayerImage)
-  const resetLayerImage = useStore((s) => s.resetLayerImage)
   const timelineOpen = useStore((s) => s.timelineOpen)
   const setTimelineOpen = useStore((s) => s.setTimelineOpen)
   const storyTreeOpen = useStore((s) => s.storyTreeOpen)
@@ -206,18 +205,6 @@ export function TopBar() {
       <button className="btn" onClick={() => fileRef.current?.click()}>
         Meine Karte
       </button>
-      {layer.imageUrl && (
-        <button
-          className="btn btn--ghost"
-          onClick={() => {
-            const prev = layer.imageUrl
-            resetLayerImage(layer.id)
-            void deleteAsset(prev)
-          }}
-        >
-          Platzhalter
-        </button>
-      )}
 
       <SearchBar />
 
