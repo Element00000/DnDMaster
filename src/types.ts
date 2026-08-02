@@ -215,6 +215,7 @@ export const FIELD_SCHEMA: Record<EntityType, FieldDef[]> = {
     { key: 'rolle', label: 'Rolle', kind: 'text', placeholder: 'z.B. Wirtin, Hauptmann ...' },
     { key: 'motivation', label: 'Motivation', kind: 'textarea', placeholder: 'Was treibt die Figur an?' },
     { key: 'gesinnung', label: 'Gesinnung', kind: 'select', options: GESINNUNG_OPTIONS },
+    { key: 'quests', label: 'Quests', kind: 'textarea', placeholder: 'Auftraege/Quests, die diese Figur betreffen ...' },
   ],
   fraktion: [
     { key: 'ziel', label: 'Ziel', kind: 'textarea', placeholder: 'Wonach strebt die Fraktion?' },

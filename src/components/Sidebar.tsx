@@ -92,7 +92,7 @@ export function Sidebar() {
               : 'Typ waehlen, dann auf die Karte klicken.'}
           </p>
           <div className="type-grid">
-            {ENTITY_TYPES.filter((t) => t.type !== 'fraktion').map((t) =>
+            {ENTITY_TYPES.filter((t) => t.type !== 'fraktion' && t.type !== 'quest' && t.type !== 'gefahr').map((t) =>
               t.type === 'nsc' ? (
                 <button
                   key={t.type}
