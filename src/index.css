@@ -415,6 +415,8 @@ button {
   inset: 0;
   overflow: hidden;
   touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
   background:
     radial-gradient(circle at 50% 38%, #12151d, var(--map-bg));
   cursor: default;

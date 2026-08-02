@@ -159,6 +159,7 @@ export function MapCanvas() {
       }
       if (e.button === 2) {
         // Rechte Maustaste: Karte verschieben.
+        e.preventDefault()
         el.setPointerCapture(e.pointerId)
         drag.current = { startX: e.clientX, startY: e.clientY, origTx: view.tx, origTy: view.ty, moved: false }
         setPanning(true)
@@ -166,6 +167,8 @@ export function MapCanvas() {
       }
       if (e.button === 0) {
         // Linke Maustaste auf leerer Flaeche: Rechteck-Markierung aufziehen.
+        // preventDefault, damit der Browser dabei nicht Text/Elemente blau markiert.
+        e.preventDefault()
         el.setPointerCapture(e.pointerId)
         marquee.current = { startX: e.clientX, startY: e.clientY, moved: false }
       }
