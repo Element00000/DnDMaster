@@ -153,6 +153,7 @@ interface StoreState extends AppData {
   setActiveLayer: (id: string) => void
   setLayerImage: (id: string, imageUrl: string, width: number, height: number) => void
   resetLayerImage: (id: string) => void
+  resizeLayer: (id: string, width: number, height: number) => void
   addLayer: (name: string) => void
   renameLayer: (id: string, name: string) => void
   deleteLayer: (id: string) => void
@@ -461,6 +462,29 @@ export const useStore = create<StoreState>()(
               l.id === id ? { ...l, imageUrl: null, width: 2000, height: 1400 } : l,
             ),
           })),
+
+        /** Kartengroesse per Eck-Ziehpunkt aendern; Markierungen und Nebel werden proportional mitskaliert. */
+        resizeLayer: (id, width, height) =>
+          patchActive((c) => {
+            const layer = c.layers.find((l) => l.id === id)
+            if (!layer) return c
+            const sx = width / layer.width
+            const sy = height / layer.height
+            const sr = (sx + sy) / 2
+            return {
+              ...c,
+              layers: c.layers.map((l) =>
+                l.id === id
+                  ? { ...l, width, height, reveals: l.reveals.map((r) => ({ x: r.x * sx, y: r.y * sy, r: r.r * sr })) }
+                  : l,
+              ),
+              entities: c.entities.map((e) =>
+                e.placement && e.placement.layerId === id
+                  ? { ...e, placement: { ...e.placement, x: e.placement.x * sx, y: e.placement.y * sy } }
+                  : e,
+              ),
+            }
+          }),
 
         addLayer: (name) => {
           const layer = makeLayer(name.trim() || 'Neue Ebene')

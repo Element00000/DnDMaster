@@ -45,6 +45,7 @@ export function MapCanvas() {
   const fogEditing = useStore((s) => s.fogEditing)
   const fogBrush = useStore((s) => s.fogBrush)
   const addReveal = useStore((s) => s.addReveal)
+  const resizeLayer = useStore((s) => s.resizeLayer)
 
   const { width, height } = layer
   const mapImage = useAsset(layer.imageUrl)
@@ -79,8 +80,15 @@ export function MapCanvas() {
   // Beim Kampagnen-/Ebenenwechsel neu einpassen.
   useEffect(() => {
     fitToView()
+    setMapSelected(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [campaign.id, layer.id])
+
+  // Kartenauswahl (Eck-Ziehpunkte zum Skalieren) automatisch aufheben, sobald
+  // ein anderes Werkzeug/Modus aktiv wird.
+  useEffect(() => {
+    if (tableMode || fogEditing || tool === 'add' || placingEntityId) setMapSelected(false)
+  }, [tableMode, fogEditing, tool, placingEntityId])
 
   // Entf/Ruecktaste: markierte Objekte loeschen (nicht waehrend Texteingabe).
   useEffect(() => {
@@ -122,6 +130,18 @@ export function MapCanvas() {
   const [marqueeRect, setMarqueeRect] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
   const [panning, setPanning] = useState(false)
   const painting = useRef(false)
+
+  // Kartengroesse per Eck-Ziehpunkt aendern (nur wenn die Karte angeklickt/ausgewaehlt ist).
+  const [mapSelected, setMapSelected] = useState(false)
+  type ResizeHandle = 'nw' | 'ne' | 'sw' | 'se'
+  const resize = useRef<{
+    startWidth: number
+    startHeight: number
+    startTx: number
+    startTy: number
+    anchorX: number
+    anchorY: number
+  } | null>(null)
 
   // Bildschirm- zu Weltkoordinaten der aktiven Ansicht.
   const toWorld = useCallback(
@@ -275,15 +295,71 @@ export function MapCanvas() {
         setTool('select')
       } else {
         selectEntity(null)
+        // Klick auf die Karte selbst waehlt sie aus (zeigt Eck-Ziehpunkte), Klick daneben hebt die Auswahl auf.
+        setMapSelected(inside && !tableMode && !fogEditing)
       }
     },
-    [tool, pendingType, pendingFields, view, width, height, layer.id, tableMode, placingEntityId, pins, addEntity, setPlacement, setPlacingEntity, selectEntity, setSelectedIds, setTool],
+    [tool, pendingType, pendingFields, view, width, height, layer.id, tableMode, fogEditing, placingEntityId, pins, addEntity, setPlacement, setPlacingEntity, selectEntity, setSelectedIds, setTool],
   )
+
+  const MIN_MAP_SIZE = 300
+
+  const startResize = useCallback(
+    (handle: ResizeHandle) => (e: React.PointerEvent) => {
+      e.stopPropagation()
+      e.preventDefault()
+      ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+      resize.current = {
+        startWidth: width,
+        startHeight: height,
+        startTx: view.tx,
+        startTy: view.ty,
+        anchorX: handle === 'nw' || handle === 'sw' ? width : 0,
+        anchorY: handle === 'nw' || handle === 'ne' ? height : 0,
+      }
+    },
+    [width, height, view.tx, view.ty],
+  )
+
+  const onResizeMove = useCallback(
+    (e: React.PointerEvent) => {
+      e.stopPropagation()
+      const r = resize.current
+      const el = containerRef.current
+      if (!r || !el) return
+      const rect = el.getBoundingClientRect()
+      const wx = (e.clientX - rect.left - r.startTx) / view.scale
+      const wy = (e.clientY - rect.top - r.startTy) / view.scale
+      const rawW = Math.abs(wx - r.anchorX)
+      const rawH = Math.abs(wy - r.anchorY)
+      let scale = (rawW / r.startWidth + rawH / r.startHeight) / 2
+      const minScale = MIN_MAP_SIZE / Math.min(r.startWidth, r.startHeight)
+      scale = Math.max(scale, minScale)
+      const newWidth = Math.round(r.startWidth * scale)
+      const newHeight = Math.round(r.startHeight * scale)
+      const anchorRoleX = r.anchorX === 0 ? 0 : newWidth
+      const anchorRoleY = r.anchorY === 0 ? 0 : newHeight
+      setView((v) => ({
+        ...v,
+        tx: r.startTx + (r.anchorX - anchorRoleX) * v.scale,
+        ty: r.startTy + (r.anchorY - anchorRoleY) * v.scale,
+      }))
+      resizeLayer(layer.id, newWidth, newHeight)
+    },
+    [view.scale, layer.id, resizeLayer],
+  )
+
+  const onResizeUp = useCallback((e: React.PointerEvent) => {
+    e.stopPropagation()
+    ;(e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId)
+    resize.current = null
+  }, [])
 
   const placingActive = placingEntityId !== null
   // Nebel voll deckend fuer Spieler/Tisch, halbtransparent fuer den DM.
   const fogActive = layer.fogEnabled
   const fogOpacity = tableMode ? 1 : 0.45
+  const showResizeHandles = mapSelected && !tableMode && !fogEditing
 
   return (
     <div
@@ -375,6 +451,7 @@ export function MapCanvas() {
               draggable={!tableMode && !fogEditing}
               scale={view.scale}
               onClick={(ev) => {
+                setMapSelected(false)
                 if (ev.ctrlKey || ev.metaKey || ev.shiftKey) toggleSelectedId(e.id)
                 else selectEntity(e.id)
               }}
@@ -396,6 +473,28 @@ export function MapCanvas() {
           className="map-marquee"
           style={{ left: marqueeRect.x, top: marqueeRect.y, width: marqueeRect.w, height: marqueeRect.h }}
         />
+      )}
+
+      {showResizeHandles && (
+        <>
+          <div
+            className="map-resize-outline"
+            style={{ left: view.tx, top: view.ty, width: width * view.scale, height: height * view.scale }}
+          />
+          {(['nw', 'ne', 'sw', 'se'] as ResizeHandle[]).map((h) => (
+            <div
+              key={h}
+              className={`map-resize-handle map-resize-handle--${h}`}
+              style={{
+                left: (h === 'nw' || h === 'sw' ? view.tx : view.tx + width * view.scale),
+                top: (h === 'nw' || h === 'ne' ? view.ty : view.ty + height * view.scale),
+              }}
+              onPointerDown={startResize(h)}
+              onPointerMove={onResizeMove}
+              onPointerUp={onResizeUp}
+            />
+          ))}
+        </>
       )}
 
       {placingActive && (

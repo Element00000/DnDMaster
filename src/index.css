@@ -452,6 +452,36 @@ button {
   z-index: 5;
 }
 
+.map-resize-outline {
+  position: absolute;
+  border: 1.5px dashed var(--gold);
+  pointer-events: none;
+  z-index: 6;
+}
+
+.map-resize-handle {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  margin: -7px;
+  border-radius: 3px;
+  background: var(--gold);
+  border: 1px solid rgba(0, 0, 0, 0.4);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+  z-index: 7;
+  touch-action: none;
+}
+
+.map-resize-handle--nw,
+.map-resize-handle--se {
+  cursor: nwse-resize;
+}
+
+.map-resize-handle--ne,
+.map-resize-handle--sw {
+  cursor: nesw-resize;
+}
+
 /* ---------- Marker-Pin ---------- */
 .map-pin {
   position: absolute;
