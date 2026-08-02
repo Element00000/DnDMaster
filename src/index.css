@@ -1174,15 +1174,46 @@ button {
   margin: 0;
 }
 
-.timefields__clear {
-  display: block;
-  margin-top: 4px;
+.schedule {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.schedule__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.schedule__row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.schedule__row .field__control {
+  flex: 1;
+}
+
+.schedule__sep {
+  font-size: 11px;
+  color: var(--ink-faint);
+}
+
+.schedule__remove {
   background: transparent;
   border: none;
+  color: var(--ink-faint);
+  font-size: 16px;
+  line-height: 1;
+  padding: 2px 4px;
+  flex-shrink: 0;
+}
+
+.schedule__remove:hover {
   color: var(--danger);
-  font-size: 11px;
-  padding: 0;
-  text-decoration: underline;
 }
 
 /* ---------- Zeitleiste ---------- */

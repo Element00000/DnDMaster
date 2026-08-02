@@ -349,7 +349,10 @@ function TimeFields({
   entity: Entity
   onUpdate: (patch: Partial<Entity>) => void
 }) {
-  const hasWindow = entity.timeStart != null && entity.timeEnd != null
+  const addScheduleEntry = useStore((s) => s.addScheduleEntry)
+  const updateScheduleEntry = useStore((s) => s.updateScheduleEntry)
+  const removeScheduleEntry = useStore((s) => s.removeScheduleEntry)
+
   return (
     <div className="field">
       <span className="field__label">Zeit</span>
@@ -370,42 +373,62 @@ function TimeFields({
           </label>
         </div>
 
-        <div className="timefields__row">
-          <label className="timefields__cell">
-            <span className="timefields__mini">Von</span>
-            <input
-              className="field__control field__control--sm"
-              type="time"
-              value={entity.timeStart != null ? formatTime(entity.timeStart) : ''}
-              onChange={(e) => onUpdate({ timeStart: parseTime(e.target.value) })}
-            />
-          </label>
-          <label className="timefields__cell">
-            <span className="timefields__mini">Bis</span>
-            <input
-              className="field__control field__control--sm"
-              type="time"
-              value={entity.timeEnd != null ? formatTime(entity.timeEnd) : ''}
-              onChange={(e) => onUpdate({ timeEnd: parseTime(e.target.value) })}
-            />
-          </label>
-        </div>
+        <div className="schedule">
+          <div className="schedule__head">
+            <span className="timefields__mini">Ortswechsel nach Uhrzeit</span>
+            {entity.placement && (
+              <button className="chipbtn" onClick={() => addScheduleEntry(entity.id)}>
+                + Zeitfenster
+              </button>
+            )}
+          </div>
 
-        <p className="timefields__hint">
-          {hasWindow
-            ? entity.timeStart! > entity.timeEnd!
-              ? 'Zeitfenster laeuft ueber Mitternacht.'
-              : 'Nur im Zeitfenster auf der Karte sichtbar.'
-            : 'Ohne Zeitfenster immer sichtbar. Beide Felder setzen zum Filtern.'}
-          {hasWindow && (
-            <button
-              className="timefields__clear"
-              onClick={() => onUpdate({ timeStart: null, timeEnd: null })}
-            >
-              Fenster loeschen
-            </button>
+          {!entity.placement ? (
+            <p className="timefields__hint">
+              Objekt erst auf der Karte platzieren, um Zeitfenster mit wechselnder Position anzulegen.
+            </p>
+          ) : entity.schedule.length === 0 ? (
+            <p className="timefields__hint">
+              Ohne Zeitfenster bleibt das Objekt immer an derselben Stelle sichtbar.
+            </p>
+          ) : (
+            <>
+              {entity.schedule.map((s) => (
+                <div key={s.id} className="schedule__row">
+                  <input
+                    className="field__control field__control--sm"
+                    type="time"
+                    value={formatTime(s.timeStart)}
+                    onChange={(e) => {
+                      const v = parseTime(e.target.value)
+                      if (v != null) updateScheduleEntry(entity.id, s.id, { timeStart: v })
+                    }}
+                  />
+                  <span className="schedule__sep">bis</span>
+                  <input
+                    className="field__control field__control--sm"
+                    type="time"
+                    value={formatTime(s.timeEnd)}
+                    onChange={(e) => {
+                      const v = parseTime(e.target.value)
+                      if (v != null) updateScheduleEntry(entity.id, s.id, { timeEnd: v })
+                    }}
+                  />
+                  <button
+                    className="schedule__remove"
+                    title="Zeitfenster entfernen"
+                    onClick={() => removeScheduleEntry(entity.id, s.id)}
+                  >
+                    &times;
+                  </button>
+                </div>
+              ))}
+              <p className="timefields__hint">
+                Zeitregler auf ein Fenster stellen, dann den Pin auf der Karte an die gewuenschte Stelle ziehen.
+              </p>
+            </>
           )}
-        </p>
+        </div>
       </div>
     </div>
   )

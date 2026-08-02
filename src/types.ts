@@ -70,6 +70,19 @@ export interface EntityLink {
   relation: RelationType
 }
 
+/**
+ * Zeitfenster, in dem sich ein Objekt an einer anderen Stelle der Karte befindet
+ * (gleiche Ebene wie die Basis-Platzierung). Ausserhalb aller Fenster gilt die
+ * normale Platzierung. start>end laeuft ueber Mitternacht.
+ */
+export interface ScheduleEntry {
+  id: string
+  timeStart: number
+  timeEnd: number
+  x: number
+  y: number
+}
+
 export interface Entity {
   id: string
   type: EntityType
@@ -93,10 +106,8 @@ export interface Entity {
   event: EventData | null
   /** Kampagnen-Kalendertag fuer die Zeitleiste; null = ohne Datum. */
   day: number | null
-  /** Beginn des Tageszeit-Fensters in Minuten (0..1439); null = immer sichtbar. */
-  timeStart: number | null
-  /** Ende des Tageszeit-Fensters in Minuten (0..1439). start>end = ueber Mitternacht. */
-  timeEnd: number | null
+  /** Zeitabhaengige Positionswechsel (z.B. vormittags Marktplatz, nachmittags Gaststaette). */
+  schedule: ScheduleEntry[]
   createdAt: number
 }
 

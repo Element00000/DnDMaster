@@ -37,6 +37,7 @@ export function MapCanvas() {
   const setPlacement = useStore((s) => s.setPlacement)
   const setPlacingEntity = useStore((s) => s.setPlacingEntity)
   const moveEntity = useStore((s) => s.moveEntity)
+  const moveScheduleEntry = useStore((s) => s.moveScheduleEntry)
   const selectEntity = useStore((s) => s.selectEntity)
   const selectedIds = useStore((s) => s.selectedIds)
   const setSelectedIds = useStore((s) => s.setSelectedIds)
@@ -61,14 +62,33 @@ export function MapCanvas() {
   // Auf dieser Ebene eingebettete Karten (andere Ebenen mit embed.parentLayerId === layer.id).
   const embeddedLayers = campaign.layers.filter((l) => l.embed && l.embed.parentLayerId === layer.id)
 
-  // Auf der aktiven Ebene platzierte Objekte (im Spieltischmodus nur entdeckte,
-  // bei aktivem Tageszeit-Filter nur die zur eingestellten Uhrzeit aktiven).
+  // Auf der aktiven Ebene platzierte Objekte (im Spieltischmodus nur entdeckte).
+  // Objekte sind immer sichtbar; bei aktivem Tageszeit-Filter kann sich ihre
+  // Position aber gemaess eines passenden Zeitplan-Eintrags verschieben.
   const pins = entities.filter(
-    (e) =>
-      e.placement &&
-      e.placement.layerId === layer.id &&
-      (!tableMode || e.visibility === 'spieler') &&
-      (!timeEnabled || inWindow(timeOfDay, e.timeStart, e.timeEnd)),
+    (e) => e.placement && e.placement.layerId === layer.id && (!tableMode || e.visibility === 'spieler'),
+  )
+
+  // Effektive Position eines Objekts: aktiver Zeitplan-Eintrag (falls vorhanden), sonst Basis-Platzierung.
+  const effectivePos = useCallback(
+    (e: Entity): { x: number; y: number } => {
+      if (timeEnabled && e.schedule.length > 0) {
+        const active = e.schedule.find((s) => inWindow(timeOfDay, s.timeStart, s.timeEnd))
+        if (active) return { x: active.x, y: active.y }
+      }
+      return { x: e.placement!.x, y: e.placement!.y }
+    },
+    [timeEnabled, timeOfDay],
+  )
+
+  // Bewegt bei aktivem Zeitplan-Eintrag dessen Position, sonst die Basis-Platzierung.
+  const moveEntityTimed = useCallback(
+    (e: Entity, dxWorld: number, dyWorld: number) => {
+      const active = timeEnabled ? e.schedule.find((s) => inWindow(timeOfDay, s.timeStart, s.timeEnd)) : undefined
+      if (active) moveScheduleEntry(e.id, active.id, dxWorld, dyWorld)
+      else moveEntity(e.id, dxWorld, dyWorld)
+    },
+    [timeEnabled, timeOfDay, moveScheduleEntry, moveEntity],
   )
 
   const fitToView = useCallback(() => {
@@ -295,8 +315,9 @@ export function MapCanvas() {
         const y1 = Math.max(m.startY, e.clientY) - rect.top
         const ids = pins
           .filter((p) => {
-            const sx = p.placement!.x * view.scale + view.tx
-            const sy = p.placement!.y * view.scale + view.ty
+            const pos = effectivePos(p)
+            const sx = pos.x * view.scale + view.tx
+            const sy = pos.y * view.scale + view.ty
             return sx >= x0 && sx <= x1 && sy >= y0 && sy <= y1
           })
           .map((p) => p.id)
@@ -379,6 +400,7 @@ export function MapCanvas() {
       embeddedLayers,
       campaign.layers,
       pins,
+      effectivePos,
       addEntity,
       setPlacement,
       setPlacingEntity,
@@ -527,11 +549,12 @@ export function MapCanvas() {
       <div className="map-markers">
         {pins.map((e) => {
           const meta = entityDisplayMeta(e)
+          const pos = effectivePos(e)
           return (
             <MapPin
               key={e.id}
-              screenX={e.placement!.x * view.scale + view.tx}
-              screenY={e.placement!.y * view.scale + view.ty}
+              screenX={pos.x * view.scale + view.tx}
+              screenY={pos.y * view.scale + view.ty}
               icon={meta.icon}
               color={meta.color}
               label={e.name}
@@ -547,9 +570,12 @@ export function MapCanvas() {
               onMove={(dxWorld, dyWorld) => {
                 // Ziehen eines markierten Pins bewegt die gesamte Mehrfachauswahl mit.
                 if (selectedIds.length > 1 && selectedIds.includes(e.id)) {
-                  selectedIds.forEach((id) => moveEntity(id, dxWorld, dyWorld))
+                  selectedIds.forEach((id) => {
+                    const ent = entities.find((x) => x.id === id)
+                    if (ent) moveEntityTimed(ent, dxWorld, dyWorld)
+                  })
                 } else {
-                  moveEntity(e.id, dxWorld, dyWorld)
+                  moveEntityTimed(e, dxWorld, dyWorld)
                 }
               }}
             />
@@ -583,7 +609,10 @@ export function MapCanvas() {
             if (ev.ctrlKey || ev.metaKey || ev.shiftKey) toggleSelectedId(id)
             else selectEntity(id)
           }}
-          onEntityMove={(id, dxSub, dySub) => moveEntity(id, dxSub, dySub)}
+          onEntityMove={(id, dxSub, dySub) => {
+            const ent = entities.find((x) => x.id === id)
+            if (ent) moveEntityTimed(ent, dxSub, dySub)
+          }}
           setEmbedRect={setEmbedRect}
         />
       ))}
@@ -816,13 +845,17 @@ function EmbeddedMap({
   }
 
   const embPins = entities.filter(
-    (e) =>
-      e.placement &&
-      e.placement.layerId === embLayer.id &&
-      (!tableMode || e.visibility === 'spieler') &&
-      (!timeEnabled || inWindow(timeOfDay, e.timeStart, e.timeEnd)),
+    (e) => e.placement && e.placement.layerId === embLayer.id && (!tableMode || e.visibility === 'spieler'),
   )
   const pinScale = view.scale * (embed.width / embLayer.width)
+
+  function embEffectivePos(e: Entity): { x: number; y: number } {
+    if (timeEnabled && e.schedule.length > 0) {
+      const active = e.schedule.find((s) => inWindow(timeOfDay, s.timeStart, s.timeEnd))
+      if (active) return { x: active.x, y: active.y }
+    }
+    return { x: e.placement!.x, y: e.placement!.y }
+  }
 
   return (
     <>
@@ -845,8 +878,9 @@ function EmbeddedMap({
 
       {embPins.map((e) => {
         const meta = entityDisplayMeta(e)
-        const px = x + (e.placement!.x / embLayer.width) * w
-        const py = y + (e.placement!.y / embLayer.height) * h
+        const pos = embEffectivePos(e)
+        const px = x + (pos.x / embLayer.width) * w
+        const py = y + (pos.y / embLayer.height) * h
         return (
           <MapPin
             key={e.id}

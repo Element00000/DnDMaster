@@ -16,6 +16,7 @@ import type {
   MapLayer,
   Placement,
   RelationType,
+  ScheduleEntry,
   Session,
   UndoEntry,
 } from '../types'
@@ -186,6 +187,13 @@ interface StoreState extends AppData {
   setPlacement: (id: string, placement: Placement | null) => void
   /** Platzierte Entitaet um ein Weltkoordinaten-Delta verschieben. */
   moveEntity: (id: string, dxWorld: number, dyWorld: number) => void
+
+  // Zeitabhaengige Positionswechsel
+  /** Neues Zeitfenster anlegen; startet an der aktuellen Basis-Position. */
+  addScheduleEntry: (entityId: string) => void
+  updateScheduleEntry: (entityId: string, scheduleId: string, patch: Partial<Omit<ScheduleEntry, 'id'>>) => void
+  removeScheduleEntry: (entityId: string, scheduleId: string) => void
+  moveScheduleEntry: (entityId: string, scheduleId: string, dxWorld: number, dyWorld: number) => void
 
   // Entscheidungen (Phase 4)
   updateDecision: (entityId: string, patch: Partial<DecisionData>) => void
@@ -577,8 +585,7 @@ export const useStore = create<StoreState>()(
             decision: type === 'entscheidung' ? emptyDecision() : null,
             event: type === 'ereignis' ? emptyEvent() : null,
             day: null,
-            timeStart: null,
-            timeEnd: null,
+            schedule: [],
             createdAt: Date.now(),
           }
           patchActive((c) => ({ ...c, entities: [...c.entities, entity] }))
@@ -678,6 +685,57 @@ export const useStore = create<StoreState>()(
                       x: e.placement.x + dxWorld,
                       y: e.placement.y + dyWorld,
                     },
+                  }
+                : e,
+            ),
+          })),
+
+        // ---------- Zeitabhaengige Positionswechsel ----------
+        addScheduleEntry: (entityId) =>
+          patchActive((c) => ({
+            ...c,
+            entities: c.entities.map((e) => {
+              if (e.id !== entityId || !e.placement) return e
+              const timeOfDay = get().timeOfDay
+              const entry: ScheduleEntry = {
+                id: uid('sched-'),
+                timeStart: timeOfDay,
+                timeEnd: (timeOfDay + 120) % (24 * 60),
+                x: e.placement.x,
+                y: e.placement.y,
+              }
+              return { ...e, schedule: [...e.schedule, entry] }
+            }),
+          })),
+
+        updateScheduleEntry: (entityId, scheduleId, patch) =>
+          patchActive((c) => ({
+            ...c,
+            entities: c.entities.map((e) =>
+              e.id === entityId
+                ? { ...e, schedule: e.schedule.map((s) => (s.id === scheduleId ? { ...s, ...patch } : s)) }
+                : e,
+            ),
+          })),
+
+        removeScheduleEntry: (entityId, scheduleId) =>
+          patchActive((c) => ({
+            ...c,
+            entities: c.entities.map((e) =>
+              e.id === entityId ? { ...e, schedule: e.schedule.filter((s) => s.id !== scheduleId) } : e,
+            ),
+          })),
+
+        moveScheduleEntry: (entityId, scheduleId, dxWorld, dyWorld) =>
+          patchActive((c) => ({
+            ...c,
+            entities: c.entities.map((e) =>
+              e.id === entityId
+                ? {
+                    ...e,
+                    schedule: e.schedule.map((s) =>
+                      s.id === scheduleId ? { ...s, x: s.x + dxWorld, y: s.y + dyWorld } : s,
+                    ),
                   }
                 : e,
             ),
@@ -998,8 +1056,7 @@ function normalizeEntity(e: Partial<Entity> & { id: string; type: EntityType; na
     decision: e.decision ?? (e.type === 'entscheidung' ? emptyDecision() : null),
     event: e.event ?? (e.type === 'ereignis' ? emptyEvent() : null),
     day: e.day ?? null,
-    timeStart: e.timeStart ?? null,
-    timeEnd: e.timeEnd ?? null,
+    schedule: e.schedule ?? [],
     createdAt: e.createdAt ?? Date.now(),
   }
 }

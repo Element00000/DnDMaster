@@ -28,7 +28,7 @@ export function Timeline() {
     .filter((e) => e.day != null)
     .filter((e) => !tableMode || e.visibility === 'spieler')
     .filter((e) => !filterId || related(e, filterId))
-    .sort((a, b) => (a.day! - b.day!) || (a.timeStart ?? -1) - (b.timeStart ?? -1))
+    .sort((a, b) => (a.day! - b.day!) || (a.schedule[0]?.timeStart ?? -1) - (b.schedule[0]?.timeStart ?? -1))
 
   // Nach Tag gruppieren.
   const days: { day: number; items: Entity[] }[] = []
@@ -93,9 +93,12 @@ export function Timeline() {
                       <div className="timeline__event-head">
                         <span>{meta.icon}</span>
                         <span className="timeline__event-name">{e.name}</span>
-                        {e.timeStart != null && e.timeEnd != null && (
-                          <span className="timeline__event-time">
-                            {formatTime(e.timeStart)}&ndash;{formatTime(e.timeEnd)}
+                        {e.schedule.length > 0 && (
+                          <span
+                            className="timeline__event-time"
+                            title={e.schedule.map((s) => `${formatTime(s.timeStart)}–${formatTime(s.timeEnd)}`).join(', ')}
+                          >
+                            {'\u{1F55B}'} wechselt Ort
                           </span>
                         )}
                       </div>
