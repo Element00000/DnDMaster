@@ -26,6 +26,7 @@ export function MapCanvas() {
   const entities = campaign.entities
   const tool = useStore((s) => s.tool)
   const pendingType = useStore((s) => s.pendingEntityType)
+  const pendingFields = useStore((s) => s.pendingEntityFields)
   // Spieler-Sicht gilt im Spielermodus UND im Spieltischmodus.
   const playerView = useStore((s) => s.playerMode || s.tableMode)
   const placingEntityId = useStore((s) => s.placingEntityId)
@@ -180,13 +181,13 @@ export function MapCanvas() {
 
       if (tool === 'add' && !playerView) {
         if (!inside) return
-        addEntity({ type: pendingType, placement: { layerId: layer.id, x: wx, y: wy } })
+        addEntity({ type: pendingType, placement: { layerId: layer.id, x: wx, y: wy }, fields: pendingFields })
         setTool('select')
       } else {
         selectEntity(null)
       }
     },
-    [tool, pendingType, view, width, height, layer.id, playerView, placingEntityId, addEntity, setPlacement, setPlacingEntity, selectEntity, setTool],
+    [tool, pendingType, pendingFields, view, width, height, layer.id, playerView, placingEntityId, addEntity, setPlacement, setPlacingEntity, selectEntity, setTool],
   )
 
   const placingActive = placingEntityId !== null

@@ -58,6 +58,8 @@ interface StoreState extends AppData {
   // UI-Zustand (nicht persistiert)
   tool: Tool
   pendingEntityType: EntityType
+  /** Voreingestellte Felder (z.B. Gesinnung) fuer das naechste anzulegende Objekt. */
+  pendingEntityFields: Record<string, string>
   selectedEntityId: string | null
   /** Ein vorhandenes (unplatziertes) Objekt wartet auf einen Kartenklick. */
   placingEntityId: string | null
@@ -149,7 +151,7 @@ interface StoreState extends AppData {
   clearReveals: (layerId: string) => void
 
   // Entitaeten (der aktiven Kampagne)
-  addEntity: (input: { type: EntityType; placement?: Placement; name?: string }) => string
+  addEntity: (input: { type: EntityType; placement?: Placement; name?: string; fields?: Record<string, string> }) => string
   updateEntity: (id: string, patch: Partial<Omit<Entity, 'id' | 'createdAt'>>) => void
   setEntityField: (id: string, key: string, value: string) => void
   deleteEntity: (id: string) => void
@@ -193,6 +195,7 @@ interface StoreState extends AppData {
   // UI
   setTool: (t: Tool) => void
   setPendingEntityType: (t: EntityType) => void
+  setPendingEntityFields: (fields: Record<string, string>) => void
   setPlacingEntity: (id: string | null) => void
   setPlayerMode: (on: boolean) => void
 }
@@ -215,6 +218,7 @@ export const useStore = create<StoreState>()(
         ...initialData(),
         tool: 'select',
         pendingEntityType: 'ort',
+        pendingEntityFields: {},
         selectedEntityId: null,
         placingEntityId: null,
         playerMode: false,
@@ -470,7 +474,7 @@ export const useStore = create<StoreState>()(
           })),
 
         // ---------- Entitaeten ----------
-        addEntity: ({ type, placement, name }) => {
+        addEntity: ({ type, placement, name, fields }) => {
           const id = uid('e-')
           const entity: Entity = {
             id,
@@ -483,7 +487,7 @@ export const useStore = create<StoreState>()(
             subMapId: null,
             imageUrl: null,
             links: [],
-            fields: {},
+            fields: fields ?? {},
             decision: type === 'entscheidung' ? emptyDecision() : null,
             event: type === 'ereignis' ? emptyEvent() : null,
             day: null,
@@ -804,7 +808,8 @@ export const useStore = create<StoreState>()(
 
         // ---------- UI ----------
         setTool: (t) => set({ tool: t }),
-        setPendingEntityType: (t) => set({ pendingEntityType: t }),
+        setPendingEntityType: (t) => set({ pendingEntityType: t, pendingEntityFields: {} }),
+        setPendingEntityFields: (fields) => set({ pendingEntityFields: fields }),
         setPlacingEntity: (id) => set({ placingEntityId: id, tool: 'select' }),
         setPlayerMode: (on) => set({ playerMode: on, tool: 'select', placingEntityId: null }),
       }

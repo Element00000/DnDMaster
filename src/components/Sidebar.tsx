@@ -1,4 +1,4 @@
-import { ENTITY_TYPES, entityMeta } from '../types'
+import { ENTITY_TYPES, GESINNUNG_OPTIONS, entityDisplayMeta } from '../types'
 import type { Entity, EntityType } from '../types'
 import { useStore } from '../store/useStore'
 import type { ToolTab } from '../store/useStore'
@@ -16,9 +16,11 @@ export function Sidebar() {
   const campaign = useStore((s) => s.campaigns.find((c) => c.id === s.activeCampaignId) ?? s.campaigns[0])
   const tool = useStore((s) => s.tool)
   const pendingType = useStore((s) => s.pendingEntityType)
+  const pendingFields = useStore((s) => s.pendingEntityFields)
   const playerMode = useStore((s) => s.playerMode)
   const setTool = useStore((s) => s.setTool)
   const setPendingType = useStore((s) => s.setPendingEntityType)
+  const setPendingFields = useStore((s) => s.setPendingEntityFields)
   const selectEntity = useStore((s) => s.selectEntity)
   const selectedId = useStore((s) => s.selectedEntityId)
   const addEntity = useStore((s) => s.addEntity)
@@ -91,12 +93,26 @@ export function Sidebar() {
               </button>
             ))}
           </div>
+          {tool === 'add' && pendingType === 'nsc' && (
+            <div className="type-grid">
+              {GESINNUNG_OPTIONS.map((g) => (
+                <button
+                  key={g.value}
+                  className={`type-chip${pendingFields.gesinnung === g.value ? ' is-active' : ''}`}
+                  onClick={() => setPendingFields({ gesinnung: g.value })}
+                  title={`Gesinnung: ${g.label}`}
+                >
+                  <span className="type-chip__label">{g.label}</span>
+                </button>
+              ))}
+            </div>
+          )}
           {tool === 'add' ? (
             <div className="sidebar__actions">
               <button
                 className="btn btn--ghost btn--full"
                 onClick={() => {
-                  addEntity({ type: pendingType })
+                  addEntity({ type: pendingType, fields: pendingFields })
                   setTool('select')
                 }}
                 title="Objekt ohne Kartenposition anlegen"
@@ -153,7 +169,7 @@ function EntityRow({
   selected: boolean
   onSelect: (id: string) => void
 }) {
-  const meta = entityMeta(entity.type)
+  const meta = entityDisplayMeta(entity)
   return (
     <li>
       <button

@@ -109,6 +109,7 @@ export function entityDisplayMeta(entity: Entity): EntityTypeMeta {
   if (entity.type === 'nsc') {
     if (entity.fields.gesinnung === 'freund') return { ...meta, icon: '\u{1F91D}', color: '#3fa34d' }
     if (entity.fields.gesinnung === 'feind') return { ...meta, icon: '\u{1F479}', color: '#c0392b' }
+    if (entity.fields.gesinnung === 'neutral') return { ...meta, icon: '\u{1F3AD}', color: '#8a93a8' }
   }
   return meta
 }
@@ -189,6 +190,13 @@ export interface FieldDef {
   options?: { value: string; label: string }[]
 }
 
+/** Gesinnung eines Charakters: bestimmt Farbe/Icon auf der Karte. */
+export const GESINNUNG_OPTIONS: { value: string; label: string }[] = [
+  { value: 'freund', label: 'Freund' },
+  { value: 'feind', label: 'Feind' },
+  { value: 'neutral', label: 'Neutral / unklar' },
+]
+
 export const FIELD_SCHEMA: Record<EntityType, FieldDef[]> = {
   ort: [
     {
@@ -206,15 +214,7 @@ export const FIELD_SCHEMA: Record<EntityType, FieldDef[]> = {
   nsc: [
     { key: 'rolle', label: 'Rolle', kind: 'text', placeholder: 'z.B. Wirtin, Hauptmann ...' },
     { key: 'motivation', label: 'Motivation', kind: 'textarea', placeholder: 'Was treibt die Figur an?' },
-    {
-      key: 'gesinnung',
-      label: 'Gesinnung',
-      kind: 'select',
-      options: [
-        { value: 'freund', label: 'Freund' },
-        { value: 'feind', label: 'Feind' },
-      ],
-    },
+    { key: 'gesinnung', label: 'Gesinnung', kind: 'select', options: GESINNUNG_OPTIONS },
   ],
   fraktion: [
     { key: 'ziel', label: 'Ziel', kind: 'textarea', placeholder: 'Wonach strebt die Fraktion?' },
