@@ -121,6 +121,18 @@ export interface RevealCircle {
   r: number
 }
 
+/**
+ * Platzierung einer Ebene als eingebettete Karte auf einer anderen (Eltern-)Ebene.
+ * x/y/width/height sind Weltkoordinaten der Eltern-Ebene.
+ */
+export interface EmbeddedPlacement {
+  parentLayerId: string
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
 /** Eine Kartenebene (Weltkarte, Regionalkarte, Stadtplan ...). */
 export interface MapLayer {
   id: string
@@ -132,6 +144,8 @@ export interface MapLayer {
   fogEnabled: boolean
   /** Bereits aufgedeckte Bereiche. */
   reveals: RevealCircle[]
+  /** Falls gesetzt: diese Ebene ist auf einer anderen Ebene eingebettet und dort erst ab genug Zoom sichtbar. */
+  embed: EmbeddedPlacement | null
 }
 
 /** Sitzungsprotokoll-Eintrag (Phase 5). */

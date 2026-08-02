@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useStore } from '../store/useStore'
 import { entityDisplayMeta } from '../types'
+import type { Entity, MapLayer } from '../types'
 import { dayNightOverlay, inWindow } from '../utils/time'
 import { useAsset } from '../useAsset'
 import { PlaceholderMap } from './PlaceholderMap'
@@ -15,6 +16,9 @@ interface View {
 const MIN_SCALE = 0.1
 const MAX_SCALE = 6
 const DRAG_THRESHOLD = 4
+/** Ab dieser Bildschirmgroesse (kuerzere Seite, px) wird eine eingebettete Karte aufgedeckt. */
+const REVEAL_THRESHOLD = 160
+const MIN_EMBED_SIZE = 100
 
 export function MapCanvas() {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -46,9 +50,16 @@ export function MapCanvas() {
   const fogBrush = useStore((s) => s.fogBrush)
   const addReveal = useStore((s) => s.addReveal)
   const resizeLayer = useStore((s) => s.resizeLayer)
+  const placingLayerId = useStore((s) => s.placingLayerId)
+  const setPlacingLayer = useStore((s) => s.setPlacingLayer)
+  const embedLayer = useStore((s) => s.embedLayer)
+  const setEmbedRect = useStore((s) => s.setEmbedRect)
 
   const { width, height } = layer
   const mapImage = useAsset(layer.imageUrl)
+
+  // Auf dieser Ebene eingebettete Karten (andere Ebenen mit embed.parentLayerId === layer.id).
+  const embeddedLayers = campaign.layers.filter((l) => l.embed && l.embed.parentLayerId === layer.id)
 
   // Auf der aktiven Ebene platzierte Objekte (im Spieltischmodus nur entdeckte,
   // bei aktivem Tageszeit-Filter nur die zur eingestellten Uhrzeit aktiven).
@@ -81,14 +92,18 @@ export function MapCanvas() {
   useEffect(() => {
     fitToView()
     setMapSelected(false)
+    setSelectedEmbedId(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [campaign.id, layer.id])
 
   // Kartenauswahl (Eck-Ziehpunkte zum Skalieren) automatisch aufheben, sobald
   // ein anderes Werkzeug/Modus aktiv wird.
   useEffect(() => {
-    if (tableMode || fogEditing || tool === 'add' || placingEntityId) setMapSelected(false)
-  }, [tableMode, fogEditing, tool, placingEntityId])
+    if (tableMode || fogEditing || tool === 'add' || placingEntityId || placingLayerId) {
+      setMapSelected(false)
+      setSelectedEmbedId(null)
+    }
+  }, [tableMode, fogEditing, tool, placingEntityId, placingLayerId])
 
   // Entf/Ruecktaste: markierte Objekte loeschen (nicht waehrend Texteingabe).
   useEffect(() => {
@@ -133,6 +148,8 @@ export function MapCanvas() {
 
   // Kartengroesse per Eck-Ziehpunkt aendern (nur wenn die Karte angeklickt/ausgewaehlt ist).
   const [mapSelected, setMapSelected] = useState(false)
+  // Welche eingebettete Karte ist gerade ausgewaehlt (zeigt ihre eigenen Eck-Ziehpunkte)?
+  const [selectedEmbedId, setSelectedEmbedId] = useState<string | null>(null)
   type ResizeHandle = 'nw' | 'ne' | 'sw' | 'se'
   const resize = useRef<{
     startWidth: number
@@ -164,6 +181,21 @@ export function MapCanvas() {
     },
     [toWorld, width, height, addReveal, layer.id, fogBrush],
   )
+
+  // Klick auf eine eingeklappte Kartenpinnadel: automatisch nah genug heranzoomen, um sie aufzudecken.
+  const zoomToEmbed = useCallback((el: MapLayer) => {
+    const cont = containerRef.current
+    const embed = el.embed
+    if (!cont || !embed) return
+    const cw = cont.clientWidth
+    const ch = cont.clientHeight
+    const targetScreen = REVEAL_THRESHOLD * 1.4
+    const neededScale = targetScreen / Math.min(embed.width, embed.height)
+    const newScale = clamp(neededScale, MIN_SCALE, MAX_SCALE)
+    const cx = embed.x + embed.width / 2
+    const cy = embed.y + embed.height / 2
+    setView({ scale: newScale, tx: cw / 2 - cx * newScale, ty: ch / 2 - cy * newScale })
+  }, [])
 
   const onPointerDown = useCallback(
     (e: React.PointerEvent) => {
@@ -280,6 +312,26 @@ export function MapCanvas() {
       const wy = (e.clientY - rect.top - view.ty) / view.scale
       const inside = wx >= 0 && wy >= 0 && wx <= width && wy <= height
 
+      // Hoechste Prioritaet: eine Karte wird gerade als eingebettete Karte platziert.
+      if (placingLayerId) {
+        if (inside) {
+          const target = campaign.layers.find((l) => l.id === placingLayerId)
+          if (target) {
+            const w = Math.max(MIN_EMBED_SIZE, width * 0.25)
+            const h = Math.max(MIN_EMBED_SIZE, w * (target.height / target.width))
+            embedLayer(placingLayerId, {
+              parentLayerId: layer.id,
+              x: clamp(wx - w / 2, 0, Math.max(0, width - w)),
+              y: clamp(wy - h / 2, 0, Math.max(0, height - h)),
+              width: w,
+              height: h,
+            })
+          }
+          setPlacingLayer(null)
+        }
+        return
+      }
+
       // Vorrang: ein vorhandenes Objekt wird gerade platziert.
       if (placingEntityId) {
         if (inside) {
@@ -290,16 +342,52 @@ export function MapCanvas() {
       }
 
       if (tool === 'add' && !tableMode) {
+        // Faellt der Klick in eine aufgedeckte eingebettete Karte, wird das Objekt dort platziert.
+        for (const el of embeddedLayers) {
+          const embed = el.embed!
+          if (wx < embed.x || wx > embed.x + embed.width || wy < embed.y || wy > embed.y + embed.height) continue
+          const screenMin = Math.min(embed.width, embed.height) * view.scale
+          if (screenMin < REVEAL_THRESHOLD) continue
+          const subX = ((wx - embed.x) / embed.width) * el.width
+          const subY = ((wy - embed.y) / embed.height) * el.height
+          addEntity({ type: pendingType, placement: { layerId: el.id, x: subX, y: subY }, fields: pendingFields })
+          setTool('select')
+          return
+        }
         if (!inside) return
         addEntity({ type: pendingType, placement: { layerId: layer.id, x: wx, y: wy }, fields: pendingFields })
         setTool('select')
       } else {
         selectEntity(null)
+        setSelectedEmbedId(null)
         // Klick auf die Karte selbst waehlt sie aus (zeigt Eck-Ziehpunkte), Klick daneben hebt die Auswahl auf.
         setMapSelected(inside && !tableMode && !fogEditing)
       }
     },
-    [tool, pendingType, pendingFields, view, width, height, layer.id, tableMode, fogEditing, placingEntityId, pins, addEntity, setPlacement, setPlacingEntity, selectEntity, setSelectedIds, setTool],
+    [
+      tool,
+      pendingType,
+      pendingFields,
+      view,
+      width,
+      height,
+      layer.id,
+      tableMode,
+      fogEditing,
+      placingEntityId,
+      placingLayerId,
+      embeddedLayers,
+      campaign.layers,
+      pins,
+      addEntity,
+      setPlacement,
+      setPlacingEntity,
+      embedLayer,
+      setPlacingLayer,
+      selectEntity,
+      setSelectedIds,
+      setTool,
+    ],
   )
 
   const MIN_MAP_SIZE = 300
@@ -355,7 +443,7 @@ export function MapCanvas() {
     resize.current = null
   }, [])
 
-  const placingActive = placingEntityId !== null
+  const placingActive = placingEntityId !== null || placingLayerId !== null
   // Nebel voll deckend fuer Spieler/Tisch, halbtransparent fuer den DM.
   const fogActive = layer.fogEnabled
   const fogOpacity = tableMode ? 1 : 0.45
@@ -452,6 +540,7 @@ export function MapCanvas() {
               scale={view.scale}
               onClick={(ev) => {
                 setMapSelected(false)
+                setSelectedEmbedId(null)
                 if (ev.ctrlKey || ev.metaKey || ev.shiftKey) toggleSelectedId(e.id)
                 else selectEntity(e.id)
               }}
@@ -467,6 +556,37 @@ export function MapCanvas() {
           )
         })}
       </div>
+
+      {embeddedLayers.map((el) => (
+        <EmbeddedMap
+          key={el.id}
+          embLayer={el}
+          view={view}
+          toWorld={toWorld}
+          tool={tool}
+          tableMode={tableMode}
+          fogEditing={fogEditing}
+          timeEnabled={timeEnabled}
+          timeOfDay={timeOfDay}
+          entities={entities}
+          selectedIds={selectedIds}
+          selected={selectedEmbedId === el.id}
+          onSelect={(id) => {
+            setSelectedEmbedId(id)
+            setMapSelected(false)
+            selectEntity(null)
+          }}
+          onZoomTo={zoomToEmbed}
+          onEntityClick={(id, ev) => {
+            setMapSelected(false)
+            setSelectedEmbedId(null)
+            if (ev.ctrlKey || ev.metaKey || ev.shiftKey) toggleSelectedId(id)
+            else selectEntity(id)
+          }}
+          onEntityMove={(id, dxSub, dySub) => moveEntity(id, dxSub, dySub)}
+          setEmbedRect={setEmbedRect}
+        />
+      ))}
 
       {marqueeRect && (
         <div
@@ -499,8 +619,16 @@ export function MapCanvas() {
 
       {placingActive && (
         <div className="map-banner">
-          Klicke auf die Karte, um das Objekt zu platzieren
-          <button className="map-banner__cancel" onClick={() => setPlacingEntity(null)}>
+          {placingLayerId
+            ? 'Klicke auf die Karte, um die eingebettete Karte dort zu platzieren'
+            : 'Klicke auf die Karte, um das Objekt zu platzieren'}
+          <button
+            className="map-banner__cancel"
+            onClick={() => {
+              setPlacingEntity(null)
+              setPlacingLayer(null)
+            }}
+          >
             Abbrechen
           </button>
         </div>
@@ -538,4 +666,222 @@ function ZoomControls({ scale, onZoom, onFit }: { scale: number; onZoom: (dir: n
 
 function clamp(v: number, min: number, max: number) {
   return Math.max(min, Math.min(max, v))
+}
+
+type EmbedResizeHandle = 'nw' | 'ne' | 'sw' | 'se'
+
+/**
+ * Eine auf einer anderen Ebene eingebettete Karte. Unterhalb der Aufdeck-Schwelle
+ * nur eine Pinnadel mit Kartensymbol; darueber Bild + eigene Pins, verschiebbar
+ * per Ziehen und per Eck-Ziehpunkten skalierbar.
+ */
+function EmbeddedMap({
+  embLayer,
+  view,
+  toWorld,
+  tool,
+  tableMode,
+  fogEditing,
+  timeEnabled,
+  timeOfDay,
+  entities,
+  selectedIds,
+  selected,
+  onSelect,
+  onZoomTo,
+  onEntityClick,
+  onEntityMove,
+  setEmbedRect,
+}: {
+  embLayer: MapLayer
+  view: View
+  toWorld: (clientX: number, clientY: number) => { wx: number; wy: number }
+  tool: string
+  tableMode: boolean
+  fogEditing: boolean
+  timeEnabled: boolean
+  timeOfDay: number
+  entities: Entity[]
+  selectedIds: string[]
+  selected: boolean
+  onSelect: (id: string) => void
+  onZoomTo: (l: MapLayer) => void
+  onEntityClick: (id: string, ev: { ctrlKey: boolean; metaKey: boolean; shiftKey: boolean }) => void
+  onEntityMove: (id: string, dxSub: number, dySub: number) => void
+  setEmbedRect: (id: string, x: number, y: number, width: number, height: number) => void
+}) {
+  const image = useAsset(embLayer.imageUrl)
+  const embed = embLayer.embed!
+  const x = embed.x * view.scale + view.tx
+  const y = embed.y * view.scale + view.ty
+  const w = embed.width * view.scale
+  const h = embed.height * view.scale
+  const revealed = Math.min(w, h) >= REVEAL_THRESHOLD
+  const interactive = !tableMode && !fogEditing
+
+  const dragRef = useRef<{ startX: number; startY: number; startEx: number; startEy: number; moved: boolean } | null>(null)
+
+  function onBgPointerDown(e: React.PointerEvent) {
+    if (!interactive || tool === 'add' || e.button !== 0) return
+    e.stopPropagation()
+    e.preventDefault()
+    ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+    dragRef.current = { startX: e.clientX, startY: e.clientY, startEx: embed.x, startEy: embed.y, moved: false }
+  }
+  function onBgPointerMove(e: React.PointerEvent) {
+    const d = dragRef.current
+    if (!d) return
+    e.stopPropagation()
+    const dx = (e.clientX - d.startX) / view.scale
+    const dy = (e.clientY - d.startY) / view.scale
+    if (!d.moved && Math.hypot(e.clientX - d.startX, e.clientY - d.startY) > DRAG_THRESHOLD) d.moved = true
+    if (d.moved) setEmbedRect(embLayer.id, d.startEx + dx, d.startEy + dy, embed.width, embed.height)
+  }
+  function onBgPointerUp(e: React.PointerEvent) {
+    const d = dragRef.current
+    dragRef.current = null
+    if (!d) return
+    e.stopPropagation()
+    ;(e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId)
+    if (!d.moved) onSelect(embLayer.id)
+  }
+
+  const resizeRef = useRef<{
+    x0: number
+    y0: number
+    w0: number
+    h0: number
+    anchorX: number
+    anchorY: number
+    isLeft: boolean
+    isTop: boolean
+  } | null>(null)
+
+  function startEmbResize(handle: EmbedResizeHandle) {
+    return (e: React.PointerEvent) => {
+      e.stopPropagation()
+      e.preventDefault()
+      ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+      const isLeft = handle === 'ne' || handle === 'se'
+      const isTop = handle === 'sw' || handle === 'se'
+      resizeRef.current = {
+        x0: embed.x,
+        y0: embed.y,
+        w0: embed.width,
+        h0: embed.height,
+        anchorX: isLeft ? embed.x : embed.x + embed.width,
+        anchorY: isTop ? embed.y : embed.y + embed.height,
+        isLeft,
+        isTop,
+      }
+    }
+  }
+  function onEmbResizeMove(e: React.PointerEvent) {
+    e.stopPropagation()
+    const r = resizeRef.current
+    if (!r) return
+    const { wx, wy } = toWorld(e.clientX, e.clientY)
+    const rawW = Math.abs(wx - r.anchorX)
+    const rawH = Math.abs(wy - r.anchorY)
+    let scale = (rawW / r.w0 + rawH / r.h0) / 2
+    const minScale = MIN_EMBED_SIZE / Math.min(r.w0, r.h0)
+    scale = Math.max(scale, minScale)
+    const newW = r.w0 * scale
+    const newH = r.h0 * scale
+    const newX = r.isLeft ? r.anchorX : r.anchorX - newW
+    const newY = r.isTop ? r.anchorY : r.anchorY - newH
+    setEmbedRect(embLayer.id, newX, newY, newW, newH)
+  }
+  function onEmbResizeUp(e: React.PointerEvent) {
+    e.stopPropagation()
+    ;(e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId)
+    resizeRef.current = null
+  }
+
+  if (!revealed) {
+    return (
+      <MapPin
+        screenX={x + w / 2}
+        screenY={y + h / 2}
+        icon="🗺"
+        color="#c9a227"
+        label={embLayer.name}
+        selected={false}
+        draggable={interactive && tool !== 'add'}
+        scale={view.scale}
+        onClick={() => onZoomTo(embLayer)}
+        onMove={(dxWorld, dyWorld) => setEmbedRect(embLayer.id, embed.x + dxWorld, embed.y + dyWorld, embed.width, embed.height)}
+      />
+    )
+  }
+
+  const embPins = entities.filter(
+    (e) =>
+      e.placement &&
+      e.placement.layerId === embLayer.id &&
+      (!tableMode || e.visibility === 'spieler') &&
+      (!timeEnabled || inWindow(timeOfDay, e.timeStart, e.timeEnd)),
+  )
+  const pinScale = view.scale * (embed.width / embLayer.width)
+
+  return (
+    <>
+      <div
+        className="embedded-map"
+        style={{ left: x, top: y, width: w, height: h }}
+        onPointerDown={onBgPointerDown}
+        onPointerMove={onBgPointerMove}
+        onPointerUp={onBgPointerUp}
+      >
+        {embLayer.imageUrl ? (
+          image && <img src={image} draggable={false} alt={embLayer.name} style={{ width: '100%', height: '100%', display: 'block', objectFit: 'fill' }} />
+        ) : (
+          <div className="embedded-map__placeholder">
+            <PlaceholderMap width={Math.max(1, Math.round(w))} height={Math.max(1, Math.round(h))} />
+          </div>
+        )}
+        <div className="embedded-map__label">{embLayer.name}</div>
+      </div>
+
+      {embPins.map((e) => {
+        const meta = entityDisplayMeta(e)
+        const px = x + (e.placement!.x / embLayer.width) * w
+        const py = y + (e.placement!.y / embLayer.height) * h
+        return (
+          <MapPin
+            key={e.id}
+            screenX={px}
+            screenY={py}
+            icon={meta.icon}
+            color={meta.color}
+            label={e.name}
+            selected={selectedIds.includes(e.id)}
+            draggable={interactive}
+            scale={pinScale}
+            onClick={(ev) => onEntityClick(e.id, ev)}
+            onMove={(dxSub, dySub) => onEntityMove(e.id, dxSub, dySub)}
+          />
+        )
+      })}
+
+      {selected && (
+        <>
+          <div className="map-resize-outline" style={{ left: x, top: y, width: w, height: h }} />
+          {(['nw', 'ne', 'sw', 'se'] as EmbedResizeHandle[]).map((hdl) => (
+            <div
+              key={hdl}
+              className={`map-resize-handle map-resize-handle--${hdl}`}
+              style={{
+                left: hdl === 'nw' || hdl === 'sw' ? x : x + w,
+                top: hdl === 'nw' || hdl === 'ne' ? y : y + h,
+              }}
+              onPointerDown={startEmbResize(hdl)}
+              onPointerMove={onEmbResizeMove}
+              onPointerUp={onEmbResizeUp}
+            />
+          ))}
+        </>
+      )}
+    </>
+  )
 }

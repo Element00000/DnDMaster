@@ -5,7 +5,7 @@ import { downloadJson, readJsonFile, slugify, todayStamp } from '../utils/backup
 import { backupHint, markBackup } from '../utils/backupReminder'
 import { fileToScaledDataUrl } from '../utils/image'
 import { deleteAsset, inlineAsset, internAsset, mapCampaignAssets, putAsset } from '../utils/assets'
-import type { AppData, Campaign } from '../types'
+import type { AppData, Campaign, MapLayer } from '../types'
 
 const BACKUP_APP = 'dnd-weltkarte'
 const BACKUP_VERSION = 6
@@ -25,6 +25,12 @@ export function TopBar() {
   const importCampaign = useStore((s) => s.importCampaign)
   const replaceAllData = useStore((s) => s.replaceAllData)
   const setLayerImage = useStore((s) => s.setLayerImage)
+  const addLayer = useStore((s) => s.addLayer)
+  const renameLayer = useStore((s) => s.renameLayer)
+  const deleteLayer = useStore((s) => s.deleteLayer)
+  const setActiveLayer = useStore((s) => s.setActiveLayer)
+  const placingLayerId = useStore((s) => s.placingLayerId)
+  const setPlacingLayer = useStore((s) => s.setPlacingLayer)
   const timelineOpen = useStore((s) => s.timelineOpen)
   const setTimelineOpen = useStore((s) => s.setTimelineOpen)
   const storyTreeOpen = useStore((s) => s.storyTreeOpen)
@@ -35,6 +41,7 @@ export function TopBar() {
   const setTableMode = useStore((s) => s.setTableMode)
 
   const [manageOpen, setManageOpen] = useState(false)
+  const [mapsMenuOpen, setMapsMenuOpen] = useState(false)
   const entityCount = activeCampaign.entities.length
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -46,6 +53,26 @@ export function TopBar() {
     const ref = await putAsset(url)
     setLayerImage(layer.id, ref, width, height)
     void deleteAsset(prev)
+  }
+
+  function onAddLayer() {
+    const name = prompt('Name der neuen Karte (z.B. Regionalkarte, Stadtplan):')
+    if (name && name.trim()) addLayer(name.trim())
+  }
+
+  function onRenameLayer(l: MapLayer) {
+    const name = prompt('Karte umbenennen:', l.name)
+    if (name && name.trim()) renameLayer(l.id, name.trim())
+  }
+
+  function onDeleteLayer(l: MapLayer) {
+    if (activeCampaign.layers.length <= 1) {
+      alert('Die letzte Karte kann nicht geloescht werden.')
+      return
+    }
+    if (confirm(`Karte "${l.name}" loeschen? Marker auf ihr verlieren ihre Position.`)) {
+      deleteLayer(l.id)
+    }
   }
 
   function onNewCampaign() {
@@ -201,10 +228,60 @@ export function TopBar() {
         <input ref={importRef} type="file" accept="application/json,.json" hidden onChange={onImport} />
       </div>
 
-      <input ref={fileRef} type="file" accept="image/*" onChange={onFile} hidden />
-      <button className="btn" onClick={() => fileRef.current?.click()}>
-        Meine Karte
-      </button>
+      <div className="campaign-switch">
+        <button className={`btn${placingLayerId ? ' btn--active' : ''}`} onClick={() => setMapsMenuOpen((o) => !o)}>
+          Meine Karten
+        </button>
+        {mapsMenuOpen && (
+          <div className="campaign-menu maps-menu" onMouseLeave={() => setMapsMenuOpen(false)}>
+            {activeCampaign.layers.map((l) => (
+              <div key={l.id} className="maps-menu__row">
+                <button
+                  className={`maps-menu__name${l.id === layer.id ? ' is-active' : ''}`}
+                  onClick={() => setActiveLayer(l.id)}
+                  title="Als aktive Karte anzeigen"
+                >
+                  {l.embed ? '↳ ' : ''}
+                  {l.name}
+                </button>
+                <button className="icon-btn icon-btn--sm" title="Umbenennen" onClick={() => onRenameLayer(l)}>
+                  ✎
+                </button>
+                {activeCampaign.layers.length > 1 && (
+                  <button className="icon-btn icon-btn--sm" title="Loeschen" onClick={() => onDeleteLayer(l)}>
+                    🗑
+                  </button>
+                )}
+                {!l.embed && l.id !== layer.id && (
+                  <button
+                    className="chipbtn"
+                    title="Diese Karte an einer Stelle der aktiven Karte einbetten"
+                    onClick={() => {
+                      setPlacingLayer(l.id)
+                      setMapsMenuOpen(false)
+                    }}
+                  >
+                    Auf Karte platzieren
+                  </button>
+                )}
+              </div>
+            ))}
+            <div className="campaign-menu__sep" />
+            <button onClick={onAddLayer}>+ Neue Karte</button>
+            <button onClick={() => fileRef.current?.click()}>Bild fuer „{layer.name}“ hochladen</button>
+          </div>
+        )}
+        <input ref={fileRef} type="file" accept="image/*" onChange={onFile} hidden />
+      </div>
+
+      {placingLayerId && (
+        <div className="topbar__hint">
+          Klicke auf die Hauptkarte, um die Karte dort einzubetten.
+          <button className="linklike" onClick={() => setPlacingLayer(null)}>
+            Abbrechen
+          </button>
+        </div>
+      )}
 
       <SearchBar />
 

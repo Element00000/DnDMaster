@@ -12,6 +12,7 @@ import type {
   EntityType,
   EventBlock,
   EventData,
+  EmbeddedPlacement,
   MapLayer,
   Placement,
   RelationType,
@@ -30,6 +31,7 @@ function makeLayer(name = 'Weltkarte'): MapLayer {
     height: 1400,
     fogEnabled: false,
     reveals: [],
+    embed: null,
   }
 }
 
@@ -70,6 +72,8 @@ interface StoreState extends AppData {
   selectedIds: string[]
   /** Ein vorhandenes (unplatziertes) Objekt wartet auf einen Kartenklick. */
   placingEntityId: string | null
+  /** Eine vorhandene Ebene wartet darauf, per Kartenklick als eingebettete Karte platziert zu werden. */
+  placingLayerId: string | null
   /** Rueckgaengig-Verlauf der aktiven Kampagne (nicht persistiert). */
   undoStack: Campaign[]
   /** Zeitpunkt des letzten Undo-Snapshots, zum Zusammenfassen schneller Aenderungen. */
@@ -157,6 +161,11 @@ interface StoreState extends AppData {
   addLayer: (name: string) => void
   renameLayer: (id: string, name: string) => void
   deleteLayer: (id: string) => void
+  /** Ebene als eingebettete Karte auf einer anderen Ebene platzieren. */
+  embedLayer: (id: string, placement: EmbeddedPlacement) => void
+  /** Position/Groesse einer eingebetteten Karte aendern (Verschieben/Skalieren per Eckgriff). */
+  setEmbedRect: (id: string, x: number, y: number, width: number, height: number) => void
+  setPlacingLayer: (id: string | null) => void
   // Nebel des Krieges (Phase 6)
   setLayerFog: (id: string, enabled: boolean) => void
   addReveal: (layerId: string, x: number, y: number, r: number) => void
@@ -249,6 +258,7 @@ export const useStore = create<StoreState>()(
         selectedEntityId: null,
         selectedIds: [],
         placingEntityId: null,
+        placingLayerId: null,
         undoStack: [],
         lastUndoPushAt: 0,
         timeEnabled: false,
@@ -501,7 +511,10 @@ export const useStore = create<StoreState>()(
         deleteLayer: (id) =>
           patchActive((c) => {
             if (c.layers.length <= 1) return c // letzte Ebene bleibt bestehen
-            const layers = c.layers.filter((l) => l.id !== id)
+            const layers = c.layers
+              .filter((l) => l.id !== id)
+              // Eingebettete Karten, deren Eltern-Ebene geloescht wird, werden zu eigenstaendigen Ebenen.
+              .map((l) => (l.embed?.parentLayerId === id ? { ...l, embed: null } : l))
             const activeLayerId = c.activeLayerId === id ? layers[0].id : c.activeLayerId
             // Platzierungen und Unterkarten-Verweise auf die geloeschte Ebene bereinigen.
             const entities = c.entities.map((e) => ({
@@ -511,6 +524,20 @@ export const useStore = create<StoreState>()(
             }))
             return { ...c, layers, activeLayerId, entities }
           }),
+
+        embedLayer: (id, placement) =>
+          patchActive((c) => ({
+            ...c,
+            layers: c.layers.map((l) => (l.id === id ? { ...l, embed: placement } : l)),
+          })),
+
+        setEmbedRect: (id, x, y, width, height) =>
+          patchActive((c) => ({
+            ...c,
+            layers: c.layers.map((l) =>
+              l.id === id && l.embed ? { ...l, embed: { ...l.embed, x, y, width, height } } : l,
+            ),
+          })),
 
         setLayerFog: (id, enabled) =>
           patchActive((c) => ({
@@ -880,6 +907,7 @@ export const useStore = create<StoreState>()(
         setPendingEntityType: (t) => set({ pendingEntityType: t, pendingEntityFields: {} }),
         setPendingEntityFields: (fields) => set({ pendingEntityFields: fields }),
         setPlacingEntity: (id) => set({ placingEntityId: id, tool: 'select' }),
+        setPlacingLayer: (id) => set({ placingLayerId: id, tool: 'select' }),
 
         undo: () =>
           set((s) => {
@@ -978,10 +1006,13 @@ function normalizeEntity(e: Partial<Entity> & { id: string; type: EntityType; na
 
 /** Fuellt fehlende Felder einer Kampagne auf (Entitaeten, Ebenen, Sitzungen). */
 function normalizeCampaign(c: Campaign): Campaign {
+  const validIds = new Set((c.layers ?? []).map((l) => l.id))
   const layers = (c.layers && c.layers.length > 0 ? c.layers : [makeLayer()]).map((l) => ({
     ...l,
     fogEnabled: l.fogEnabled ?? false,
     reveals: l.reveals ?? [],
+    // Eingebettete Karte nur behalten, wenn die referenzierte Eltern-Ebene noch existiert.
+    embed: l.embed && validIds.has(l.embed.parentLayerId) ? l.embed : null,
   }))
   return {
     ...c,
