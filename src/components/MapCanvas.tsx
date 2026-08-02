@@ -35,7 +35,9 @@ export function MapCanvas() {
   const setPlacingEntity = useStore((s) => s.setPlacingEntity)
   const moveEntity = useStore((s) => s.moveEntity)
   const selectEntity = useStore((s) => s.selectEntity)
-  const selectedId = useStore((s) => s.selectedEntityId)
+  const selectedIds = useStore((s) => s.selectedIds)
+  const setSelectedIds = useStore((s) => s.setSelectedIds)
+  const toggleSelectedId = useStore((s) => s.toggleSelectedId)
   const setTool = useStore((s) => s.setTool)
   const timeEnabled = useStore((s) => s.timeEnabled)
   const timeOfDay = useStore((s) => s.timeOfDay)
@@ -94,7 +96,12 @@ export function MapCanvas() {
     })
   }, [])
 
+  // Rechte Maustaste: Karte verschieben.
   const drag = useRef<{ startX: number; startY: number; origTx: number; origTy: number; moved: boolean } | null>(null)
+  // Linke Maustaste auf leerer Flaeche: Rechteck-Markierung.
+  const marquee = useRef<{ startX: number; startY: number; moved: boolean } | null>(null)
+  const [marqueeRect, setMarqueeRect] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
+  const [panning, setPanning] = useState(false)
   const painting = useRef(false)
 
   // Bildschirm- zu Weltkoordinaten der aktiven Ansicht.
@@ -121,17 +128,28 @@ export function MapCanvas() {
 
   const onPointerDown = useCallback(
     (e: React.PointerEvent) => {
-      if (e.button !== 0) return
       const el = containerRef.current
       if (!el) return
-      el.setPointerCapture(e.pointerId)
-      // Nebel-Pinsel: aufdecken statt schieben.
+      // Nebel-Pinsel: aufdecken statt schieben/markieren.
       if (fogEditing) {
+        if (e.button !== 0) return
+        el.setPointerCapture(e.pointerId)
         painting.current = true
         paintReveal(e.clientX, e.clientY)
         return
       }
-      drag.current = { startX: e.clientX, startY: e.clientY, origTx: view.tx, origTy: view.ty, moved: false }
+      if (e.button === 2) {
+        // Rechte Maustaste: Karte verschieben.
+        el.setPointerCapture(e.pointerId)
+        drag.current = { startX: e.clientX, startY: e.clientY, origTx: view.tx, origTy: view.ty, moved: false }
+        setPanning(true)
+        return
+      }
+      if (e.button === 0) {
+        // Linke Maustaste auf leerer Flaeche: Rechteck-Markierung aufziehen.
+        el.setPointerCapture(e.pointerId)
+        marquee.current = { startX: e.clientX, startY: e.clientY, moved: false }
+      }
     },
     [view.tx, view.ty, fogEditing, paintReveal],
   )
@@ -143,11 +161,34 @@ export function MapCanvas() {
         return
       }
       const d = drag.current
-      if (!d) return
-      const dx = e.clientX - d.startX
-      const dy = e.clientY - d.startY
-      if (!d.moved && Math.hypot(dx, dy) > DRAG_THRESHOLD) d.moved = true
-      if (d.moved) setView((v) => ({ ...v, tx: d.origTx + dx, ty: d.origTy + dy }))
+      if (d) {
+        const dx = e.clientX - d.startX
+        const dy = e.clientY - d.startY
+        if (!d.moved && Math.hypot(dx, dy) > DRAG_THRESHOLD) d.moved = true
+        if (d.moved) setView((v) => ({ ...v, tx: d.origTx + dx, ty: d.origTy + dy }))
+        return
+      }
+      const m = marquee.current
+      if (m) {
+        const el = containerRef.current
+        if (!el) return
+        const dx = e.clientX - m.startX
+        const dy = e.clientY - m.startY
+        if (!m.moved && Math.hypot(dx, dy) > DRAG_THRESHOLD) m.moved = true
+        if (m.moved) {
+          const rect = el.getBoundingClientRect()
+          const x0 = m.startX - rect.left
+          const y0 = m.startY - rect.top
+          const x1 = e.clientX - rect.left
+          const y1 = e.clientY - rect.top
+          setMarqueeRect({
+            x: Math.min(x0, x1),
+            y: Math.min(y0, y1),
+            w: Math.abs(x1 - x0),
+            h: Math.abs(y1 - y0),
+          })
+        }
+      }
     },
     [paintReveal],
   )
@@ -160,11 +201,38 @@ export function MapCanvas() {
         painting.current = false
         return
       }
-      const d = drag.current
-      drag.current = null
-      if (!el || !d) return
-      if (d.moved) return
 
+      // Rechte Maustaste: nur Verschieben, keine Auswahl-/Anlege-Logik.
+      if (drag.current) {
+        drag.current = null
+        setPanning(false)
+        return
+      }
+
+      const m = marquee.current
+      marquee.current = null
+      if (m && m.moved) {
+        setMarqueeRect(null)
+        if (!el) return
+        const rect = el.getBoundingClientRect()
+        const x0 = Math.min(m.startX, e.clientX) - rect.left
+        const y0 = Math.min(m.startY, e.clientY) - rect.top
+        const x1 = Math.max(m.startX, e.clientX) - rect.left
+        const y1 = Math.max(m.startY, e.clientY) - rect.top
+        const ids = pins
+          .filter((p) => {
+            const sx = p.placement!.x * view.scale + view.tx
+            const sy = p.placement!.y * view.scale + view.ty
+            return sx >= x0 && sx <= x1 && sy >= y0 && sy <= y1
+          })
+          .map((p) => p.id)
+        setSelectedIds(ids)
+        return
+      }
+      setMarqueeRect(null)
+      if (!m) return // Klick kam nicht von der linken Maustaste (z.B. Fog-Pinsel).
+
+      if (!el) return
       const rect = el.getBoundingClientRect()
       const wx = (e.clientX - rect.left - view.tx) / view.scale
       const wy = (e.clientY - rect.top - view.ty) / view.scale
@@ -187,7 +255,7 @@ export function MapCanvas() {
         selectEntity(null)
       }
     },
-    [tool, pendingType, pendingFields, view, width, height, layer.id, playerView, placingEntityId, addEntity, setPlacement, setPlacingEntity, selectEntity, setTool],
+    [tool, pendingType, pendingFields, view, width, height, layer.id, playerView, placingEntityId, pins, addEntity, setPlacement, setPlacingEntity, selectEntity, setSelectedIds, setTool],
   )
 
   const placingActive = placingEntityId !== null
@@ -202,10 +270,12 @@ export function MapCanvas() {
       data-tool={tool}
       data-placing={placingActive ? 'true' : undefined}
       data-fog={fogEditing ? 'true' : undefined}
+      data-panning={panning ? 'true' : undefined}
       onWheel={onWheel}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
+      onContextMenu={(e) => e.preventDefault()}
       onDoubleClick={() => fitToView()}
     >
       <div
@@ -279,15 +349,25 @@ export function MapCanvas() {
               icon={meta.icon}
               color={meta.color}
               label={e.name}
-              selected={e.id === selectedId}
+              selected={selectedIds.includes(e.id)}
               draggable={!playerView && !fogEditing}
               scale={view.scale}
-              onClick={() => selectEntity(e.id)}
+              onClick={(ev) => {
+                if (ev.ctrlKey || ev.metaKey) toggleSelectedId(e.id)
+                else selectEntity(e.id)
+              }}
               onMove={(dxWorld, dyWorld) => moveEntity(e.id, dxWorld, dyWorld)}
             />
           )
         })}
       </div>
+
+      {marqueeRect && (
+        <div
+          className="map-marquee"
+          style={{ left: marqueeRect.x, top: marqueeRect.y, width: marqueeRect.w, height: marqueeRect.h }}
+        />
+      )}
 
       {placingActive && (
         <div className="map-banner">

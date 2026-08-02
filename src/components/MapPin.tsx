@@ -9,7 +9,7 @@ interface Props {
   selected: boolean
   draggable: boolean
   scale: number
-  onClick: () => void
+  onClick: (e: React.PointerEvent) => void
   onMove: (dxWorld: number, dyWorld: number) => void
 }
 
@@ -56,7 +56,7 @@ export function MapPin({
     state.current = null
     e.stopPropagation()
     ;(e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId)
-    if (!s || !s.moved) onClick()
+    if (!s || !s.moved) onClick(e)
   }
 
   return (

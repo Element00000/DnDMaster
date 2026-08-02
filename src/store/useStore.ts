@@ -61,6 +61,8 @@ interface StoreState extends AppData {
   /** Voreingestellte Felder (z.B. Gesinnung) fuer das naechste anzulegende Objekt. */
   pendingEntityFields: Record<string, string>
   selectedEntityId: string | null
+  /** Mehrfachauswahl auf der Karte (Rechteck-Markierung / Strg+Klick). */
+  selectedIds: string[]
   /** Ein vorhandenes (unplatziertes) Objekt wartet auf einen Kartenklick. */
   placingEntityId: string | null
   /** Spieler-Ansicht: DM-Geheimnisse und unentdeckte Objekte ausblenden. */
@@ -156,6 +158,10 @@ interface StoreState extends AppData {
   setEntityField: (id: string, key: string, value: string) => void
   deleteEntity: (id: string) => void
   selectEntity: (id: string | null) => void
+  /** Mehrfachauswahl komplett ersetzen (z.B. Ergebnis einer Rechteck-Markierung). */
+  setSelectedIds: (ids: string[]) => void
+  /** Einzelnes Objekt in der Mehrfachauswahl an-/abwaehlen (Strg+Klick). */
+  toggleSelectedId: (id: string) => void
   addLink: (fromId: string, targetId: string, relation: RelationType) => void
   removeLink: (fromId: string, targetId: string, relation: RelationType) => void
   setPlacement: (id: string, placement: Placement | null) => void
@@ -220,6 +226,7 @@ export const useStore = create<StoreState>()(
         pendingEntityType: 'ort',
         pendingEntityFields: {},
         selectedEntityId: null,
+        selectedIds: [],
         placingEntityId: null,
         playerMode: false,
         timeEnabled: false,
@@ -255,6 +262,7 @@ export const useStore = create<StoreState>()(
             storyTreeOpen: on ? false : get().storyTreeOpen,
             fogEditing: false,
             selectedEntityId: on ? null : get().selectedEntityId,
+            selectedIds: on ? [] : get().selectedIds,
           }),
         setFogEditing: (on) => set({ fogEditing: on, tool: 'select' }),
         setFogBrush: (r) => set({ fogBrush: Math.max(30, Math.min(500, r)) }),
@@ -347,6 +355,7 @@ export const useStore = create<StoreState>()(
             campaigns: [...s.campaigns, c],
             activeCampaignId: c.id,
             selectedEntityId: null,
+            selectedIds: [],
           }))
         },
 
@@ -366,11 +375,11 @@ export const useStore = create<StoreState>()(
             const campaigns = s.campaigns.filter((c) => c.id !== id)
             const activeCampaignId =
               s.activeCampaignId === id ? campaigns[0].id : s.activeCampaignId
-            return { campaigns, activeCampaignId, selectedEntityId: null }
+            return { campaigns, activeCampaignId, selectedEntityId: null, selectedIds: [] }
           }),
 
         setActiveCampaign: (id) =>
-          set({ activeCampaignId: id, selectedEntityId: null, tool: 'select' }),
+          set({ activeCampaignId: id, selectedEntityId: null, selectedIds: [], tool: 'select' }),
 
         addMusicEntry: (label, url) =>
           patchActive((c) => ({
@@ -389,6 +398,7 @@ export const useStore = create<StoreState>()(
               campaigns: [...s.campaigns, camp],
               activeCampaignId: camp.id,
               selectedEntityId: null,
+              selectedIds: [],
               fightEventId: null,
             }
           }),
@@ -400,7 +410,7 @@ export const useStore = create<StoreState>()(
             const activeCampaignId = campaigns.some((c) => c.id === data.activeCampaignId)
               ? data.activeCampaignId
               : campaigns[0].id
-            return { campaigns, activeCampaignId, selectedEntityId: null, fightEventId: null }
+            return { campaigns, activeCampaignId, selectedEntityId: null, selectedIds: [], fightEventId: null }
           }),
 
         // ---------- Ebenen ----------
@@ -430,7 +440,7 @@ export const useStore = create<StoreState>()(
         addLayer: (name) => {
           const layer = makeLayer(name.trim() || 'Neue Ebene')
           patchActive((c) => ({ ...c, layers: [...c.layers, layer], activeLayerId: layer.id }))
-          set({ selectedEntityId: null })
+          set({ selectedEntityId: null, selectedIds: [] })
         },
 
         renameLayer: (id, name) =>
@@ -496,7 +506,7 @@ export const useStore = create<StoreState>()(
             createdAt: Date.now(),
           }
           patchActive((c) => ({ ...c, entities: [...c.entities, entity] }))
-          set({ selectedEntityId: id })
+          set({ selectedEntityId: id, selectedIds: [id] })
           return id
         },
 
@@ -530,10 +540,20 @@ export const useStore = create<StoreState>()(
               // ... und alle Verknuepfungen auf sie loeschen.
               .map((e) => ({ ...e, links: e.links.filter((l) => l.targetId !== id) })),
           }))
-          set((s) => ({ selectedEntityId: s.selectedEntityId === id ? null : s.selectedEntityId }))
+          set((s) => ({
+            selectedEntityId: s.selectedEntityId === id ? null : s.selectedEntityId,
+            selectedIds: s.selectedIds.filter((x) => x !== id),
+          }))
         },
 
-        selectEntity: (id) => set({ selectedEntityId: id }),
+        selectEntity: (id) => set({ selectedEntityId: id, selectedIds: id ? [id] : [] }),
+        setSelectedIds: (ids) => set({ selectedIds: ids, selectedEntityId: ids.length ? ids[ids.length - 1] : null }),
+        toggleSelectedId: (id) =>
+          set((s) => {
+            const has = s.selectedIds.includes(id)
+            const next = has ? s.selectedIds.filter((x) => x !== id) : [...s.selectedIds, id]
+            return { selectedIds: next, selectedEntityId: next.length ? next[next.length - 1] : null }
+          }),
 
         addLink: (fromId, targetId, relation) => {
           if (fromId === targetId) return
