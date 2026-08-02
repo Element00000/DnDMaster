@@ -20,7 +20,7 @@ interface Pos {
 /** Beziehungsgraph: Netzwerkansicht der Objekte und ihrer Verknuepfungen. */
 export function RelationGraph() {
   const campaign = useStore((s) => s.campaigns.find((c) => c.id === s.activeCampaignId) ?? s.campaigns[0])
-  const playerView = useStore((s) => s.playerMode || s.tableMode)
+  const tableMode = useStore((s) => s.tableMode)
   const setOpen = useStore((s) => s.setRelationGraphOpen)
   const selectEntity = useStore((s) => s.selectEntity)
   const setActiveLayer = useStore((s) => s.setActiveLayer)
@@ -30,7 +30,7 @@ export function RelationGraph() {
 
   // Sichtbare Objekte und Kanten bestimmen.
   const { nodes, edges } = useMemo(() => {
-    const visible = campaign.entities.filter((e) => !playerView || e.visibility === 'spieler')
+    const visible = campaign.entities.filter((e) => !tableMode || e.visibility === 'spieler')
     const allowed = onlyChars
       ? visible.filter((e) => e.type === 'nsc' || e.type === 'fraktion')
       : visible
@@ -51,7 +51,7 @@ export function RelationGraph() {
     })
     const nodes: Node[] = allowed.filter((e) => connected.has(e.id)).map((e) => ({ id: e.id, entity: e }))
     return { nodes, edges }
-  }, [campaign.entities, playerView, onlyChars])
+  }, [campaign.entities, tableMode, onlyChars])
 
   const graphKey = useMemo(
     () => nodes.map((n) => n.id).join(',') + '|' + edges.map((e) => `${e.source}>${e.target}`).join(','),

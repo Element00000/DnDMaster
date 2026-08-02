@@ -19,7 +19,6 @@ export default function App() {
   const toolsOpen = useStore((s) => s.toolsOpen)
   const tableMode = useStore((s) => s.tableMode)
   const fightEventId = useStore((s) => s.fightEventId)
-  const playerMode = useStore((s) => s.playerMode)
   const undo = useStore((s) => s.undo)
 
   // Strg+Z (bzw. Cmd+Z): letzte Aenderung rueckgaengig machen. Wird in Text-
@@ -27,7 +26,7 @@ export default function App() {
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z') {
-        if (playerMode) return
+        if (tableMode) return
         const target = e.target as HTMLElement | null
         const tag = target?.tagName
         if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target?.isContentEditable) return
@@ -37,7 +36,7 @@ export default function App() {
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [playerMode, undo])
+  }, [tableMode, undo])
 
   return (
     <div className={`app${tableMode ? ' app--table' : ''}`}>

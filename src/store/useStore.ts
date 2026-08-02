@@ -70,8 +70,6 @@ interface StoreState extends AppData {
   selectedIds: string[]
   /** Ein vorhandenes (unplatziertes) Objekt wartet auf einen Kartenklick. */
   placingEntityId: string | null
-  /** Spieler-Ansicht: DM-Geheimnisse und unentdeckte Objekte ausblenden. */
-  playerMode: boolean
   /** Rueckgaengig-Verlauf der aktiven Kampagne (nicht persistiert). */
   undoStack: Campaign[]
   /** Zeitpunkt des letzten Undo-Snapshots, zum Zusammenfassen schneller Aenderungen. */
@@ -106,7 +104,7 @@ interface StoreState extends AppData {
   setToolsTab: (tab: ToolTab) => void
 
   // Feinschliff (Phase 6)
-  /** Spieltischmodus: aufgeraeumte Live-Ansicht. */
+  /** Spieltischmodus: aufgeraeumte Live-Ansicht fuer die Spielrunde (blendet DM-Geheimnisse und unentdeckte Objekte aus, keine Bearbeitung). */
   tableMode: boolean
   /** Nebel-Pinsel aktiv (DM deckt Bereiche auf)? */
   fogEditing: boolean
@@ -214,7 +212,6 @@ interface StoreState extends AppData {
   setPendingEntityType: (t: EntityType) => void
   setPendingEntityFields: (fields: Record<string, string>) => void
   setPlacingEntity: (id: string | null) => void
-  setPlayerMode: (on: boolean) => void
 }
 
 function initialData(): AppData {
@@ -251,7 +248,6 @@ export const useStore = create<StoreState>()(
         selectedEntityId: null,
         selectedIds: [],
         placingEntityId: null,
-        playerMode: false,
         undoStack: [],
         lastUndoPushAt: 0,
         timeEnabled: false,
@@ -282,9 +278,11 @@ export const useStore = create<StoreState>()(
             tableMode: on,
             // Im Tischmodus die Bearbeitungs-Overlays schliessen.
             tool: 'select',
+            placingEntityId: null,
             toolsOpen: on ? false : get().toolsOpen,
             timelineOpen: on ? false : get().timelineOpen,
             storyTreeOpen: on ? false : get().storyTreeOpen,
+            relationGraphOpen: on ? false : get().relationGraphOpen,
             fogEditing: false,
             selectedEntityId: on ? null : get().selectedEntityId,
             selectedIds: on ? [] : get().selectedIds,
@@ -858,7 +856,6 @@ export const useStore = create<StoreState>()(
         setPendingEntityType: (t) => set({ pendingEntityType: t, pendingEntityFields: {} }),
         setPendingEntityFields: (fields) => set({ pendingEntityFields: fields }),
         setPlacingEntity: (id) => set({ placingEntityId: id, tool: 'select' }),
-        setPlayerMode: (on) => set({ playerMode: on, tool: 'select', placingEntityId: null }),
 
         undo: () =>
           set((s) => {

@@ -4,7 +4,7 @@ import { useStore } from '../store/useStore'
 export function LayerBar() {
   const campaign = useStore((s) => s.campaigns.find((c) => c.id === s.activeCampaignId) ?? s.campaigns[0])
   const layer = campaign.layers.find((l) => l.id === campaign.activeLayerId) ?? campaign.layers[0]
-  const playerView = useStore((s) => s.playerMode || s.tableMode)
+  const tableMode = useStore((s) => s.tableMode)
   const setActiveLayer = useStore((s) => s.setActiveLayer)
   const addLayer = useStore((s) => s.addLayer)
   const renameLayer = useStore((s) => s.renameLayer)
@@ -53,7 +53,7 @@ export function LayerBar() {
           ))}
         </select>
 
-        {!playerView && (
+        {!tableMode && (
           <>
             <button className="layerbar__btn" title="Neue Ebene" onClick={onAdd}>
               +
@@ -70,7 +70,7 @@ export function LayerBar() {
         )}
       </div>
 
-      {!playerView && (
+      {!tableMode && (
         <div className="layerbar__fog">
           <label className="layerbar__fogtoggle" title="Nebel des Krieges auf dieser Ebene">
             <input

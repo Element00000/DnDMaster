@@ -26,8 +26,6 @@ export function TopBar() {
   const replaceAllData = useStore((s) => s.replaceAllData)
   const setLayerImage = useStore((s) => s.setLayerImage)
   const resetLayerImage = useStore((s) => s.resetLayerImage)
-  const playerMode = useStore((s) => s.playerMode)
-  const setPlayerMode = useStore((s) => s.setPlayerMode)
   const timelineOpen = useStore((s) => s.timelineOpen)
   const setTimelineOpen = useStore((s) => s.setTimelineOpen)
   const storyTreeOpen = useStore((s) => s.storyTreeOpen)
@@ -238,35 +236,21 @@ export function TopBar() {
           Spieltisch
         </button>
 
-        <label className="switch" title="Spieler-Ansicht: Geheimnisse und unentdeckte Objekte ausblenden">
-          <input
-            type="checkbox"
-            checked={playerMode}
-            onChange={(e) => setPlayerMode(e.target.checked)}
-          />
-          <span className="switch__track" />
-          <span className="switch__label">{playerMode ? 'Spielersicht' : 'DM-Sicht'}</span>
-        </label>
-
-        {!playerMode && (
-          <>
-            <input ref={fileRef} type="file" accept="image/*" onChange={onFile} hidden />
-            <button className="btn" onClick={() => fileRef.current?.click()}>
-              Kartenbild
-            </button>
-            {layer.imageUrl && (
-              <button
-                className="btn btn--ghost"
-                onClick={() => {
-                  const prev = layer.imageUrl
-                  resetLayerImage(layer.id)
-                  void deleteAsset(prev)
-                }}
-              >
-                Platzhalter
-              </button>
-            )}
-          </>
+        <input ref={fileRef} type="file" accept="image/*" onChange={onFile} hidden />
+        <button className="btn" onClick={() => fileRef.current?.click()}>
+          Kartenbild
+        </button>
+        {layer.imageUrl && (
+          <button
+            className="btn btn--ghost"
+            onClick={() => {
+              const prev = layer.imageUrl
+              resetLayerImage(layer.id)
+              void deleteAsset(prev)
+            }}
+          >
+            Platzhalter
+          </button>
         )}
       </div>
     </header>

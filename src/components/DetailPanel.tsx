@@ -19,7 +19,7 @@ import { AssetImg } from './AssetImg'
 export function DetailPanel() {
   const campaign = useStore((s) => s.campaigns.find((c) => c.id === s.activeCampaignId) ?? s.campaigns[0])
   const selectedId = useStore((s) => s.selectedEntityId)
-  const playerMode = useStore((s) => s.playerMode)
+  const tableMode = useStore((s) => s.tableMode)
   const updateEntity = useStore((s) => s.updateEntity)
   const setEntityField = useStore((s) => s.setEntityField)
   const deleteEntity = useStore((s) => s.deleteEntity)
@@ -51,7 +51,7 @@ export function DetailPanel() {
     .filter((e) => e.id !== marker.id)
     .flatMap((e) => e.links.filter((l) => l.targetId === marker.id).map((l) => ({ from: e, relation: l.relation })))
 
-  const readOnly = playerMode
+  const readOnly = tableMode
 
   return (
     <aside className="detail" style={{ ['--chip-color' as string]: meta.color }}>
@@ -167,7 +167,7 @@ export function DetailPanel() {
         </label>
 
         {/* Geheimnisse: nur DM */}
-        {!playerMode && (
+        {!tableMode && (
           <label className="field">
             <span className="field__label field__label--secret">Geheimnis (nur DM)</span>
             <textarea

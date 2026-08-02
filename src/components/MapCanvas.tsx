@@ -27,8 +27,7 @@ export function MapCanvas() {
   const tool = useStore((s) => s.tool)
   const pendingType = useStore((s) => s.pendingEntityType)
   const pendingFields = useStore((s) => s.pendingEntityFields)
-  // Spieler-Sicht gilt im Spielermodus UND im Spieltischmodus.
-  const playerView = useStore((s) => s.playerMode || s.tableMode)
+  const tableMode = useStore((s) => s.tableMode)
   const placingEntityId = useStore((s) => s.placingEntityId)
   const addEntity = useStore((s) => s.addEntity)
   const setPlacement = useStore((s) => s.setPlacement)
@@ -50,13 +49,13 @@ export function MapCanvas() {
   const { width, height } = layer
   const mapImage = useAsset(layer.imageUrl)
 
-  // Auf der aktiven Ebene platzierte Objekte (in der Spieler-Sicht nur entdeckte,
+  // Auf der aktiven Ebene platzierte Objekte (im Spieltischmodus nur entdeckte,
   // bei aktivem Tageszeit-Filter nur die zur eingestellten Uhrzeit aktiven).
   const pins = entities.filter(
     (e) =>
       e.placement &&
       e.placement.layerId === layer.id &&
-      (!playerView || e.visibility === 'spieler') &&
+      (!tableMode || e.visibility === 'spieler') &&
       (!timeEnabled || inWindow(timeOfDay, e.timeStart, e.timeEnd)),
   )
 
@@ -87,7 +86,7 @@ export function MapCanvas() {
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if (e.key !== 'Delete' && e.key !== 'Backspace') return
-      if (playerView || selectedIds.length === 0) return
+      if (tableMode || selectedIds.length === 0) return
       const target = e.target as HTMLElement | null
       const tag = target?.tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target?.isContentEditable) return
@@ -100,7 +99,7 @@ export function MapCanvas() {
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [selectedIds, playerView, entities, deleteEntity])
+  }, [selectedIds, tableMode, entities, deleteEntity])
 
   const onWheel = useCallback((e: React.WheelEvent) => {
     const el = containerRef.current
@@ -267,7 +266,7 @@ export function MapCanvas() {
         return
       }
 
-      if (tool === 'add' && !playerView) {
+      if (tool === 'add' && !tableMode) {
         if (!inside) return
         addEntity({ type: pendingType, placement: { layerId: layer.id, x: wx, y: wy }, fields: pendingFields })
         setTool('select')
@@ -275,13 +274,13 @@ export function MapCanvas() {
         selectEntity(null)
       }
     },
-    [tool, pendingType, pendingFields, view, width, height, layer.id, playerView, placingEntityId, pins, addEntity, setPlacement, setPlacingEntity, selectEntity, setSelectedIds, setTool],
+    [tool, pendingType, pendingFields, view, width, height, layer.id, tableMode, placingEntityId, pins, addEntity, setPlacement, setPlacingEntity, selectEntity, setSelectedIds, setTool],
   )
 
   const placingActive = placingEntityId !== null
   // Nebel voll deckend fuer Spieler/Tisch, halbtransparent fuer den DM.
   const fogActive = layer.fogEnabled
-  const fogOpacity = playerView ? 1 : 0.45
+  const fogOpacity = tableMode ? 1 : 0.45
 
   return (
     <div
@@ -370,7 +369,7 @@ export function MapCanvas() {
               color={meta.color}
               label={e.name}
               selected={selectedIds.includes(e.id)}
-              draggable={!playerView && !fogEditing}
+              draggable={!tableMode && !fogEditing}
               scale={view.scale}
               onClick={(ev) => {
                 if (ev.ctrlKey || ev.metaKey || ev.shiftKey) toggleSelectedId(e.id)

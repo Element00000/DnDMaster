@@ -15,7 +15,7 @@ interface Hit {
 /** Globale Suche ueber Objekte und Sitzungsnotizen der aktiven Kampagne. */
 export function SearchBar() {
   const campaign = useStore((s) => s.campaigns.find((c) => c.id === s.activeCampaignId) ?? s.campaigns[0])
-  const playerMode = useStore((s) => s.playerMode)
+  const tableMode = useStore((s) => s.tableMode)
   const selectEntity = useStore((s) => s.selectEntity)
   const setActiveLayer = useStore((s) => s.setActiveLayer)
   const setToolsOpen = useStore((s) => s.setToolsOpen)
@@ -30,7 +30,7 @@ export function SearchBar() {
     if (!q) return []
     const out: Hit[] = []
     for (const e of campaign.entities) {
-      if (playerMode && e.visibility !== 'spieler') continue
+      if (tableMode && e.visibility !== 'spieler') continue
       const haystack = [e.name, e.description, ...Object.values(e.fields)].join(' ').toLowerCase()
       if (haystack.includes(q)) {
         const meta = entityMeta(e.type)
@@ -45,7 +45,7 @@ export function SearchBar() {
         })
       }
     }
-    if (!playerMode) {
+    if (!tableMode) {
       for (const s of campaign.sessions) {
         if (`${s.title} ${s.body} ${s.inGameDate}`.toLowerCase().includes(q)) {
           out.push({ id: s.id, kind: 'session', icon: '\u{1F4D3}', color: '#7c83ff', name: s.title || 'Sitzung', detail: 'Notiz', layerId: null })
@@ -53,7 +53,7 @@ export function SearchBar() {
       }
     }
     return out.slice(0, 12)
-  }, [query, campaign, playerMode])
+  }, [query, campaign, tableMode])
 
   function choose(hit: Hit) {
     if (hit.kind === 'entity') {

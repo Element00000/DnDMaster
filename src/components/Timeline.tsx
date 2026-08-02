@@ -7,7 +7,7 @@ import { formatTime } from '../utils/time'
 /** Kampagnen-Zeitleiste nach Kalendertag (Abschnitt 5 des Konzepts). */
 export function Timeline() {
   const campaign = useStore((s) => s.campaigns.find((c) => c.id === s.activeCampaignId) ?? s.campaigns[0])
-  const playerMode = useStore((s) => s.playerMode)
+  const tableMode = useStore((s) => s.tableMode)
   const setTimelineOpen = useStore((s) => s.setTimelineOpen)
   const selectEntity = useStore((s) => s.selectEntity)
   const setActiveLayer = useStore((s) => s.setActiveLayer)
@@ -26,7 +26,7 @@ export function Timeline() {
 
   const dated = all
     .filter((e) => e.day != null)
-    .filter((e) => !playerMode || e.visibility === 'spieler')
+    .filter((e) => !tableMode || e.visibility === 'spieler')
     .filter((e) => !filterId || related(e, filterId))
     .sort((a, b) => (a.day! - b.day!) || (a.timeStart ?? -1) - (b.timeStart ?? -1))
 
@@ -45,7 +45,7 @@ export function Timeline() {
     selectEntity(e.id)
   }
 
-  const filterCandidates = all.filter((e) => !playerMode || e.visibility === 'spieler')
+  const filterCandidates = all.filter((e) => !tableMode || e.visibility === 'spieler')
 
   return (
     <div className="timeline">

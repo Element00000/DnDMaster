@@ -25,7 +25,7 @@ export function Sidebar() {
   const tool = useStore((s) => s.tool)
   const pendingType = useStore((s) => s.pendingEntityType)
   const pendingFields = useStore((s) => s.pendingEntityFields)
-  const playerMode = useStore((s) => s.playerMode)
+  const tableMode = useStore((s) => s.tableMode)
   const setTool = useStore((s) => s.setTool)
   const setPendingType = useStore((s) => s.setPendingEntityType)
   const setPendingFields = useStore((s) => s.setPendingEntityFields)
@@ -48,8 +48,8 @@ export function Sidebar() {
     }
   }
 
-  // Im Spielermodus nur entdeckte Objekte anzeigen.
-  const visible = campaign.entities.filter((e) => !playerMode || e.visibility === 'spieler')
+  // Im Spieltischmodus nur entdeckte Objekte anzeigen.
+  const visible = campaign.entities.filter((e) => !tableMode || e.visibility === 'spieler')
 
   function startAdding(type: EntityType) {
     setPopup(null)
@@ -89,7 +89,7 @@ export function Sidebar() {
         </div>
       </section>
 
-      {!playerMode && (
+      {!tableMode && (
         <section className="sidebar__section">
           <h2 className="sidebar__heading">Objekt anlegen</h2>
           <p className="sidebar__hint">
@@ -167,11 +167,11 @@ export function Sidebar() {
 
       <section className="sidebar__section sidebar__section--grow">
         <h2 className="sidebar__heading">
-          {playerMode ? 'Entdeckt' : 'Objekte'} <span className="sidebar__count">{visible.length}</span>
+          {tableMode ? 'Entdeckt' : 'Objekte'} <span className="sidebar__count">{visible.length}</span>
         </h2>
         {visible.length === 0 ? (
           <p className="sidebar__empty">
-            {playerMode
+            {tableMode
               ? 'Noch nichts entdeckt.'
               : 'Noch keine Objekte. Waehle oben einen Typ und klicke auf die Karte.'}
           </p>

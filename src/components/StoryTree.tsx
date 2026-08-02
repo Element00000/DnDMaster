@@ -5,12 +5,12 @@ import { useStore } from '../store/useStore'
 /** Handlungsbaum: Entscheidungen nach Verkettungstiefe in Spalten. */
 export function StoryTree() {
   const campaign = useStore((s) => s.campaigns.find((c) => c.id === s.activeCampaignId) ?? s.campaigns[0])
-  const playerMode = useStore((s) => s.playerMode)
+  const tableMode = useStore((s) => s.tableMode)
   const setStoryTreeOpen = useStore((s) => s.setStoryTreeOpen)
   const selectEntity = useStore((s) => s.selectEntity)
 
   const decisions = campaign.entities.filter(
-    (e) => e.type === 'entscheidung' && e.decision && (!playerMode || e.visibility === 'spieler'),
+    (e) => e.type === 'entscheidung' && e.decision && (!tableMode || e.visibility === 'spieler'),
   )
   const byId = new Map(decisions.map((e) => [e.id, e]))
 
