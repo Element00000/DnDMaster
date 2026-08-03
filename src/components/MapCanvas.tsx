@@ -294,6 +294,29 @@ export function MapCanvas() {
     [campaign.layers, layer.id, embedLayer],
   )
 
+  // Objekt-Pinnadel per Ziehen auf eine andere Karte fallen lassen: das Objekt gehoert dann
+  // zu dieser Karte, statt weiterhin unsichtbar an die alte Karte gebunden zu bleiben (nur
+  // sichtbar, wenn diese wieder nah genug aufgedeckt ist). Zeitplan-Positionen (kein eigenes
+  // layerId) werden dabei nicht umgehaengt.
+  const onReparentEntity = useCallback(
+    (entityId: string, clientX: number, clientY: number) => {
+      const el = containerRef.current
+      if (!el) return
+      const ent = entities.find((x) => x.id === entityId)
+      if (!ent?.placement) return
+      const active = timeEnabled ? ent.schedule.find((s) => inWindow(timeOfDay, s.timeStart, s.timeEnd)) : undefined
+      if (active) return
+      const rect = el.getBoundingClientRect()
+      const v = viewRef.current
+      const wx = (clientX - rect.left - v.tx) / v.scale
+      const wy = (clientY - rect.top - v.ty) / v.scale
+      const result = resolveDeepTarget(campaign.layers, layer.id, wx, wy, v.scale)
+      if (result.layerId === ent.placement.layerId) return
+      setPlacement(entityId, { layerId: result.layerId, x: result.x, y: result.y })
+    },
+    [entities, campaign.layers, layer.id, setPlacement, timeEnabled, timeOfDay],
+  )
+
   const onPointerDown = useCallback(
     (e: React.PointerEvent) => {
       const el = containerRef.current
@@ -684,6 +707,11 @@ export function MapCanvas() {
                   moveEntityTimed(e, dxWorld, dyWorld)
                 }
               }}
+              onDragEnd={
+                selectedIds.length > 1 && selectedIds.includes(e.id)
+                  ? undefined
+                  : (clientX, clientY) => onReparentEntity(e.id, clientX, clientY)
+              }
             />
           )
         })}
@@ -722,6 +750,7 @@ export function MapCanvas() {
             const ent = entities.find((x) => x.id === id)
             if (ent) moveEntityTimed(ent, dxSub, dySub)
           }}
+          onEntityDragEnd={onReparentEntity}
           setEmbedRect={setEmbedRect}
         />
       ))}
@@ -946,6 +975,7 @@ function EmbeddedMap({
   onReparent,
   onEntityClick,
   onEntityMove,
+  onEntityDragEnd,
   setEmbedRect,
 }: {
   embLayer: MapLayer
@@ -969,6 +999,8 @@ function EmbeddedMap({
   onReparent: (draggedId: string, clientX: number, clientY: number) => void
   onEntityClick: (id: string, ev: { ctrlKey: boolean; metaKey: boolean; shiftKey: boolean }) => void
   onEntityMove: (id: string, dxSub: number, dySub: number) => void
+  /** Nach dem Ziehen eines Objekt-Pins: prueft, ob es auf eine andere Karte gehoert. */
+  onEntityDragEnd: (id: string, clientX: number, clientY: number) => void
   setEmbedRect: (id: string, x: number, y: number, width: number, height: number) => void
 }) {
   const image = useAsset(embLayer.imageUrl)
@@ -1161,6 +1193,7 @@ function EmbeddedMap({
             scale={childView.scale}
             onClick={(ev) => onEntityClick(e.id, ev)}
             onMove={(dxSub, dySub) => onEntityMove(e.id, dxSub, dySub)}
+            onDragEnd={(clientX, clientY) => onEntityDragEnd(e.id, clientX, clientY)}
           />
         )
       })}
@@ -1186,6 +1219,7 @@ function EmbeddedMap({
           onReparent={onReparent}
           onEntityClick={onEntityClick}
           onEntityMove={onEntityMove}
+          onEntityDragEnd={onEntityDragEnd}
           setEmbedRect={setEmbedRect}
         />
       ))}
