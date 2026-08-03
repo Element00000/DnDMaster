@@ -966,6 +966,11 @@ button {
   flex-shrink: 0;
 }
 
+.swap-image-icon {
+  width: 15px;
+  height: 15px;
+}
+
 .topbar__hint {
   display: flex;
   align-items: center;

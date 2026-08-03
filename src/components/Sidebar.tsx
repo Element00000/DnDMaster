@@ -333,7 +333,20 @@ export function Sidebar() {
                       {l.name}
                     </button>
                     <button className="icon-btn icon-btn--sm" title="Kartenbild austauschen" onClick={() => onSwapImage(l)}>
-                      🖼
+                      <svg
+                        className="swap-image-icon"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.6"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                      >
+                        <rect x="3" y="7" width="14" height="14" rx="2" />
+                        <path d="M21 3 A11 11 0 0 1 12 12" />
+                        <polyline points="7 9 12 15 17 9" />
+                      </svg>
                     </button>
                     <button className="icon-btn icon-btn--sm" title="Umbenennen" onClick={() => onRenameLayer(l)}>
                       ✎
