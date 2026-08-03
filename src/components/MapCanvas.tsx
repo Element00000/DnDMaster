@@ -226,13 +226,13 @@ export function MapCanvas() {
   // automatisch nah genug heranzoomen, um sie aufzudecken. sx/sy/sw/sh sind ihre aktuelle
   // Bildschirm-Position/-Groesse (bereits rekursiv aus allen Eltern-Transformationen
   // berechnet), also unabhaengig davon, wie tief sie verschachtelt ist.
-  const zoomToScreenRect = useCallback((sx: number, sy: number, sw: number, sh: number) => {
+  const zoomToScreenRect = useCallback((sx: number, sy: number, sw: number, sh: number, targetScreen?: number) => {
     const cont = containerRef.current
     if (!cont) return
     const cw = cont.clientWidth
     const ch = cont.clientHeight
-    const targetScreen = REVEAL_THRESHOLD * 1.4
-    const neededFactor = targetScreen / Math.min(sw, sh)
+    const target = targetScreen ?? REVEAL_THRESHOLD * 1.4
+    const neededFactor = target / Math.min(sw, sh)
     const cx = sx + sw / 2
     const cy = sy + sh / 2
     setView((v) => {
@@ -242,6 +242,26 @@ export function MapCanvas() {
       return { scale: newScale, tx: cw / 2 - wx * newScale, ty: ch / 2 - wy * newScale }
     })
   }, [])
+
+  const viewLayerId = useStore((s) => s.viewLayerId)
+  const viewRef = useRef(view)
+  viewRef.current = view
+
+  // "Meine Karten" -> Karte anklicken: nicht die aktive Ebene wechseln, sondern die aktuelle
+  // Wurzelkarten-Instanz per Zoom/Schwenk so fuehren, dass die angeklickte (verschachtelte)
+  // Karte moeglichst gross im sichtbaren Bereich erscheint. null = zurueck zur Wurzelansicht.
+  useEffect(() => {
+    if (viewLayerId == null) {
+      fitToView()
+      return
+    }
+    const cont = containerRef.current
+    if (!cont) return
+    const target = Math.min(cont.clientWidth, cont.clientHeight) * 0.92
+    const rect = computeLayerScreenRect(campaign.layers, layer.id, viewLayerId, viewRef.current)
+    if (rect) zoomToScreenRect(rect.x, rect.y, rect.w, rect.h, target)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewLayerId])
 
   const onPointerDown = useCallback(
     (e: React.PointerEvent) => {
@@ -525,7 +545,10 @@ export function MapCanvas() {
             alt={layer.name}
             style={{ display: 'block', pointerEvents: 'none' }}
           />
-        ) : layer.imageUrl && mapImage === undefined ? null : tableMode ? (
+        ) : layer.imageUrl && mapImage === undefined ? null : tableMode || tool === 'add' ? (
+          // Waehrend des Platzierens eines neuen Objekts (tool 'add') darf dieser Bereich
+          // Klicks NICHT abfangen - sonst wuerde der Klick den Datei-Dialog oeffnen statt
+          // das Objekt zu platzieren. Deshalb hier bewusst kein Button, kein stopPropagation.
           <div className="map-empty" style={{ width, height }}>
             <span className="map-empty__text">
               {layer.imageUrl ? 'Kartenbild konnte nicht geladen werden.' : 'Keine Weltkarte vorhanden.'}
@@ -758,6 +781,40 @@ function ZoomControls({ scale, onZoom, onFit }: { scale: number; onZoom: (dir: n
 
 function clamp(v: number, min: number, max: number) {
   return Math.max(min, Math.min(max, v))
+}
+
+/**
+ * Bildschirm-Rechteck einer (beliebig tief verschachtelten) Karte innerhalb der Wurzelkarte,
+ * rein aus den Hierarchie-Daten berechnet - unabhaengig davon, ob sie im aktuellen View
+ * gerade aufgedeckt/gerendert ist. Liefert null, wenn targetLayerId keine (verschachtelte)
+ * Unterkarte von rootLayerId ist (z.B. eine andere, nicht verbundene Wurzelkarte).
+ */
+function computeLayerScreenRect(
+  layers: MapLayer[],
+  rootLayerId: string,
+  targetLayerId: string,
+  rootView: View,
+): { x: number; y: number; w: number; h: number } | null {
+  const chain: MapLayer[] = []
+  let current = layers.find((l) => l.id === targetLayerId)
+  while (current && current.id !== rootLayerId) {
+    if (!current.embed) return null
+    chain.unshift(current)
+    current = layers.find((l) => l.id === current!.embed!.parentLayerId)
+  }
+  if (!current) return null
+  let v = rootView
+  let rect: { x: number; y: number; w: number; h: number } | null = null
+  for (const l of chain) {
+    const embed = l.embed!
+    const x = embed.x * v.scale + v.tx
+    const y = embed.y * v.scale + v.ty
+    const w = embed.width * v.scale
+    const h = embed.height * v.scale
+    rect = { x, y, w, h }
+    v = { scale: w / l.width, tx: x, ty: y }
+  }
+  return rect
 }
 
 /**

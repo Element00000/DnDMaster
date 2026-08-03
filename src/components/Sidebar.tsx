@@ -48,6 +48,8 @@ export function Sidebar() {
   const placingLayerId = useStore((s) => s.placingLayerId)
   const setPlacingLayer = useStore((s) => s.setPlacingLayer)
   const embedLayer = useStore((s) => s.embedLayer)
+  const viewLayerId = useStore((s) => s.viewLayerId)
+  const setViewLayerId = useStore((s) => s.setViewLayerId)
 
   const [popup, setPopup] = useState<{ type: EntityType; top: number; left: number } | null>(null)
   const [mapsMenu, setMapsMenu] = useState<{ top: number; left: number } | null>(null)
@@ -91,8 +93,8 @@ export function Sidebar() {
 
   // "+ Neue Karte": oeffnet direkt den Datei-Dialog. Der Dateiname (ohne Endung) wird als
   // Kartenname uebernommen - ueber das Bearbeiten-Symbol spaeter jederzeit anpassbar. Die
-  // neue Karte ist zunaechst nicht eingebettet (ausserhalb der Hierarchie) und laesst sich
-  // per Drag & Drop auf eine bestehende Karte ziehen, um sie dort einzuordnen.
+  // neue Karte wird sofort hierarchisch in die Karte eingebettet, die man gerade betrachtet
+  // (viewLayerId, sonst die Wurzelkarte selbst) - zentriert, in einem Viertel von deren Groesse.
   async function onNewLayerFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     e.target.value = ''
@@ -102,6 +104,15 @@ export function Sidebar() {
     const { url, width, height } = await fileToScaledDataUrl(file, { maxDim: 2400, quality: 0.85 })
     const ref = await putAsset(url)
     setLayerImage(id, ref, width, height)
+    const parentId = viewLayerId ?? layer.id
+    const parent = campaign.layers.find((l) => l.id === parentId)
+    if (parent) {
+      const w = Math.max(MIN_EMBED_SIZE, parent.width * 0.25)
+      const h = Math.max(MIN_EMBED_SIZE, w * (height / width))
+      const x = Math.max(0, Math.min(parent.width - w, (parent.width - w) / 2))
+      const y = Math.max(0, Math.min(parent.height - h, (parent.height - h) / 2))
+      embedLayer(id, { parentLayerId: parentId, x, y, width: w, height: h })
+    }
   }
 
   function onRenameLayer(l: MapLayer) {
@@ -154,6 +165,30 @@ export function Sidebar() {
       current = campaign.layers.find((l) => l.id === current!.embed!.parentLayerId)
     }
     return true
+  }
+
+  // Ist l eine (beliebig tief verschachtelte) Unterkarte der aktuellen Wurzelkarte (layer)?
+  function isDescendantOfActive(l: MapLayer): boolean {
+    let current: MapLayer | undefined = l
+    while (current?.embed) {
+      if (current.embed.parentLayerId === layer.id) return true
+      current = campaign.layers.find((x) => x.id === current!.embed!.parentLayerId)
+    }
+    return false
+  }
+
+  // Karte in "Meine Karten" anklicken: bleibt in der Wurzelkarten-Instanz und schwenkt/zoomt
+  // nur dorthin (viewLayerId), solange die Karte Teil der aktuellen Hierarchie ist. Nur bei
+  // einer voellig getrennten (anderen) Wurzelkarte wird tatsaechlich die aktive Ebene gewechselt.
+  function onClickLayerName(l: MapLayer) {
+    if (l.id === layer.id) {
+      setViewLayerId(null)
+    } else if (isDescendantOfActive(l)) {
+      setViewLayerId(l.id)
+    } else {
+      setActiveLayer(l.id)
+    }
+    setMapsMenu(null)
   }
 
   function onLayerDrop(draggedId: string, target: MapLayer) {
@@ -279,8 +314,8 @@ export function Sidebar() {
                     title="Ziehen, um diese Karte auf eine andere Karte einzubetten"
                   >
                     <button
-                      className={`maps-menu__name${l.id === layer.id ? ' is-active' : ''}`}
-                      onClick={() => setActiveLayer(l.id)}
+                      className={`maps-menu__name${l.id === (viewLayerId ?? layer.id) ? ' is-active' : ''}`}
+                      onClick={() => onClickLayerName(l)}
                       title={depth === 0 ? 'Hauptkarten-Ebene' : `Eingebettet, Ebene ${depth + 1}`}
                     >
                       {depth > 0 ? '↳ ' : ''}

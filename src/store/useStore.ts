@@ -75,6 +75,16 @@ interface StoreState extends AppData {
   placingEntityId: string | null
   /** Eine vorhandene Ebene wartet darauf, per Kartenklick als eingebettete Karte platziert zu werden. */
   placingLayerId: string | null
+  /**
+   * Welche (verschachtelte) Karte innerhalb der aktiven Wurzelkarte man gerade "betrachtet"
+   * - null = die Wurzelkarte selbst. Bestimmt sowohl, wohin neu angelegte Karten eingebettet
+   * werden, als auch (als einmaliger Navigations-Befehl) wohin die Kartenansicht per Zoom/
+   * Schwenk als naechstes gefuehrt werden soll, wenn ein Eintrag in "Meine Karten" angeklickt
+   * wird. Es wird NICHT die aktive Ebene gewechselt - man bleibt immer in der Wurzelkarten-
+   * Instanz, nur der sichtbare Ausschnitt aendert sich.
+   */
+  viewLayerId: string | null
+  setViewLayerId: (id: string | null) => void
   /** Rueckgaengig-Verlauf der aktiven Kampagne (nicht persistiert). */
   undoStack: Campaign[]
   /** Zeitpunkt des letzten Undo-Snapshots, zum Zusammenfassen schneller Aenderungen. */
@@ -267,6 +277,7 @@ export const useStore = create<StoreState>()(
         selectedIds: [],
         placingEntityId: null,
         placingLayerId: null,
+        viewLayerId: null,
         undoStack: [],
         lastUndoPushAt: 0,
         timeEnabled: false,
@@ -399,6 +410,7 @@ export const useStore = create<StoreState>()(
             selectedEntityId: null,
             selectedIds: [],
             undoStack: [],
+            viewLayerId: null,
           }))
         },
 
@@ -418,11 +430,11 @@ export const useStore = create<StoreState>()(
             const campaigns = s.campaigns.filter((c) => c.id !== id)
             const activeCampaignId =
               s.activeCampaignId === id ? campaigns[0].id : s.activeCampaignId
-            return { campaigns, activeCampaignId, selectedEntityId: null, selectedIds: [], undoStack: [] }
+            return { campaigns, activeCampaignId, selectedEntityId: null, selectedIds: [], undoStack: [], viewLayerId: null }
           }),
 
         setActiveCampaign: (id) =>
-          set({ activeCampaignId: id, selectedEntityId: null, selectedIds: [], undoStack: [], tool: 'select' }),
+          set({ activeCampaignId: id, selectedEntityId: null, selectedIds: [], undoStack: [], tool: 'select', viewLayerId: null }),
 
         addMusicEntry: (label, url) =>
           patchActive((c) => ({
@@ -444,6 +456,7 @@ export const useStore = create<StoreState>()(
               selectedIds: [],
               undoStack: [],
               fightEventId: null,
+              viewLayerId: null,
             }
           }),
 
@@ -454,7 +467,15 @@ export const useStore = create<StoreState>()(
             const activeCampaignId = campaigns.some((c) => c.id === data.activeCampaignId)
               ? data.activeCampaignId
               : campaigns[0].id
-            return { campaigns, activeCampaignId, selectedEntityId: null, selectedIds: [], undoStack: [], fightEventId: null }
+            return {
+              campaigns,
+              activeCampaignId,
+              selectedEntityId: null,
+              selectedIds: [],
+              undoStack: [],
+              fightEventId: null,
+              viewLayerId: null,
+            }
           }),
 
         // ---------- Ebenen ----------
@@ -463,7 +484,10 @@ export const useStore = create<StoreState>()(
           return c.layers.find((l) => l.id === c.activeLayerId) ?? c.layers[0]
         },
 
-        setActiveLayer: (id) => patchActive((c) => ({ ...c, activeLayerId: id })),
+        setActiveLayer: (id) => {
+          patchActive((c) => ({ ...c, activeLayerId: id }))
+          set({ viewLayerId: null })
+        },
 
         setLayerImage: (id, imageUrl, width, height) =>
           patchActive((c) => ({
@@ -506,7 +530,9 @@ export const useStore = create<StoreState>()(
 
         addLayer: (name) => {
           const layer = makeLayer(name.trim() || 'Neue Ebene')
-          patchActive((c) => ({ ...c, layers: [...c.layers, layer], activeLayerId: layer.id }))
+          // Wechselt bewusst NICHT die aktive Ebene: neue Karten werden (vom Aufrufer) direkt
+          // in die gerade betrachtete Karte eingebettet, man bleibt in der Wurzelkarten-Instanz.
+          patchActive((c) => ({ ...c, layers: [...c.layers, layer] }))
           set({ selectedEntityId: null, selectedIds: [] })
           return layer.id
         },
@@ -967,6 +993,7 @@ export const useStore = create<StoreState>()(
         setPendingEntityFields: (fields) => set({ pendingEntityFields: fields }),
         setPlacingEntity: (id) => set({ placingEntityId: id, tool: 'select' }),
         setPlacingLayer: (id) => set({ placingLayerId: id, tool: 'select' }),
+        setViewLayerId: (id) => set({ viewLayerId: id }),
 
         undo: () =>
           set((s) => {
