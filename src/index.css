@@ -237,6 +237,37 @@ button {
   line-height: 1.4;
 }
 
+/* ---------- "Meine Karten"-Dropdown oben in der Sidebar ---------- */
+.sidebar-maps {
+  margin-bottom: 14px;
+}
+
+.sidebar-maps__toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 0;
+}
+
+.sidebar-maps__arrow {
+  font-size: 10px;
+  color: var(--ink-dim);
+  transition: transform 0.15s;
+}
+
+.sidebar-maps__toggle.btn--active .sidebar-maps__arrow {
+  transform: rotate(180deg);
+}
+
+/* Als document.body-Portal positioniert (wie .picker-popover), damit die Kartenhierarchie
+   samt Aktionen (Umbenennen/Loeschen/Einbetten) breiter als die schmale Sidebar sein und
+   ueber die Karte ragen darf, statt am Sidebar-Rand abgeschnitten zu werden. */
+.sidebar-maps__menu {
+  position: fixed;
+  z-index: 40;
+}
+
 .sidebar__empty {
   font-size: 12px;
   color: var(--ink-faint);
