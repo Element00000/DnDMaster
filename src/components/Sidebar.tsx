@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { ENTITY_TYPES, GESINNUNG_OPTIONS, ITEM_ART_OPTIONS, entityDisplayMeta } from '../types'
 import type { Entity, EntityType } from '../types'
@@ -38,6 +38,28 @@ export function Sidebar() {
   const setToolsTab = useStore((s) => s.setToolsTab)
 
   const [popup, setPopup] = useState<{ type: EntityType; top: number; left: number } | null>(null)
+  const addSectionRef = useRef<HTMLElement>(null)
+
+  // "Objekt anlegen"-Menue (Ohne Karte anlegen/Abbrechen) automatisch schliessen, sobald
+  // woanders hingeklickt wird - auf ein anderes Objekt (Liste oder Pin) oder allgemein
+  // irgendwohin ausserhalb der Anlege-Steuerung. Ein Klick auf die Karte selbst platziert
+  // das Objekt dort (bzw. verwirft den Klick daneben) und regelt das Beenden selbst.
+  useEffect(() => {
+    if (tool !== 'add') return
+    function onPointerDownCapture(e: PointerEvent) {
+      const target = e.target as HTMLElement
+      if (addSectionRef.current?.contains(target)) return
+      if (target.closest('.picker-popover') || target.closest('.popover-backdrop')) return
+      if (target.closest('.map-pin')) {
+        setTool('select')
+        return
+      }
+      if (target.closest('.map-canvas')) return
+      setTool('select')
+    }
+    document.addEventListener('pointerdown', onPointerDownCapture, true)
+    return () => document.removeEventListener('pointerdown', onPointerDownCapture, true)
+  }, [tool, setTool])
 
   function openTool(tab: ToolTab) {
     if (toolsOpen && toolsTab === tab) {
@@ -90,7 +112,7 @@ export function Sidebar() {
       </section>
 
       {!tableMode && (
-        <section className="sidebar__section">
+        <section className="sidebar__section" ref={addSectionRef}>
           <h2 className="sidebar__heading">Objekt anlegen</h2>
           <p className="sidebar__hint">
             {tool === 'add'
