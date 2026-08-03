@@ -24,6 +24,8 @@ export interface EntityTypeMeta {
   plural: string
   icon: string
   color: string
+  /** Icon soll weiss statt in der Standardfarbe dargestellt werden (z.B. Spieler-Charaktere). */
+  iconInvert?: boolean
 }
 
 export const ENTITY_TYPES: EntityTypeMeta[] = [
@@ -113,7 +115,8 @@ export interface Entity {
 
 /**
  * Farbe fuer die Anzeige (Karte etc.), inkl. Ueberschreibung fuer Charaktere:
- * Freund gruen, Feind rot, neutral grau. Das Icon bleibt immer das Charakter-Icon.
+ * Freund gruen, Feind rot, neutral grau, Spieler dunkelgruen mit weissem Icon.
+ * Das Icon selbst bleibt sonst immer das Charakter-Icon.
  */
 export function entityDisplayMeta(entity: Entity): EntityTypeMeta {
   const meta = entityMeta(entity.type)
@@ -121,6 +124,7 @@ export function entityDisplayMeta(entity: Entity): EntityTypeMeta {
     if (entity.fields.gesinnung === 'freund') return { ...meta, color: '#3fa34d' }
     if (entity.fields.gesinnung === 'feind') return { ...meta, color: '#c0392b' }
     if (entity.fields.gesinnung === 'neutral') return { ...meta, color: '#8a93a8' }
+    if (entity.fields.gesinnung === 'spieler') return { ...meta, color: '#1f5c38', iconInvert: true }
   }
   return meta
 }
@@ -210,6 +214,7 @@ export const GESINNUNG_OPTIONS: { value: string; label: string }[] = [
   { value: 'freund', label: 'Freund' },
   { value: 'feind', label: 'Feind' },
   { value: 'neutral', label: 'Neutral / unklar' },
+  { value: 'spieler', label: 'Spieler' },
 ]
 
 /**

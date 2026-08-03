@@ -74,11 +74,15 @@ export function DetailPanel() {
   // Liste zurueck, wie zuvor.
   const visibleIds = combatMode ? sortedEnemies.map((e) => e.id) : mapEntities.map((e) => e.id)
   const showInline = !!selectedId && visibleIds.includes(selectedId)
+  // Faellt die Anzeige unterhalb der Liste zurueck (statt Inline-Dropdown)? Nur dann muss
+  // die Liste selbst Platz fuer den Detailbereich darunter lassen - sonst darf sie die ganze
+  // Seitenleiste ausfuellen, auch bei vielen Objekten.
+  const hasFloatingDetail = !!selectedId && !!marker && !showInline
   const readOnly = tableMode
 
   let detailContent: React.ReactNode = null
   if (marker) {
-    const meta = entityMeta(marker.type)
+    const meta = entityDisplayMeta(marker)
     const fields = FIELD_SCHEMA[marker.type]
     const others = campaign.entities.filter((e) => e.id !== marker.id)
     // Eingehende Verknuepfungen (andere Objekte, die auf dieses zeigen).
@@ -89,7 +93,7 @@ export function DetailPanel() {
     detailContent = (
     <div className="detail__panel" style={{ ['--chip-color' as string]: meta.color }}>
       <div className="detail__header">
-        <span className="detail__icon">{meta.icon}</span>
+        <span className={`detail__icon${meta.iconInvert ? ' is-icon-invert' : ''}`}>{meta.icon}</span>
         <input
           className="detail__title-input"
           value={marker.name}
@@ -347,7 +351,7 @@ export function DetailPanel() {
   }
 
   const objectsSection = (
-    <div className={`detail__objects${showInline ? ' detail__objects--expanded' : ''}`}>
+    <div className={`detail__objects${hasFloatingDetail ? ' detail__objects--capped' : ''}`}>
       <div className="detail__objects-head">
         <h2 className="detail__objects-title">
           {mapLayer.name}
@@ -425,7 +429,7 @@ export function DetailPanel() {
           <p>Klicke ein Objekt auf der Karte oder in der Liste, um seine Details zu sehen.</p>
         </div>
       )}
-      {selectedId && marker && !showInline && <div className="detail__floating">{detailContent}</div>}
+      {hasFloatingDetail && <div className="detail__floating">{detailContent}</div>}
     </aside>
   )
 }
@@ -831,7 +835,7 @@ function EntityRow({
         style={{ ['--chip-color' as string]: meta.color }}
         onClick={() => onSelect(entity.id)}
       >
-        <span className="marker-list__icon">{meta.icon}</span>
+        <span className={`marker-list__icon${meta.iconInvert ? ' is-icon-invert' : ''}`}>{meta.icon}</span>
         <span className="marker-list__name">{entity.name}</span>
       </button>
       {dropdown && <div className="marker-list__dropdown">{dropdown}</div>}
@@ -865,7 +869,7 @@ function EnemyRow({
         style={{ ['--chip-color' as string]: meta.color }}
       >
         <button className="enemyrow__name" onClick={() => onSelect(entity.id)}>
-          <span className="marker-list__icon">{meta.icon}</span>
+          <span className={`marker-list__icon${meta.iconInvert ? ' is-icon-invert' : ''}`}>{meta.icon}</span>
           <span className="marker-list__name">{entity.name}</span>
         </button>
         <span className="enemyrow__init">

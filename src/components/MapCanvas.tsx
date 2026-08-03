@@ -690,6 +690,7 @@ export function MapCanvas() {
               screenY={pos.y * view.scale + view.ty}
               icon={meta.icon}
               color={meta.color}
+              iconInvert={meta.iconInvert}
               label={e.name}
               selected={selectedIds.includes(e.id)}
               draggable={!tableMode && !fogEditing}
@@ -1195,6 +1196,7 @@ function EmbeddedMap({
             screenY={pos.y * childView.scale + childView.ty}
             icon={meta.icon}
             color={meta.color}
+            iconInvert={meta.iconInvert}
             label={e.name}
             selected={selectedIds.includes(e.id)}
             draggable={interactive}

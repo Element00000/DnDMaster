@@ -11,6 +11,8 @@ interface Props {
   scale: number
   /** Markiert Pins, die eine eingebettete Karte repraesentieren (visuell hervorgehoben). */
   isMapLink?: boolean
+  /** Icon weiss statt in Originalfarbe darstellen (z.B. Spieler-Charaktere). */
+  iconInvert?: boolean
   onClick: (e: React.PointerEvent) => void
   onMove: (dxWorld: number, dyWorld: number) => void
   /** Nach einem Ziehen (nicht bei einem reinen Klick): Bildschirmkoordinaten des Loslassens. */
@@ -31,6 +33,7 @@ export function MapPin({
   draggable,
   scale,
   isMapLink,
+  iconInvert,
   onClick,
   onMove,
   onDragEnd,
@@ -77,7 +80,7 @@ export function MapPin({
 
   return (
     <div
-      className={`map-pin${selected ? ' is-selected' : ''}${draggable ? ' is-draggable' : ''}${isMapLink ? ' is-map-link' : ''}`}
+      className={`map-pin${selected ? ' is-selected' : ''}${draggable ? ' is-draggable' : ''}${isMapLink ? ' is-map-link' : ''}${iconInvert ? ' is-icon-invert' : ''}`}
       style={{ left: screenX, top: screenY, ['--pin-color' as string]: color }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}

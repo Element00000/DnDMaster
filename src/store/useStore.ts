@@ -1195,6 +1195,7 @@ const NSC_GESINNUNG_LABELS: Record<string, string> = {
   freund: 'Freund',
   feind: 'Feind',
   neutral: 'Neutrale Kreatur',
+  spieler: 'Spieler',
 }
 
 function standardName(type: EntityType, existing: Entity[], fields?: Record<string, string>): string {

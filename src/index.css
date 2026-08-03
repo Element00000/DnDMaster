@@ -438,6 +438,10 @@ button {
   font-size: 15px;
 }
 
+.marker-list__icon.is-icon-invert {
+  filter: brightness(0) invert(1);
+}
+
 .marker-list__name {
   flex: 1;
   font-size: 13px;
@@ -642,6 +646,12 @@ button {
   line-height: 1;
 }
 
+/* Spieler-Charaktere: Icon weiss statt in Originalfarbe, um sie von anderen Charakteren
+   abzuheben. Der Filter faerbt jedes Icon (auch mehrfarbige Emoji) rein weiss ein. */
+.map-pin.is-icon-invert .map-pin__icon {
+  filter: brightness(0) invert(1);
+}
+
 .map-pin__label {
   margin-top: 4px;
   font-size: 11px;
@@ -726,7 +736,6 @@ button {
 }
 
 .detail--empty {
-  flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -752,6 +761,10 @@ button {
 
 .detail__icon {
   font-size: 20px;
+}
+
+.detail__icon.is-icon-invert {
+  filter: brightness(0) invert(1);
 }
 
 .detail__title-input {
@@ -791,6 +804,8 @@ button {
   gap: 16px;
 }
 
+/* Fuellt standardmaessig die ganze Seitenleiste aus (statt bei einer festen Hoehe
+   abgeschnitten zu sein), damit auch viele Objekte per Scroll erreichbar bleiben. */
 .detail__objects {
   padding: 14px 16px;
   border-bottom: 1px solid var(--border);
@@ -798,17 +813,16 @@ button {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  max-height: 40vh;
-  overflow-y: auto;
-  flex-shrink: 0;
-}
-
-/* Wenn ein Objekt-Dropdown innerhalb der Liste offen ist, darf die Liste den restlichen
-   Platz der Seitenleiste einnehmen statt bei 40vh gedeckelt zu sein. */
-.detail__objects--expanded {
-  max-height: none;
   flex: 1;
   min-height: 0;
+  overflow-y: auto;
+}
+
+/* Nur wenn darunter noch ein Detailbereich eingeblendet wird (Objekt ohne Kartenposition
+   bzw. auf einer anderen Karte ausgewaehlt), muss die Liste selbst Platz dafuer lassen. */
+.detail__objects--capped {
+  flex: none;
+  max-height: 40vh;
 }
 
 .detail__panel {
