@@ -862,6 +862,9 @@ button {
 .icon-btn {
   width: 36px;
   height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: var(--panel-2);
@@ -969,6 +972,7 @@ button {
 .swap-image-icon {
   width: 15px;
   height: 15px;
+  flex-shrink: 0;
 }
 
 .topbar__hint {
