@@ -67,94 +67,27 @@ export function DetailPanel() {
     setInitiatives(Object.fromEntries(enemies.map((e) => [e.id, rollDie(20)])))
   }
 
-  const objectsSection = (
-    <div className="detail__objects">
-      <div className="detail__objects-head">
-        <h2 className="detail__objects-title">
-          {mapLayer.name}
-          <span className="sidebar__count">{combatMode ? enemies.length : mapEntities.length}</span>
-        </h2>
-        <button
-          className={`btn btn--sm${combatMode ? ' btn--active' : ''}`}
-          onClick={() => setCombatMode((v) => !v)}
-          title="Kampfmodus: nur Feinde, mit Initiative"
-        >
-          ⚔ Kampfmodus
-        </button>
-      </div>
-
-      {combatMode ? (
-        <>
-          {enemies.length > 0 && (
-            <button className="chipbtn detail__objects-rollall" onClick={rollAllInitiative}>
-              🎲 Alle Initiativen wuerfeln
-            </button>
-          )}
-          {sortedEnemies.length === 0 ? (
-            <p className="sidebar__empty">Keine Feinde auf dieser Karte.</p>
-          ) : (
-            <ul className="marker-list">
-              {sortedEnemies.map((e) => (
-                <EnemyRow
-                  key={e.id}
-                  entity={e}
-                  selected={e.id === selectedId}
-                  initiative={initiatives[e.id] ?? null}
-                  onSelect={selectEntity}
-                  onInitiativeChange={(v) => setInitiatives((prev) => ({ ...prev, [e.id]: v }))}
-                  onRoll={() => rollOne(e.id)}
-                />
-              ))}
-            </ul>
-          )}
-        </>
-      ) : mapEntities.length === 0 ? (
-        <p className="sidebar__empty">Noch keine Objekte auf dieser Karte.</p>
-      ) : (
-        <div className="entity-groups">
-          {groups.map((g) => (
-            <div key={g.meta.type} className="entity-group">
-              <div className="entity-group__title" style={{ ['--chip-color' as string]: g.meta.color }}>
-                <span>{g.meta.icon}</span>
-                {g.meta.plural}
-                <span className="entity-group__count">{g.items.length}</span>
-              </div>
-              <ul className="marker-list">
-                {g.items.map((e) => (
-                  <EntityRow key={e.id} entity={e} selected={e.id === selectedId} onSelect={selectEntity} />
-                ))}
-              </ul>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-
-  if (!selectedId || !marker) {
-    return (
-      <aside className="detail">
-        {objectsSection}
-        <div className="detail--empty">
-          <p>Klicke ein Objekt auf der Karte oder in der Liste, um seine Details zu sehen.</p>
-        </div>
-      </aside>
-    )
-  }
-
-  const meta = entityMeta(marker.type)
-  const fields = FIELD_SCHEMA[marker.type]
-  const others = campaign.entities.filter((e) => e.id !== marker.id)
-  // Eingehende Verknuepfungen (andere Objekte, die auf dieses zeigen).
-  const incoming = campaign.entities
-    .filter((e) => e.id !== marker.id)
-    .flatMap((e) => e.links.filter((l) => l.targetId === marker.id).map((l) => ({ from: e, relation: l.relation })))
-
+  // Details erscheinen als Dropdown direkt unter dem angeklickten Objekt in der Liste - aber
+  // nur wenn dieses Objekt tatsaechlich in der aktuell sichtbaren Liste steht (auf dieser
+  // Karte platziert bzw. im Kampfmodus ein Feind). Sonst (Objekt ohne Kartenposition oder ueber
+  // eine Verknuepfung auf einer anderen Karte ausgewaehlt) faellt die Anzeige unterhalb der
+  // Liste zurueck, wie zuvor.
+  const visibleIds = combatMode ? sortedEnemies.map((e) => e.id) : mapEntities.map((e) => e.id)
+  const showInline = !!selectedId && visibleIds.includes(selectedId)
   const readOnly = tableMode
 
-  return (
-    <aside className="detail" style={{ ['--chip-color' as string]: meta.color }}>
-      {objectsSection}
+  let detailContent: React.ReactNode = null
+  if (marker) {
+    const meta = entityMeta(marker.type)
+    const fields = FIELD_SCHEMA[marker.type]
+    const others = campaign.entities.filter((e) => e.id !== marker.id)
+    // Eingehende Verknuepfungen (andere Objekte, die auf dieses zeigen).
+    const incoming = campaign.entities
+      .filter((e) => e.id !== marker.id)
+      .flatMap((e) => e.links.filter((l) => l.targetId === marker.id).map((l) => ({ from: e, relation: l.relation })))
+
+    detailContent = (
+    <div className="detail__panel" style={{ ['--chip-color' as string]: meta.color }}>
       <div className="detail__header">
         <span className="detail__icon">{meta.icon}</span>
         <input
@@ -438,6 +371,90 @@ export function DetailPanel() {
           </button>
         </div>
       )}
+    </div>
+    )
+  }
+
+  const objectsSection = (
+    <div className={`detail__objects${showInline ? ' detail__objects--expanded' : ''}`}>
+      <div className="detail__objects-head">
+        <h2 className="detail__objects-title">
+          {mapLayer.name}
+          <span className="sidebar__count">{combatMode ? enemies.length : mapEntities.length}</span>
+        </h2>
+        <button
+          className={`btn btn--sm${combatMode ? ' btn--active' : ''}`}
+          onClick={() => setCombatMode((v) => !v)}
+          title="Kampfmodus: nur Feinde, mit Initiative"
+        >
+          ⚔ Kampfmodus
+        </button>
+      </div>
+
+      {combatMode ? (
+        <>
+          {enemies.length > 0 && (
+            <button className="chipbtn detail__objects-rollall" onClick={rollAllInitiative}>
+              🎲 Alle Initiativen wuerfeln
+            </button>
+          )}
+          {sortedEnemies.length === 0 ? (
+            <p className="sidebar__empty">Keine Feinde auf dieser Karte.</p>
+          ) : (
+            <ul className="marker-list">
+              {sortedEnemies.map((e) => (
+                <EnemyRow
+                  key={e.id}
+                  entity={e}
+                  selected={e.id === selectedId}
+                  initiative={initiatives[e.id] ?? null}
+                  onSelect={selectEntity}
+                  onInitiativeChange={(v) => setInitiatives((prev) => ({ ...prev, [e.id]: v }))}
+                  onRoll={() => rollOne(e.id)}
+                  dropdown={e.id === selectedId ? detailContent : null}
+                />
+              ))}
+            </ul>
+          )}
+        </>
+      ) : mapEntities.length === 0 ? (
+        <p className="sidebar__empty">Noch keine Objekte auf dieser Karte.</p>
+      ) : (
+        <div className="entity-groups">
+          {groups.map((g) => (
+            <div key={g.meta.type} className="entity-group">
+              <div className="entity-group__title" style={{ ['--chip-color' as string]: g.meta.color }}>
+                <span>{g.meta.icon}</span>
+                {g.meta.plural}
+                <span className="entity-group__count">{g.items.length}</span>
+              </div>
+              <ul className="marker-list">
+                {g.items.map((e) => (
+                  <EntityRow
+                    key={e.id}
+                    entity={e}
+                    selected={e.id === selectedId}
+                    onSelect={selectEntity}
+                    dropdown={e.id === selectedId ? detailContent : null}
+                  />
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+
+  return (
+    <aside className="detail">
+      {objectsSection}
+      {!selectedId && (
+        <div className="detail--empty">
+          <p>Klicke ein Objekt auf der Karte oder in der Liste, um seine Details zu sehen.</p>
+        </div>
+      )}
+      {selectedId && marker && !showInline && <div className="detail__floating">{detailContent}</div>}
     </aside>
   )
 }
@@ -828,14 +845,16 @@ function EntityRow({
   entity,
   selected,
   onSelect,
+  dropdown,
 }: {
   entity: Entity
   selected: boolean
   onSelect: (id: string) => void
+  dropdown?: React.ReactNode
 }) {
   const meta = entityDisplayMeta(entity)
   return (
-    <li>
+    <li className={dropdown ? 'marker-list__row--expanded' : undefined}>
       <button
         className={`marker-list__item${selected ? ' is-selected' : ''}`}
         style={{ ['--chip-color' as string]: meta.color }}
@@ -844,6 +863,7 @@ function EntityRow({
         <span className="marker-list__icon">{meta.icon}</span>
         <span className="marker-list__name">{entity.name}</span>
       </button>
+      {dropdown && <div className="marker-list__dropdown">{dropdown}</div>}
     </li>
   )
 }
@@ -856,6 +876,7 @@ function EnemyRow({
   onSelect,
   onInitiativeChange,
   onRoll,
+  dropdown,
 }: {
   entity: Entity
   selected: boolean
@@ -863,10 +884,11 @@ function EnemyRow({
   onSelect: (id: string) => void
   onInitiativeChange: (value: number | null) => void
   onRoll: () => void
+  dropdown?: React.ReactNode
 }) {
   const meta = entityDisplayMeta(entity)
   return (
-    <li>
+    <li className={dropdown ? 'marker-list__row--expanded' : undefined}>
       <div
         className={`marker-list__item enemyrow${selected ? ' is-selected' : ''}`}
         style={{ ['--chip-color' as string]: meta.color }}
@@ -888,6 +910,7 @@ function EnemyRow({
           </button>
         </span>
       </div>
+      {dropdown && <div className="marker-list__dropdown">{dropdown}</div>}
     </li>
   )
 }

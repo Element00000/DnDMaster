@@ -453,6 +453,19 @@ button {
   letter-spacing: 0.5px;
 }
 
+.marker-list__row--expanded {
+  margin-bottom: 4px;
+}
+
+.marker-list__dropdown {
+  margin-top: 6px;
+  border: 1px solid var(--chip-color, var(--border));
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--panel);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+}
+
 /* ---------- Karte ---------- */
 .map-canvas {
   position: absolute;
@@ -788,6 +801,28 @@ button {
   max-height: 40vh;
   overflow-y: auto;
   flex-shrink: 0;
+}
+
+/* Wenn ein Objekt-Dropdown innerhalb der Liste offen ist, darf die Liste den restlichen
+   Platz der Seitenleiste einnehmen statt bei 40vh gedeckelt zu sein. */
+.detail__objects--expanded {
+  max-height: none;
+  flex: 1;
+  min-height: 0;
+}
+
+.detail__panel {
+  display: flex;
+  flex-direction: column;
+}
+
+.detail__floating {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  border-top: 1px solid var(--border);
 }
 
 .detail__objects-head {
