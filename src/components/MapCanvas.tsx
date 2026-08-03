@@ -855,7 +855,7 @@ function ZoomControls({ scale, onZoom, onFit }: { scale: number; onZoom: (dir: n
       <button title="Hineinzoomen" onClick={() => onZoom(1)}>+</button>
       <span className="zoom-level">{Math.round(scale * 100)}%</span>
       <button title="Herauszoomen" onClick={() => onZoom(-1)}>&minus;</button>
-      <button title="Einpassen (Doppelklick)" onClick={onFit}>&#9633;</button>
+      <button title="Einpassen" onClick={onFit}>&#9633;</button>
     </div>
   )
 }
