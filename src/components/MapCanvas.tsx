@@ -245,6 +245,7 @@ export function MapCanvas() {
   }, [])
 
   const viewLayerId = useStore((s) => s.viewLayerId)
+  const setViewLayerId = useStore((s) => s.setViewLayerId)
   const viewRef = useRef(view)
   viewRef.current = view
 
@@ -479,6 +480,8 @@ export function MapCanvas() {
         setSelectedEmbedId(null)
         // Klick auf die Karte selbst waehlt sie aus (zeigt Eck-Ziehpunkte), Klick daneben hebt die Auswahl auf.
         setMapSelected(inside && !tableMode && !fogEditing)
+        // Klick auf die Wurzelkarte selbst zeigt wieder deren eigene Objekte im rechten Panel.
+        if (inside) setViewLayerId(null)
       }
     },
     [
@@ -504,6 +507,7 @@ export function MapCanvas() {
       selectEntity,
       setSelectedIds,
       setTool,
+      setViewLayerId,
     ],
   )
 
@@ -737,8 +741,12 @@ export function MapCanvas() {
             setSelectedEmbedId(id)
             setMapSelected(false)
             selectEntity(null)
+            setViewLayerId(id)
           }}
-          onZoomTo={zoomToScreenRect}
+          // Zoomt zur Karte per viewLayerId-Effekt (berechnet den Ziel-Bildschirmbereich selbst
+          // aus der Hierarchie) statt hier zusaetzlich manuell zu zoomen - sonst wuerde doppelt
+          // gezoomt.
+          onZoomTo={(_sx, _sy, _sw, _sh, id) => setViewLayerId(id)}
           onReparent={onReparentEmbed}
           onEntityClick={(id, ev) => {
             setMapSelected(false)
@@ -994,7 +1002,7 @@ function EmbeddedMap({
   selectedIds: string[]
   selectedEmbedId: string | null
   onSelect: (id: string) => void
-  onZoomTo: (sx: number, sy: number, sw: number, sh: number) => void
+  onZoomTo: (sx: number, sy: number, sw: number, sh: number, id: string) => void
   /** Nach dem Ziehen: prueft, ob die Karte auf eine andere (Vorfahren-)Karte umgehaengt werden soll. */
   onReparent: (draggedId: string, clientX: number, clientY: number) => void
   onEntityClick: (id: string, ev: { ctrlKey: boolean; metaKey: boolean; shiftKey: boolean }) => void
@@ -1129,7 +1137,7 @@ function EmbeddedMap({
         draggable={interactive && tool !== 'add'}
         scale={parentView.scale}
         isMapLink
-        onClick={() => onZoomTo(x, y, w, h)}
+        onClick={() => onZoomTo(x, y, w, h, embLayer.id)}
         onMove={(dxWorld, dyWorld) => setEmbedRect(embLayer.id, embed.x + dxWorld, embed.y + dyWorld, embed.width, embed.height)}
         onDragEnd={(clientX, clientY) => onReparent(embLayer.id, clientX, clientY)}
       />
