@@ -5,6 +5,7 @@ import {
   FIELD_SCHEMA,
   FREUND_BERUFE,
   RELATIONS,
+  entityDisplayMeta,
   entityMeta,
   relationMeta,
 } from '../types'
@@ -13,12 +14,15 @@ import { useStore } from '../store/useStore'
 import { formatTime, parseTime } from '../utils/time'
 import { fileToScaledDataUrl } from '../utils/image'
 import { deleteAsset, putAsset } from '../utils/assets'
+import { rollDie } from '../utils/tools'
 import { DecisionEditor } from './DecisionEditor'
 import { EventEditor } from './EventEditor'
 import { AssetImg } from './AssetImg'
 
 export function DetailPanel() {
   const campaign = useStore((s) => s.campaigns.find((c) => c.id === s.activeCampaignId) ?? s.campaigns[0])
+  const activeLayer = campaign.layers.find((l) => l.id === campaign.activeLayerId) ?? campaign.layers[0]
+  const viewLayerId = useStore((s) => s.viewLayerId)
   const selectedId = useStore((s) => s.selectedEntityId)
   const tableMode = useStore((s) => s.tableMode)
   const updateEntity = useStore((s) => s.updateEntity)
@@ -34,12 +38,106 @@ export function DetailPanel() {
   const setToolsOpen = useStore((s) => s.setToolsOpen)
   const setToolsTab = useStore((s) => s.setToolsTab)
 
+  const [combatMode, setCombatMode] = useState(false)
+  // Initiative wird pro Kampf gewuerfelt/eingegeben, nicht am Charakter gespeichert -
+  // daher nur fluechtiger Panel-Zustand.
+  const [initiatives, setInitiatives] = useState<Record<string, number | null>>({})
+
   const marker = campaign.entities.find((e) => e.id === selectedId) ?? null
+
+  // Objekte der Karte, die man gerade betrachtet (viewLayerId beim Navigieren in der
+  // Hierarchie, sonst die Wurzelkarte selbst) - dieselbe Karte, in die "+ Neue Karte"
+  // aktuell einbetten wuerde.
+  const mapLayerId = viewLayerId ?? activeLayer.id
+  const mapLayer = campaign.layers.find((l) => l.id === mapLayerId) ?? activeLayer
+  const mapEntities = campaign.entities.filter((e) => e.placement?.layerId === mapLayerId)
+  const enemies = mapEntities.filter((e) => e.type === 'nsc' && e.fields.gesinnung === 'feind')
+  const sortedEnemies = [...enemies].sort(
+    (a, b) => (initiatives[b.id] ?? -Infinity) - (initiatives[a.id] ?? -Infinity),
+  )
+  const groups = ENTITY_TYPES.map((m) => ({
+    meta: m,
+    items: mapEntities.filter((e) => e.type === m.type),
+  })).filter((g) => g.items.length > 0)
+
+  function rollOne(id: string) {
+    setInitiatives((prev) => ({ ...prev, [id]: rollDie(20) }))
+  }
+  function rollAllInitiative() {
+    setInitiatives(Object.fromEntries(enemies.map((e) => [e.id, rollDie(20)])))
+  }
+
+  const objectsSection = (
+    <div className="detail__objects">
+      <div className="detail__objects-head">
+        <h2 className="detail__objects-title">
+          {mapLayer.name}
+          <span className="sidebar__count">{combatMode ? enemies.length : mapEntities.length}</span>
+        </h2>
+        <button
+          className={`btn btn--sm${combatMode ? ' btn--active' : ''}`}
+          onClick={() => setCombatMode((v) => !v)}
+          title="Kampfmodus: nur Feinde, mit Initiative"
+        >
+          ⚔ Kampfmodus
+        </button>
+      </div>
+
+      {combatMode ? (
+        <>
+          {enemies.length > 0 && (
+            <button className="chipbtn detail__objects-rollall" onClick={rollAllInitiative}>
+              🎲 Alle Initiativen wuerfeln
+            </button>
+          )}
+          {sortedEnemies.length === 0 ? (
+            <p className="sidebar__empty">Keine Feinde auf dieser Karte.</p>
+          ) : (
+            <ul className="marker-list">
+              {sortedEnemies.map((e) => (
+                <EnemyRow
+                  key={e.id}
+                  entity={e}
+                  selected={e.id === selectedId}
+                  initiative={initiatives[e.id] ?? null}
+                  onSelect={selectEntity}
+                  onInitiativeChange={(v) => setInitiatives((prev) => ({ ...prev, [e.id]: v }))}
+                  onRoll={() => rollOne(e.id)}
+                />
+              ))}
+            </ul>
+          )}
+        </>
+      ) : mapEntities.length === 0 ? (
+        <p className="sidebar__empty">Noch keine Objekte auf dieser Karte.</p>
+      ) : (
+        <div className="entity-groups">
+          {groups.map((g) => (
+            <div key={g.meta.type} className="entity-group">
+              <div className="entity-group__title" style={{ ['--chip-color' as string]: g.meta.color }}>
+                <span>{g.meta.icon}</span>
+                {g.meta.plural}
+                <span className="entity-group__count">{g.items.length}</span>
+              </div>
+              <ul className="marker-list">
+                {g.items.map((e) => (
+                  <EntityRow key={e.id} entity={e} selected={e.id === selectedId} onSelect={selectEntity} />
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
 
   if (!selectedId || !marker) {
     return (
-      <aside className="detail detail--empty">
-        <p>Klicke ein Objekt auf der Karte oder in der Liste, um seine Details zu sehen.</p>
+      <aside className="detail">
+        {objectsSection}
+        <div className="detail--empty">
+          <p>Klicke ein Objekt auf der Karte oder in der Liste, um seine Details zu sehen.</p>
+        </div>
       </aside>
     )
   }
@@ -56,6 +154,7 @@ export function DetailPanel() {
 
   return (
     <aside className="detail" style={{ ['--chip-color' as string]: meta.color }}>
+      {objectsSection}
       <div className="detail__header">
         <span className="detail__icon">{meta.icon}</span>
         <input
@@ -721,5 +820,74 @@ function CombatStatFields({
         </label>
       ))}
     </div>
+  )
+}
+
+/** Zeile fuer ein Objekt der aktuell betrachteten Karte (nicht im Kampfmodus). */
+function EntityRow({
+  entity,
+  selected,
+  onSelect,
+}: {
+  entity: Entity
+  selected: boolean
+  onSelect: (id: string) => void
+}) {
+  const meta = entityDisplayMeta(entity)
+  return (
+    <li>
+      <button
+        className={`marker-list__item${selected ? ' is-selected' : ''}`}
+        style={{ ['--chip-color' as string]: meta.color }}
+        onClick={() => onSelect(entity.id)}
+      >
+        <span className="marker-list__icon">{meta.icon}</span>
+        <span className="marker-list__name">{entity.name}</span>
+      </button>
+    </li>
+  )
+}
+
+/** Zeile fuer einen Feind im Kampfmodus, mit direkt editierbarer/wuerfelbarer Initiative. */
+function EnemyRow({
+  entity,
+  selected,
+  initiative,
+  onSelect,
+  onInitiativeChange,
+  onRoll,
+}: {
+  entity: Entity
+  selected: boolean
+  initiative: number | null
+  onSelect: (id: string) => void
+  onInitiativeChange: (value: number | null) => void
+  onRoll: () => void
+}) {
+  const meta = entityDisplayMeta(entity)
+  return (
+    <li>
+      <div
+        className={`marker-list__item enemyrow${selected ? ' is-selected' : ''}`}
+        style={{ ['--chip-color' as string]: meta.color }}
+      >
+        <button className="enemyrow__name" onClick={() => onSelect(entity.id)}>
+          <span className="marker-list__icon">{meta.icon}</span>
+          <span className="marker-list__name">{entity.name}</span>
+        </button>
+        <span className="enemyrow__init">
+          <input
+            type="number"
+            className="enemyrow__init-input"
+            value={initiative ?? ''}
+            placeholder="–"
+            onChange={(e) => onInitiativeChange(e.target.value === '' ? null : Number(e.target.value))}
+          />
+          <button className="enemyrow__roll" onClick={onRoll} title="Initiative wuerfeln (d20)">
+            🎲
+          </button>
+        </span>
+      </div>
+    </li>
   )
 }

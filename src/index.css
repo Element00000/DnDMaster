@@ -713,6 +713,8 @@ button {
 }
 
 .detail--empty {
+  flex: 1;
+  display: flex;
   align-items: center;
   justify-content: center;
   padding: 24px;
@@ -774,6 +776,92 @@ button {
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+.detail__objects {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel-2);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 40vh;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+
+.detail__objects-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.detail__objects-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-display);
+  font-size: 15px;
+  color: var(--ink);
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detail__objects-rollall {
+  align-self: flex-start;
+}
+
+.enemyrow {
+  padding: 6px 10px 6px 10px;
+  gap: 8px;
+}
+
+.enemyrow__name {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  color: inherit;
+  text-align: left;
+  padding: 0;
+  font: inherit;
+}
+
+.enemyrow__init {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.enemyrow__init-input {
+  width: 44px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--ink);
+  font-size: 13px;
+  text-align: center;
+  padding: 3px 2px;
+}
+
+.enemyrow__roll {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2px 5px;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.enemyrow__roll:hover {
+  background: var(--panel);
 }
 
 .field {
@@ -1010,16 +1098,6 @@ button {
   height: 26px;
   font-size: 12px;
   flex-shrink: 0;
-}
-
-.icon-btn--battle {
-  border-color: color-mix(in srgb, var(--danger) 45%, var(--border));
-  color: var(--danger);
-}
-
-.icon-btn--battle:hover {
-  border-color: var(--danger);
-  background: var(--danger-tint);
 }
 
 .swap-image-icon {

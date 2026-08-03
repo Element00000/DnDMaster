@@ -222,10 +222,6 @@ interface StoreState extends AppData {
   setLayerFog: (id: string, enabled: boolean) => void
   addReveal: (layerId: string, x: number, y: number, r: number) => void
   clearReveals: (layerId: string) => void
-  /** Kampfmodus geoeffnet fuer diese Ebene? (nicht persistiert; jede Karte mit mind. einem
-   *  darauf platzierten Feind kann in den Kampfmodus genommen werden). */
-  battleModeLayerId: string | null
-  setBattleMode: (id: string | null) => void
 
   // Entitaeten (der aktiven Kampagne)
   addEntity: (input: { type: EntityType; placement?: Placement; name?: string; fields?: Record<string, string> }) => string
@@ -323,7 +319,6 @@ export const useStore = create<StoreState>()(
         placingEntityId: null,
         placingLayerId: null,
         viewLayerId: null,
-        battleModeLayerId: null,
         undoStack: [],
         lastUndoPushAt: 0,
         timeEnabled: false,
@@ -1036,7 +1031,6 @@ export const useStore = create<StoreState>()(
 
         fightEventId: null,
         setFightEvent: (id) => set({ fightEventId: id }),
-        setBattleMode: (id) => set({ battleModeLayerId: id }),
 
         // ---------- UI ----------
         setTool: (t) => set({ tool: t }),

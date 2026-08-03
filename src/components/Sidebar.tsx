@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { ENTITY_TYPES, GESINNUNG_OPTIONS, ITEM_ART_OPTIONS, entityDisplayMeta } from '../types'
-import type { Entity, EntityType, MapLayer } from '../types'
+import { ENTITY_TYPES, GESINNUNG_OPTIONS, ITEM_ART_OPTIONS } from '../types'
+import type { EntityType, MapLayer } from '../types'
 import { useStore } from '../store/useStore'
 import type { ToolTab } from '../store/useStore'
 import { fileToScaledDataUrl } from '../utils/image'
@@ -33,8 +33,6 @@ export function Sidebar() {
   const setTool = useStore((s) => s.setTool)
   const setPendingType = useStore((s) => s.setPendingEntityType)
   const setPendingFields = useStore((s) => s.setPendingEntityFields)
-  const selectEntity = useStore((s) => s.selectEntity)
-  const selectedId = useStore((s) => s.selectedEntityId)
   const addEntity = useStore((s) => s.addEntity)
   const toolsOpen = useStore((s) => s.toolsOpen)
   const toolsTab = useStore((s) => s.toolsTab)
@@ -50,7 +48,6 @@ export function Sidebar() {
   const embedLayer = useStore((s) => s.embedLayer)
   const viewLayerId = useStore((s) => s.viewLayerId)
   const setViewLayerId = useStore((s) => s.setViewLayerId)
-  const setBattleMode = useStore((s) => s.setBattleMode)
 
   const [popup, setPopup] = useState<{ type: EntityType; top: number; left: number } | null>(null)
   const [mapsMenu, setMapsMenu] = useState<{ top: number; left: number } | null>(null)
@@ -189,15 +186,6 @@ export function Sidebar() {
     return false
   }
 
-  // Steht mindestens ein Feind auf dieser Karte? Bestimmt, ob das Kampfmodus-Symbol
-  // erscheint - der Kampfmodus wird nicht mehr manuell markiert, sondern ist automatisch
-  // fuer jede Karte mit darauf platzierten Feinden verfuegbar.
-  function layerHasEnemy(layerId: string): boolean {
-    return campaign.entities.some(
-      (e) => e.type === 'nsc' && e.fields.gesinnung === 'feind' && e.placement?.layerId === layerId,
-    )
-  }
-
   // Karte in "Meine Karten" anklicken: bleibt in der Wurzelkarten-Instanz und schwenkt/zoomt
   // nur dorthin (viewLayerId), solange die Karte Teil der aktuellen Hierarchie ist. Nur bei
   // einer voellig getrennten (anderen) Wurzelkarte wird tatsaechlich die aktive Ebene gewechselt.
@@ -231,9 +219,6 @@ export function Sidebar() {
     }
   }
 
-  // Im Spieltischmodus nur entdeckte Objekte anzeigen.
-  const visible = campaign.entities.filter((e) => !tableMode || e.visibility === 'spieler')
-
   function startAdding(type: EntityType) {
     setPopup(null)
     setPendingType(type)
@@ -246,12 +231,6 @@ export function Sidebar() {
     setPendingFields({ [fieldKey]: value })
     setTool('add')
   }
-
-  // Objekte nach Typ gruppieren, in der Reihenfolge von ENTITY_TYPES.
-  const groups = ENTITY_TYPES.map((meta) => ({
-    meta,
-    items: visible.filter((e) => e.type === meta.type),
-  })).filter((g) => g.items.length > 0)
 
   return (
     <aside className="sidebar">
@@ -342,18 +321,6 @@ export function Sidebar() {
                       {depth > 0 ? '↳ ' : ''}
                       {l.name}
                     </button>
-                    {layerHasEnemy(l.id) && (
-                      <button
-                        className="icon-btn icon-btn--sm icon-btn--battle"
-                        title="Kampfmodus starten (Feinde auf dieser Karte)"
-                        onClick={() => {
-                          setBattleMode(l.id)
-                          setMapsMenu(null)
-                        }}
-                      >
-                        ⚔
-                      </button>
-                    )}
                     <button className="icon-btn icon-btn--sm" title="Kartenbild austauschen" onClick={() => onSwapImage(l)}>
                       <svg
                         className="swap-image-icon"
@@ -474,61 +441,6 @@ export function Sidebar() {
           ) : null}
         </section>
       )}
-
-      <section className="sidebar__section sidebar__section--grow">
-        <h2 className="sidebar__heading">
-          {tableMode ? 'Entdeckt' : 'Objekte'} <span className="sidebar__count">{visible.length}</span>
-        </h2>
-        {visible.length === 0 ? (
-          <p className="sidebar__empty">
-            {tableMode
-              ? 'Noch nichts entdeckt.'
-              : 'Noch keine Objekte. Waehle oben einen Typ und klicke auf die Karte.'}
-          </p>
-        ) : (
-          <div className="entity-groups">
-            {groups.map((g) => (
-              <div key={g.meta.type} className="entity-group">
-                <div className="entity-group__title" style={{ ['--chip-color' as string]: g.meta.color }}>
-                  <span>{g.meta.icon}</span>
-                  {g.meta.plural}
-                  <span className="entity-group__count">{g.items.length}</span>
-                </div>
-                <ul className="marker-list">
-                  {g.items.map((e) => (
-                    <EntityRow key={e.id} entity={e} selected={e.id === selectedId} onSelect={selectEntity} />
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
     </aside>
-  )
-}
-
-function EntityRow({
-  entity,
-  selected,
-  onSelect,
-}: {
-  entity: Entity
-  selected: boolean
-  onSelect: (id: string) => void
-}) {
-  const meta = entityDisplayMeta(entity)
-  return (
-    <li>
-      <button
-        className={`marker-list__item${selected ? ' is-selected' : ''}`}
-        style={{ ['--chip-color' as string]: meta.color }}
-        onClick={() => onSelect(entity.id)}
-      >
-        <span className="marker-list__icon">{meta.icon}</span>
-        <span className="marker-list__name">{entity.name}</span>
-        {!entity.placement && <span className="marker-list__badge" title="Nicht auf der Karte">Liste</span>}
-      </button>
-    </li>
   )
 }
