@@ -51,6 +51,47 @@ function makeCampaign(name: string): Campaign {
   }
 }
 
+/**
+ * Skaliert saemtlichen Inhalt einer Kartenebene proportional mit, wenn sich deren eigene
+ * Breite/Hoehe aendert (Eck-Ziehpunkt-Resize oder Bildaustausch): Nebel-Aufdeckungen, auf
+ * ihr platzierte Objekte (inkl. Zeitplan-Positionen) sowie - damit die Hierarchie nicht
+ * "kaputt geht" - die Platzierung aller direkt in sie eingebetteten Karten. Ohne das wuerden
+ * eingebettete Karten und Objekte bei einem kleineren neuen Bild ausserhalb des sichtbaren
+ * Bereichs "herunterfallen".
+ */
+function rescaleLayerContent(c: Campaign, layerId: string, sx: number, sy: number): Campaign {
+  const sr = (sx + sy) / 2
+  return {
+    ...c,
+    layers: c.layers.map((l) => {
+      if (l.id === layerId) {
+        return { ...l, reveals: l.reveals.map((r) => ({ x: r.x * sx, y: r.y * sy, r: r.r * sr })) }
+      }
+      if (l.embed?.parentLayerId === layerId) {
+        return {
+          ...l,
+          embed: {
+            ...l.embed,
+            x: l.embed.x * sx,
+            y: l.embed.y * sy,
+            width: l.embed.width * sx,
+            height: l.embed.height * sy,
+          },
+        }
+      }
+      return l
+    }),
+    entities: c.entities.map((e) => {
+      if (!e.placement || e.placement.layerId !== layerId) return e
+      return {
+        ...e,
+        placement: { ...e.placement, x: e.placement.x * sx, y: e.placement.y * sy },
+        schedule: e.schedule.map((s) => ({ ...s, x: s.x * sx, y: s.y * sy })),
+      }
+    }),
+  }
+}
+
 /** Maximale Anzahl an Undo-Schritten. */
 const UNDO_LIMIT = 50
 /** Aenderungen innerhalb dieses Fensters zaehlen als ein Undo-Schritt (Tippen, Ziehen). */
@@ -489,13 +530,23 @@ export const useStore = create<StoreState>()(
           set({ viewLayerId: null })
         },
 
+        /**
+         * Kartenbild (aus)tauschen. Hat das neue Bild andere Abmessungen als das alte, werden
+         * Nebel, Objekte darauf und darin eingebettete Karten proportional mitskaliert, damit
+         * nichts ausserhalb der neuen Karte landet und die Hierarchie erhalten bleibt.
+         */
         setLayerImage: (id, imageUrl, width, height) =>
-          patchActive((c) => ({
-            ...c,
-            layers: c.layers.map((l) =>
-              l.id === id ? { ...l, imageUrl, width, height } : l,
-            ),
-          })),
+          patchActive((c) => {
+            const layer = c.layers.find((l) => l.id === id)
+            if (!layer) return c
+            const sx = width / layer.width
+            const sy = height / layer.height
+            const rescaled = rescaleLayerContent(c, id, sx, sy)
+            return {
+              ...rescaled,
+              layers: rescaled.layers.map((l) => (l.id === id ? { ...l, imageUrl, width, height } : l)),
+            }
+          }),
 
         resetLayerImage: (id) =>
           patchActive((c) => ({
@@ -505,26 +556,20 @@ export const useStore = create<StoreState>()(
             ),
           })),
 
-        /** Kartengroesse per Eck-Ziehpunkt aendern; Markierungen und Nebel werden proportional mitskaliert. */
+        /**
+         * Kartengroesse per Eck-Ziehpunkt aendern; Markierungen, Nebel und darin eingebettete
+         * Karten werden proportional mitskaliert.
+         */
         resizeLayer: (id, width, height) =>
           patchActive((c) => {
             const layer = c.layers.find((l) => l.id === id)
             if (!layer) return c
             const sx = width / layer.width
             const sy = height / layer.height
-            const sr = (sx + sy) / 2
+            const rescaled = rescaleLayerContent(c, id, sx, sy)
             return {
-              ...c,
-              layers: c.layers.map((l) =>
-                l.id === id
-                  ? { ...l, width, height, reveals: l.reveals.map((r) => ({ x: r.x * sx, y: r.y * sy, r: r.r * sr })) }
-                  : l,
-              ),
-              entities: c.entities.map((e) =>
-                e.placement && e.placement.layerId === id
-                  ? { ...e, placement: { ...e.placement, x: e.placement.x * sx, y: e.placement.y * sy } }
-                  : e,
-              ),
+              ...rescaled,
+              layers: rescaled.layers.map((l) => (l.id === id ? { ...l, width, height } : l)),
             }
           }),
 

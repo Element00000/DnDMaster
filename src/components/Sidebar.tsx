@@ -55,8 +55,9 @@ export function Sidebar() {
   const [mapsMenu, setMapsMenu] = useState<{ top: number; left: number } | null>(null)
   const [draggingLayerId, setDraggingLayerId] = useState<string | null>(null)
   const [dropTargetId, setDropTargetId] = useState<string | null>(null)
+  const [imageSwapTargetId, setImageSwapTargetId] = useState<string | null>(null)
   const addSectionRef = useRef<HTMLElement>(null)
-  const mapFileRef = useRef<HTMLInputElement>(null)
+  const swapImageFileRef = useRef<HTMLInputElement>(null)
   const newLayerFileRef = useRef<HTMLInputElement>(null)
 
   // "Objekt anlegen"-Menue (Ohne Karte anlegen/Abbrechen) automatisch schliessen, sobald
@@ -80,14 +81,24 @@ export function Sidebar() {
     return () => document.removeEventListener('pointerdown', onPointerDownCapture, true)
   }, [tool, setTool])
 
-  async function onMapFile(e: React.ChangeEvent<HTMLInputElement>) {
+  // Kartenbild einer beliebigen Karte in der Hierarchie austauschen (Button je Zeile in
+  // "Meine Karten"). setLayerImage skaliert bei abweichenden Bildmassen Nebel, Objekte und
+  // darin eingebettete Karten proportional mit, damit dabei nichts "herunterfaellt".
+  function onSwapImage(l: MapLayer) {
+    setImageSwapTargetId(l.id)
+    swapImageFileRef.current?.click()
+  }
+
+  async function onSwapImageFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     e.target.value = ''
-    if (!file) return
-    const prev = layer.imageUrl
+    const targetId = imageSwapTargetId
+    setImageSwapTargetId(null)
+    if (!file || !targetId) return
+    const prev = campaign.layers.find((l) => l.id === targetId)?.imageUrl ?? null
     const { url, width, height } = await fileToScaledDataUrl(file, { maxDim: 2400, quality: 0.85 })
     const ref = await putAsset(url)
-    setLayerImage(layer.id, ref, width, height)
+    setLayerImage(targetId, ref, width, height)
     void deleteAsset(prev)
   }
 
@@ -321,6 +332,9 @@ export function Sidebar() {
                       {depth > 0 ? '↳ ' : ''}
                       {l.name}
                     </button>
+                    <button className="icon-btn icon-btn--sm" title="Kartenbild austauschen" onClick={() => onSwapImage(l)}>
+                      🖼
+                    </button>
                     <button className="icon-btn icon-btn--sm" title="Umbenennen" onClick={() => onRenameLayer(l)}>
                       ✎
                     </button>
@@ -345,11 +359,10 @@ export function Sidebar() {
                 ))}
                   <div className="campaign-menu__sep" />
                   <button onClick={() => newLayerFileRef.current?.click()}>+ Neue Karte</button>
-                  <button onClick={() => mapFileRef.current?.click()}>Bild fuer „{layer.name}“ hochladen</button>
                 </div>,
                 document.body,
               )}
-            <input ref={mapFileRef} type="file" accept="image/*" onChange={onMapFile} hidden />
+            <input ref={swapImageFileRef} type="file" accept="image/*" onChange={onSwapImageFile} hidden />
             <input ref={newLayerFileRef} type="file" accept="image/*" onChange={onNewLayerFile} hidden />
           </div>
 
