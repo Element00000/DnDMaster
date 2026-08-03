@@ -67,6 +67,12 @@ export function DetailPanel() {
     setInitiatives(Object.fromEntries(enemies.map((e) => [e.id, rollDie(20)])))
   }
 
+  // Erneuter Klick auf das bereits ausgewaehlte Objekt in der Liste schliesst dessen
+  // Dropdown wieder, statt es einfach offen zu lassen (wie ein Akkordeon).
+  function onRowSelect(id: string) {
+    selectEntity(id === selectedId ? null : id)
+  }
+
   // Details erscheinen als Dropdown direkt unter dem angeklickten Objekt in der Liste - aber
   // nur wenn dieses Objekt tatsaechlich in der aktuell sichtbaren Liste steht (auf dieser
   // Karte platziert bzw. im Kampfmodus ein Feind). Sonst (Objekt ohne Kartenposition oder ueber
@@ -383,7 +389,7 @@ export function DetailPanel() {
                   entity={e}
                   selected={e.id === selectedId}
                   initiative={initiatives[e.id] ?? null}
-                  onSelect={selectEntity}
+                  onSelect={onRowSelect}
                   onInitiativeChange={(v) => setInitiatives((prev) => ({ ...prev, [e.id]: v }))}
                   onRoll={() => rollOne(e.id)}
                   dropdown={e.id === selectedId ? detailContent : null}
@@ -409,7 +415,7 @@ export function DetailPanel() {
                     key={e.id}
                     entity={e}
                     selected={e.id === selectedId}
-                    onSelect={selectEntity}
+                    onSelect={onRowSelect}
                     dropdown={e.id === selectedId ? detailContent : null}
                   />
                 ))}
