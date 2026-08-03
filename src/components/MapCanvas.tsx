@@ -687,9 +687,16 @@ export function MapCanvas() {
 
 function ZoomControls({ scale, onZoom, onFit }: { scale: number; onZoom: (dir: number) => void; onFit: () => void }) {
   // stopPropagation: sonst faengt das darunterliegende Karten-Pointerdown (Verschieben/
-  // Rechteck-Markierung) den Klick ab, bevor er die Buttons erreicht.
+  // Rechteck-Markierung) den Klick ab, bevor er die Buttons erreicht. Ebenso wuerde ein
+  // schnelles Doppelklicken auf einen Button (z.B. zweimal "+" hintereinander) als
+  // natives dblclick bis zur Karte durchsickern und ueber deren Doppelklick-zum-Einpassen
+  // die Ansicht ungewollt zurueck auf die Einpass-Groesse setzen.
   return (
-    <div className="zoom-controls" onPointerDown={(e) => e.stopPropagation()}>
+    <div
+      className="zoom-controls"
+      onPointerDown={(e) => e.stopPropagation()}
+      onDoubleClick={(e) => e.stopPropagation()}
+    >
       <button title="Hineinzoomen" onClick={() => onZoom(1)}>+</button>
       <span className="zoom-level">{Math.round(scale * 100)}%</span>
       <button title="Herauszoomen" onClick={() => onZoom(-1)}>&minus;</button>
