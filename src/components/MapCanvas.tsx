@@ -14,7 +14,7 @@ interface View {
 }
 
 const MIN_SCALE = 0.1
-const MAX_SCALE = 6
+const MAX_SCALE = 30
 const DRAG_THRESHOLD = 4
 /** Ab dieser Bildschirmgroesse (kuerzere Seite, px) wird eine eingebettete Karte aufgedeckt. */
 const REVEAL_THRESHOLD = 160
