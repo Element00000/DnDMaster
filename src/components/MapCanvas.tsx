@@ -202,19 +202,25 @@ export function MapCanvas() {
     [toWorld, width, height, addReveal, layer.id, fogBrush],
   )
 
-  // Klick auf eine eingeklappte Kartenpinnadel: automatisch nah genug heranzoomen, um sie aufzudecken.
-  const zoomToEmbed = useCallback((el: MapLayer) => {
+  // Klick auf eine eingeklappte Kartenpinnadel (auf beliebiger Verschachtelungstiefe):
+  // automatisch nah genug heranzoomen, um sie aufzudecken. sx/sy/sw/sh sind ihre aktuelle
+  // Bildschirm-Position/-Groesse (bereits rekursiv aus allen Eltern-Transformationen
+  // berechnet), also unabhaengig davon, wie tief sie verschachtelt ist.
+  const zoomToScreenRect = useCallback((sx: number, sy: number, sw: number, sh: number) => {
     const cont = containerRef.current
-    const embed = el.embed
-    if (!cont || !embed) return
+    if (!cont) return
     const cw = cont.clientWidth
     const ch = cont.clientHeight
     const targetScreen = REVEAL_THRESHOLD * 1.4
-    const neededScale = targetScreen / Math.min(embed.width, embed.height)
-    const newScale = clamp(neededScale, MIN_SCALE, MAX_SCALE)
-    const cx = embed.x + embed.width / 2
-    const cy = embed.y + embed.height / 2
-    setView({ scale: newScale, tx: cw / 2 - cx * newScale, ty: ch / 2 - cy * newScale })
+    const neededFactor = targetScreen / Math.min(sw, sh)
+    const cx = sx + sw / 2
+    const cy = sy + sh / 2
+    setView((v) => {
+      const newScale = clamp(v.scale * neededFactor, MIN_SCALE, MAX_SCALE)
+      const wx = (cx - v.tx) / v.scale
+      const wy = (cy - v.ty) / v.scale
+      return { scale: newScale, tx: cw / 2 - wx * newScale, ty: ch / 2 - wy * newScale }
+    })
   }, [])
 
   const onPointerDown = useCallback(
@@ -334,16 +340,20 @@ export function MapCanvas() {
       const inside = wx >= 0 && wy >= 0 && wx <= width && wy <= height
 
       // Hoechste Prioritaet: eine Karte wird gerade als eingebettete Karte platziert.
+      // Faellt der Klick in eine (beliebig tief) aufgedeckte eingebettete Karte,
+      // wird dort eingebettet statt immer auf der Wurzelebene.
       if (placingLayerId) {
         if (inside) {
-          const target = campaign.layers.find((l) => l.id === placingLayerId)
-          if (target) {
-            const w = Math.max(MIN_EMBED_SIZE, width * 0.25)
-            const h = Math.max(MIN_EMBED_SIZE, w * (target.height / target.width))
+          const t = resolveDeepTarget(campaign.layers, layer.id, wx, wy, view.scale)
+          const parentLayer = campaign.layers.find((l) => l.id === t.layerId)
+          const movingLayer = campaign.layers.find((l) => l.id === placingLayerId)
+          if (parentLayer && movingLayer) {
+            const w = Math.max(MIN_EMBED_SIZE, parentLayer.width * 0.25)
+            const h = Math.max(MIN_EMBED_SIZE, w * (movingLayer.height / movingLayer.width))
             embedLayer(placingLayerId, {
-              parentLayerId: layer.id,
-              x: clamp(wx - w / 2, 0, Math.max(0, width - w)),
-              y: clamp(wy - h / 2, 0, Math.max(0, height - h)),
+              parentLayerId: parentLayer.id,
+              x: clamp(t.x - w / 2, 0, Math.max(0, parentLayer.width - w)),
+              y: clamp(t.y - h / 2, 0, Math.max(0, parentLayer.height - h)),
               width: w,
               height: h,
             })
@@ -356,27 +366,19 @@ export function MapCanvas() {
       // Vorrang: ein vorhandenes Objekt wird gerade platziert.
       if (placingEntityId) {
         if (inside) {
-          setPlacement(placingEntityId, { layerId: layer.id, x: wx, y: wy })
+          const t = resolveDeepTarget(campaign.layers, layer.id, wx, wy, view.scale)
+          setPlacement(placingEntityId, { layerId: t.layerId, x: t.x, y: t.y })
           setPlacingEntity(null)
         }
         return
       }
 
       if (tool === 'add' && !tableMode) {
-        // Faellt der Klick in eine aufgedeckte eingebettete Karte, wird das Objekt dort platziert.
-        for (const el of embeddedLayers) {
-          const embed = el.embed!
-          if (wx < embed.x || wx > embed.x + embed.width || wy < embed.y || wy > embed.y + embed.height) continue
-          const screenMin = Math.min(embed.width, embed.height) * view.scale
-          if (screenMin < REVEAL_THRESHOLD) continue
-          const subX = ((wx - embed.x) / embed.width) * el.width
-          const subY = ((wy - embed.y) / embed.height) * el.height
-          addEntity({ type: pendingType, placement: { layerId: el.id, x: subX, y: subY }, fields: pendingFields })
-          setTool('select')
-          return
-        }
         if (!inside) return
-        addEntity({ type: pendingType, placement: { layerId: layer.id, x: wx, y: wy }, fields: pendingFields })
+        // Faellt der Klick in eine (beliebig tief) aufgedeckte eingebettete Karte,
+        // wird das Objekt dort platziert statt auf der Wurzelebene.
+        const t = resolveDeepTarget(campaign.layers, layer.id, wx, wy, view.scale)
+        addEntity({ type: pendingType, placement: { layerId: t.layerId, x: t.x, y: t.y }, fields: pendingFields })
         setTool('select')
       } else {
         selectEntity(null)
@@ -397,7 +399,6 @@ export function MapCanvas() {
       fogEditing,
       placingEntityId,
       placingLayerId,
-      embeddedLayers,
       campaign.layers,
       pins,
       effectivePos,
@@ -587,8 +588,10 @@ export function MapCanvas() {
         <EmbeddedMap
           key={el.id}
           embLayer={el}
-          view={view}
-          toWorld={toWorld}
+          parentView={view}
+          containerRef={containerRef}
+          layers={campaign.layers}
+          visited={[]}
           tool={tool}
           tableMode={tableMode}
           fogEditing={fogEditing}
@@ -596,13 +599,13 @@ export function MapCanvas() {
           timeOfDay={timeOfDay}
           entities={entities}
           selectedIds={selectedIds}
-          selected={selectedEmbedId === el.id}
+          selectedEmbedId={selectedEmbedId}
           onSelect={(id) => {
             setSelectedEmbedId(id)
             setMapSelected(false)
             selectEntity(null)
           }}
-          onZoomTo={zoomToEmbed}
+          onZoomTo={zoomToScreenRect}
           onEntityClick={(id, ev) => {
             setMapSelected(false)
             setSelectedEmbedId(null)
@@ -697,6 +700,32 @@ function clamp(v: number, min: number, max: number) {
   return Math.max(min, Math.min(max, v))
 }
 
+/**
+ * Findet die am tiefsten verschachtelte, aktuell aufgedeckte eingebettete Karte an einem
+ * Weltpunkt (rekursiv durch beliebig viele Ebenen). effScale ist der Bildschirm-Massstab
+ * der Startebene (Pixel pro Welteinheit dieser Ebene, i.d.R. view.scale der Wurzelebene).
+ * Liefert die Zielebene sowie den Punkt in deren eigenen Weltkoordinaten.
+ */
+function resolveDeepTarget(
+  layers: MapLayer[],
+  parentLayerId: string,
+  wx: number,
+  wy: number,
+  effScale: number,
+): { layerId: string; x: number; y: number } {
+  for (const child of layers) {
+    const embed = child.embed
+    if (!embed || embed.parentLayerId !== parentLayerId) continue
+    if (wx < embed.x || wx > embed.x + embed.width || wy < embed.y || wy > embed.y + embed.height) continue
+    if (Math.min(embed.width, embed.height) * effScale < REVEAL_THRESHOLD) continue
+    const subX = ((wx - embed.x) / embed.width) * child.width
+    const subY = ((wy - embed.y) / embed.height) * child.height
+    const childEffScale = effScale * (embed.width / child.width)
+    return resolveDeepTarget(layers, child.id, subX, subY, childEffScale)
+  }
+  return { layerId: parentLayerId, x: wx, y: wy }
+}
+
 type EmbedResizeHandle = 'nw' | 'ne' | 'sw' | 'se'
 
 /**
@@ -706,8 +735,10 @@ type EmbedResizeHandle = 'nw' | 'ne' | 'sw' | 'se'
  */
 function EmbeddedMap({
   embLayer,
-  view,
-  toWorld,
+  parentView,
+  containerRef,
+  layers,
+  visited,
   tool,
   tableMode,
   fogEditing,
@@ -715,7 +746,7 @@ function EmbeddedMap({
   timeOfDay,
   entities,
   selectedIds,
-  selected,
+  selectedEmbedId,
   onSelect,
   onZoomTo,
   onEntityClick,
@@ -723,8 +754,12 @@ function EmbeddedMap({
   setEmbedRect,
 }: {
   embLayer: MapLayer
-  view: View
-  toWorld: (clientX: number, clientY: number) => { wx: number; wy: number }
+  /** Bildschirm-Transformation der Eltern-Ebene (Weltkoordinaten der Eltern-Ebene -> Bildschirm). */
+  parentView: View
+  containerRef: React.RefObject<HTMLDivElement>
+  layers: MapLayer[]
+  /** IDs aller Eltern-Ebenen auf dem Weg von der Wurzel hierher (Zyklenschutz). */
+  visited: string[]
   tool: string
   tableMode: boolean
   fogEditing: boolean
@@ -732,21 +767,32 @@ function EmbeddedMap({
   timeOfDay: number
   entities: Entity[]
   selectedIds: string[]
-  selected: boolean
+  selectedEmbedId: string | null
   onSelect: (id: string) => void
-  onZoomTo: (l: MapLayer) => void
+  onZoomTo: (sx: number, sy: number, sw: number, sh: number) => void
   onEntityClick: (id: string, ev: { ctrlKey: boolean; metaKey: boolean; shiftKey: boolean }) => void
   onEntityMove: (id: string, dxSub: number, dySub: number) => void
   setEmbedRect: (id: string, x: number, y: number, width: number, height: number) => void
 }) {
   const image = useAsset(embLayer.imageUrl)
   const embed = embLayer.embed!
-  const x = embed.x * view.scale + view.tx
-  const y = embed.y * view.scale + view.ty
-  const w = embed.width * view.scale
-  const h = embed.height * view.scale
+  const selected = selectedEmbedId === embLayer.id
+  const x = embed.x * parentView.scale + parentView.tx
+  const y = embed.y * parentView.scale + parentView.ty
+  const w = embed.width * parentView.scale
+  const h = embed.height * parentView.scale
   const revealed = Math.min(w, h) >= REVEAL_THRESHOLD
   const interactive = !tableMode && !fogEditing
+
+  // Bildschirm- zu Weltkoordinaten der Eltern-Ebene, zum Ziehen der Eck-Griffe.
+  function toParentWorld(clientX: number, clientY: number) {
+    const el = containerRef.current!
+    const rect = el.getBoundingClientRect()
+    return {
+      wx: (clientX - rect.left - parentView.tx) / parentView.scale,
+      wy: (clientY - rect.top - parentView.ty) / parentView.scale,
+    }
+  }
 
   const dragRef = useRef<{ startX: number; startY: number; startEx: number; startEy: number; moved: boolean } | null>(null)
 
@@ -761,8 +807,8 @@ function EmbeddedMap({
     const d = dragRef.current
     if (!d) return
     e.stopPropagation()
-    const dx = (e.clientX - d.startX) / view.scale
-    const dy = (e.clientY - d.startY) / view.scale
+    const dx = (e.clientX - d.startX) / parentView.scale
+    const dy = (e.clientY - d.startY) / parentView.scale
     if (!d.moved && Math.hypot(e.clientX - d.startX, e.clientY - d.startY) > DRAG_THRESHOLD) d.moved = true
     if (d.moved) setEmbedRect(embLayer.id, d.startEx + dx, d.startEy + dy, embed.width, embed.height)
   }
@@ -809,7 +855,7 @@ function EmbeddedMap({
     e.stopPropagation()
     const r = resizeRef.current
     if (!r) return
-    const { wx, wy } = toWorld(e.clientX, e.clientY)
+    const { wx, wy } = toParentWorld(e.clientX, e.clientY)
     const rawW = Math.abs(wx - r.anchorX)
     const rawH = Math.abs(wy - r.anchorY)
     let scale = (rawW / r.w0 + rawH / r.h0) / 2
@@ -837,18 +883,25 @@ function EmbeddedMap({
         label={embLayer.name}
         selected={false}
         draggable={interactive && tool !== 'add'}
-        scale={view.scale}
+        scale={parentView.scale}
         isMapLink
-        onClick={() => onZoomTo(embLayer)}
+        onClick={() => onZoomTo(x, y, w, h)}
         onMove={(dxWorld, dyWorld) => setEmbedRect(embLayer.id, embed.x + dxWorld, embed.y + dyWorld, embed.width, embed.height)}
       />
     )
   }
 
+  // Eigene Bildschirm-Transformation dieser Ebene (Weltkoordinaten dieser Ebene -> Bildschirm).
+  // Damit funktionieren ihre Pins und weitere, in ihr eingebettete Karten genauso wie auf
+  // der Wurzelebene - rekursiv, beliebig tief, ohne die aktive Ebene zu wechseln.
+  const childView: View = { scale: w / embLayer.width, tx: x, ty: y }
+
   const embPins = entities.filter(
     (e) => e.placement && e.placement.layerId === embLayer.id && (!tableMode || e.visibility === 'spieler'),
   )
-  const pinScale = view.scale * (embed.width / embLayer.width)
+  const nestedEmbeds = layers.filter(
+    (l) => l.embed && l.embed.parentLayerId === embLayer.id && !visited.includes(l.id),
+  )
 
   function embEffectivePos(e: Entity): { x: number; y: number } {
     if (timeEnabled && e.schedule.length > 0) {
@@ -880,24 +933,46 @@ function EmbeddedMap({
       {embPins.map((e) => {
         const meta = entityDisplayMeta(e)
         const pos = embEffectivePos(e)
-        const px = x + (pos.x / embLayer.width) * w
-        const py = y + (pos.y / embLayer.height) * h
         return (
           <MapPin
             key={e.id}
-            screenX={px}
-            screenY={py}
+            screenX={pos.x * childView.scale + childView.tx}
+            screenY={pos.y * childView.scale + childView.ty}
             icon={meta.icon}
             color={meta.color}
             label={e.name}
             selected={selectedIds.includes(e.id)}
             draggable={interactive}
-            scale={pinScale}
+            scale={childView.scale}
             onClick={(ev) => onEntityClick(e.id, ev)}
             onMove={(dxSub, dySub) => onEntityMove(e.id, dxSub, dySub)}
           />
         )
       })}
+
+      {nestedEmbeds.map((nl) => (
+        <EmbeddedMap
+          key={nl.id}
+          embLayer={nl}
+          parentView={childView}
+          containerRef={containerRef}
+          layers={layers}
+          visited={[...visited, embLayer.id]}
+          tool={tool}
+          tableMode={tableMode}
+          fogEditing={fogEditing}
+          timeEnabled={timeEnabled}
+          timeOfDay={timeOfDay}
+          entities={entities}
+          selectedIds={selectedIds}
+          selectedEmbedId={selectedEmbedId}
+          onSelect={onSelect}
+          onZoomTo={onZoomTo}
+          onEntityClick={onEntityClick}
+          onEntityMove={onEntityMove}
+          setEmbedRect={setEmbedRect}
+        />
+      ))}
 
       {selected && (
         <>
