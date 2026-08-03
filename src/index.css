@@ -482,6 +482,37 @@ button {
   box-shadow: 0 0 60px rgba(0, 0, 0, 0.6);
 }
 
+.map-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  text-align: center;
+  background: var(--panel);
+  border: 3px dashed var(--border-strong);
+  color: var(--ink-faint);
+  font-family: var(--font-display);
+  font-size: 48px;
+}
+
+.map-empty__icon {
+  font-size: 64px;
+  line-height: 1;
+  opacity: 0.7;
+}
+
+.map-empty--cta {
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.map-empty--cta:hover {
+  border-color: var(--gold);
+  color: var(--ink);
+  background: var(--panel-2);
+}
+
 .map-markers {
   position: absolute;
   inset: 0;

@@ -6,6 +6,8 @@ import { dayNightOverlay, inWindow } from '../utils/time'
 import { useAsset } from '../useAsset'
 import { PlaceholderMap } from './PlaceholderMap'
 import { MapPin } from './MapPin'
+import { fileToScaledDataUrl } from '../utils/image'
+import { deleteAsset, putAsset } from '../utils/assets'
 
 interface View {
   scale: number
@@ -55,9 +57,22 @@ export function MapCanvas() {
   const setPlacingLayer = useStore((s) => s.setPlacingLayer)
   const embedLayer = useStore((s) => s.embedLayer)
   const setEmbedRect = useStore((s) => s.setEmbedRect)
+  const setLayerImage = useStore((s) => s.setLayerImage)
 
   const { width, height } = layer
   const mapImage = useAsset(layer.imageUrl)
+  const mapUploadRef = useRef<HTMLInputElement>(null)
+
+  async function onUploadMapImage(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    const prev = layer.imageUrl
+    const { url, width: w, height: h } = await fileToScaledDataUrl(file, { maxDim: 2400, quality: 0.85 })
+    const ref = await putAsset(url)
+    setLayerImage(layer.id, ref, w, h)
+    void deleteAsset(prev)
+  }
 
   // Auf dieser Ebene eingebettete Karten (andere Ebenen mit embed.parentLayerId === layer.id).
   const embeddedLayers = campaign.layers.filter((l) => l.embed && l.embed.parentLayerId === layer.id)
@@ -507,8 +522,26 @@ export function MapCanvas() {
               style={{ display: 'block', pointerEvents: 'none' }}
             />
           )
+        ) : tableMode ? (
+          <div className="map-empty" style={{ width, height }}>
+            <span className="map-empty__text">Keine Weltkarte vorhanden.</span>
+          </div>
         ) : (
-          <PlaceholderMap width={width} height={height} />
+          <>
+            <button
+              type="button"
+              className="map-empty map-empty--cta"
+              style={{ width, height }}
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={() => mapUploadRef.current?.click()}
+            >
+              <span>Füge eine Weltkarte ein.</span>
+              <span className="map-empty__icon" aria-hidden="true">
+                &#11014;
+              </span>
+            </button>
+            <input ref={mapUploadRef} type="file" accept="image/*" onChange={onUploadMapImage} hidden />
+          </>
         )}
 
         {/* Nebel des Krieges: deckt unentdeckte Bereiche ab (skaliert mit der Karte). */}
