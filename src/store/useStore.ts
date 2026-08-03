@@ -3,7 +3,6 @@ import { persist } from 'zustand/middleware'
 import type {
   AppData,
   Campaign,
-  Combatant,
   Creature,
   DecisionData,
   DecisionOption,
@@ -101,7 +100,7 @@ const UNDO_COALESCE_MS = 700
 export type Tool = 'select' | 'add'
 
 /** Reiter im DM-Werkzeug-Panel. */
-export type ToolTab = 'wuerfel' | 'kampf' | 'notizen' | 'zufall' | 'ki' | 'musik'
+export type ToolTab = 'wuerfel' | 'notizen' | 'ki' | 'musik'
 
 interface StoreState extends AppData {
   // UI-Zustand (nicht persistiert)
@@ -174,20 +173,6 @@ interface StoreState extends AppData {
   addSession: () => string
   updateSession: (id: string, patch: Partial<Omit<Session, 'id' | 'createdAt'>>) => void
   deleteSession: (id: string) => void
-
-  // Kampf-Tracker (nur zur Laufzeit)
-  combatants: Combatant[]
-  combatRound: number
-  combatTurn: number
-  combatPlace: string | null
-  addCombatant: (input: { name: string; initiative: number; hp: number; maxHp: number; isPC: boolean }) => void
-  updateCombatant: (id: string, patch: Partial<Omit<Combatant, 'id'>>) => void
-  removeCombatant: (id: string) => void
-  sortCombat: () => void
-  nextTurn: () => void
-  prevTurn: () => void
-  resetCombat: () => void
-  setCombatPlace: (id: string | null) => void
 
   // Kampagnen
   activeCampaign: () => Campaign
@@ -384,58 +369,6 @@ export const useStore = create<StoreState>()(
 
         deleteSession: (id) =>
           patchActive((c) => ({ ...c, sessions: c.sessions.filter((s) => s.id !== id) })),
-
-        // Kampf-Tracker
-        combatants: [],
-        combatRound: 1,
-        combatTurn: 0,
-        combatPlace: null,
-
-        addCombatant: (input) =>
-          set((s) => ({
-            combatants: [...s.combatants, { id: uid('cb-'), ...input }],
-          })),
-
-        updateCombatant: (id, patch) =>
-          set((s) => ({
-            combatants: s.combatants.map((c) => (c.id === id ? { ...c, ...patch } : c)),
-          })),
-
-        removeCombatant: (id) =>
-          set((s) => {
-            const combatants = s.combatants.filter((c) => c.id !== id)
-            const combatTurn = Math.min(s.combatTurn, Math.max(0, combatants.length - 1))
-            return { combatants, combatTurn }
-          }),
-
-        sortCombat: () =>
-          set((s) => ({
-            combatants: [...s.combatants].sort((a, b) => b.initiative - a.initiative),
-            combatTurn: 0,
-          })),
-
-        nextTurn: () =>
-          set((s) => {
-            if (s.combatants.length === 0) return s
-            const atEnd = s.combatTurn >= s.combatants.length - 1
-            return {
-              combatTurn: atEnd ? 0 : s.combatTurn + 1,
-              combatRound: atEnd ? s.combatRound + 1 : s.combatRound,
-            }
-          }),
-
-        prevTurn: () =>
-          set((s) => {
-            if (s.combatants.length === 0) return s
-            const atStart = s.combatTurn <= 0
-            return {
-              combatTurn: atStart ? s.combatants.length - 1 : s.combatTurn - 1,
-              combatRound: atStart ? Math.max(1, s.combatRound - 1) : s.combatRound,
-            }
-          }),
-
-        resetCombat: () => set({ combatants: [], combatRound: 1, combatTurn: 0, combatPlace: null }),
-        setCombatPlace: (id) => set({ combatPlace: id }),
 
         // ---------- Kampagnen ----------
         activeCampaign: () => {
@@ -1275,7 +1208,7 @@ function standardName(type: EntityType, existing: Entity[], fields?: Record<stri
   }
   const count = existing.filter((e) => e.type === type).length + 1
   const labels: Record<EntityType, string> = {
-    ort: 'Neuer Ort',
+    ort: 'Neue Umgebung',
     nsc: 'Neuer Charakter',
     fraktion: 'Neue Fraktion',
     ereignis: 'Neues Ereignis',

@@ -27,7 +27,7 @@ export interface EntityTypeMeta {
 }
 
 export const ENTITY_TYPES: EntityTypeMeta[] = [
-  { type: 'ort', label: 'Ort', plural: 'Orte', icon: '\u{1F3F0}', color: '#c9a227' },
+  { type: 'ort', label: 'Umgebung', plural: 'Umgebungen', icon: '\u{1F3F0}', color: '#c9a227' },
   { type: 'nsc', label: 'Charakter', plural: 'Charaktere', icon: '\u{1F464}', color: '#4f9d69' },
   { type: 'fraktion', label: 'Fraktion', plural: 'Fraktionen', icon: '\u{2694}', color: '#a3572b' },
   { type: 'ereignis', label: 'Ereignis', plural: 'Ereignisse', icon: '\u{1F4C5}', color: '#3b7dd8' },
@@ -188,16 +188,6 @@ export interface Campaign {
   entities: Entity[]
   sessions: Session[]
   music: MusicEntry[]
-}
-
-/** Teilnehmer im Kampf-Tracker (Phase 5, nur zur Laufzeit). */
-export interface Combatant {
-  id: string
-  name: string
-  initiative: number
-  hp: number
-  maxHp: number
-  isPC: boolean
 }
 
 export interface AppData {

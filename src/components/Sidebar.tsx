@@ -7,12 +7,14 @@ import type { ToolTab } from '../store/useStore'
 import { fileToScaledDataUrl } from '../utils/image'
 import { deleteAsset, putAsset } from '../utils/assets'
 import { MIN_EMBED_SIZE } from './MapCanvas'
+import { DiceTool } from './tools/DiceTool'
+import { SessionNotes } from './tools/SessionNotes'
+import { AiTool } from './tools/AiTool'
+import { MusicTool } from './tools/MusicTool'
 
 const TOOL_ITEMS: { tab: ToolTab; label: string; icon: string }[] = [
   { tab: 'wuerfel', label: 'Wuerfel', icon: '\u{1F3B2}' },
-  { tab: 'kampf', label: 'Kampf', icon: '\u{2694}' },
   { tab: 'notizen', label: 'Notizen', icon: '\u{1F4D3}' },
-  { tab: 'zufall', label: 'Zufall', icon: '\u{1F52E}' },
   { tab: 'ki', label: 'KI', icon: '\u{2728}' },
   { tab: 'musik', label: 'Musik', icon: '\u{1F3B5}' },
 ]
@@ -234,23 +236,6 @@ export function Sidebar() {
 
   return (
     <aside className="sidebar">
-      <section className="sidebar__section">
-        <h2 className="sidebar__heading">Werkzeuge</h2>
-        <div className="toolbar-grid">
-          {TOOL_ITEMS.map((t) => (
-            <button
-              key={t.tab}
-              className={`toolbtn${toolsOpen && toolsTab === t.tab ? ' is-active' : ''}`}
-              onClick={() => openTool(t.tab)}
-              title={t.label}
-            >
-              <span className="toolbtn__icon">{t.icon}</span>
-              <span className="toolbtn__label">{t.label}</span>
-            </button>
-          ))}
-        </div>
-      </section>
-
       {!tableMode && (
         <section className="sidebar__section" ref={addSectionRef}>
           <div className="sidebar-maps">
@@ -441,6 +426,40 @@ export function Sidebar() {
           ) : null}
         </section>
       )}
+
+      <section className="sidebar__section">
+        <h2 className="sidebar__heading">Werkzeuge</h2>
+        <div className="toolbar-grid">
+          {TOOL_ITEMS.map((t) => (
+            <button
+              key={t.tab}
+              className={`toolbtn${toolsOpen && toolsTab === t.tab ? ' is-active' : ''}`}
+              onClick={() => openTool(t.tab)}
+              title={t.label}
+            >
+              <span className="toolbtn__icon">{t.icon}</span>
+              <span className="toolbtn__label">{t.label}</span>
+            </button>
+          ))}
+        </div>
+
+        {toolsOpen && (
+          <div className="sidebar-tool">
+            <div className="sidebar-tool__head">
+              <span className="sidebar-tool__title">{TOOL_ITEMS.find((t) => t.tab === toolsTab)?.label}</span>
+              <button className="sidebar-tool__close" onClick={() => setToolsOpen(false)} title="Schliessen">
+                &times;
+              </button>
+            </div>
+            <div className="sidebar-tool__body">
+              {toolsTab === 'wuerfel' && <DiceTool />}
+              {toolsTab === 'notizen' && <SessionNotes />}
+              {toolsTab === 'ki' && <AiTool />}
+              {toolsTab === 'musik' && <MusicTool />}
+            </div>
+          </div>
+        )}
+      </section>
     </aside>
   )
 }
