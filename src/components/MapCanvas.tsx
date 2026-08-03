@@ -223,7 +223,8 @@ export function MapCanvas() {
   )
 
   // Klick auf eine eingeklappte Kartenpinnadel (auf beliebiger Verschachtelungstiefe):
-  // automatisch nah genug heranzoomen, um sie aufzudecken. sx/sy/sw/sh sind ihre aktuelle
+  // zoomt so heran, dass die Karte den sichtbaren Bereich maximal ausfuellt (nicht nur
+  // knapp die Aufdeck-Schwelle ueberschreitet). sx/sy/sw/sh sind ihre aktuelle
   // Bildschirm-Position/-Groesse (bereits rekursiv aus allen Eltern-Transformationen
   // berechnet), also unabhaengig davon, wie tief sie verschachtelt ist.
   const zoomToScreenRect = useCallback((sx: number, sy: number, sw: number, sh: number, targetScreen?: number) => {
@@ -231,7 +232,7 @@ export function MapCanvas() {
     if (!cont) return
     const cw = cont.clientWidth
     const ch = cont.clientHeight
-    const target = targetScreen ?? REVEAL_THRESHOLD * 1.4
+    const target = targetScreen ?? Math.min(cw, ch) * 0.92
     const neededFactor = target / Math.min(sw, sh)
     const cx = sx + sw / 2
     const cy = sy + sh / 2
@@ -255,11 +256,8 @@ export function MapCanvas() {
       fitToView()
       return
     }
-    const cont = containerRef.current
-    if (!cont) return
-    const target = Math.min(cont.clientWidth, cont.clientHeight) * 0.92
     const rect = computeLayerScreenRect(campaign.layers, layer.id, viewLayerId, viewRef.current)
-    if (rect) zoomToScreenRect(rect.x, rect.y, rect.w, rect.h, target)
+    if (rect) zoomToScreenRect(rect.x, rect.y, rect.w, rect.h)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewLayerId])
 
