@@ -10,7 +10,7 @@ export function Timeline() {
   const tableMode = useStore((s) => s.tableMode)
   const setTimelineOpen = useStore((s) => s.setTimelineOpen)
   const selectEntity = useStore((s) => s.selectEntity)
-  const setActiveLayer = useStore((s) => s.setActiveLayer)
+  const goToLayer = useStore((s) => s.goToLayer)
   const [filterId, setFilterId] = useState('')
 
   const all = campaign.entities
@@ -39,8 +39,8 @@ export function Timeline() {
   }
 
   function openEntity(e: Entity) {
-    if (e.placement && e.placement.layerId !== campaign.activeLayerId) {
-      setActiveLayer(e.placement.layerId)
+    if (e.placement) {
+      goToLayer(e.placement.layerId)
     }
     selectEntity(e.id)
   }

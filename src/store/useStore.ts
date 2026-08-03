@@ -134,6 +134,14 @@ interface StoreState extends AppData {
    */
   viewLayerNonce: number
   /**
+   * Zur Karte eines Objekts navigieren (Suche, Zeitleiste, Beziehungsgraph, Sitzungsnotizen).
+   * Wechselt die aktive Wurzelkarte NUR, wenn die Zielebene zu einer anderen Wurzel gehoert,
+   * und zoomt sonst (auch dann) per viewLayerId zur Zielebene, statt die aktive Ebene direkt
+   * auf eine verschachtelte Karte zu setzen - sonst waere beim Herauszoomen nur noch diese
+   * eine Karte isoliert zu sehen, statt wieder die gesamte Hierarchie.
+   */
+  goToLayer: (layerId: string) => void
+  /**
    * Zaehler als einmaliger Befehl an MapCanvas, die aktive Karte komplett einzupassen
    * (herauszuzoomen, bis sie vollstaendig sichtbar ist). Wird bei jedem Aufruf erhoeht,
    * damit ein Effekt in MapCanvas auch mehrfach hintereinander darauf reagieren kann.
@@ -478,6 +486,18 @@ export const useStore = create<StoreState>()(
         setActiveLayer: (id) => {
           patchActive((c) => ({ ...c, activeLayerId: id }))
           set({ viewLayerId: null })
+        },
+
+        goToLayer: (layerId) => {
+          const c = get().activeCampaign()
+          let root = layerId
+          let current = c.layers.find((l) => l.id === root)
+          while (current?.embed) {
+            root = current.embed.parentLayerId
+            current = c.layers.find((l) => l.id === root)
+          }
+          if (root !== c.activeLayerId) get().setActiveLayer(root)
+          set((s) => ({ viewLayerId: layerId === root ? null : layerId, viewLayerNonce: s.viewLayerNonce + 1 }))
         },
 
         /**

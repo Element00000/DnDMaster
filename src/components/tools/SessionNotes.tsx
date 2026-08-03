@@ -8,14 +8,14 @@ export function SessionNotes() {
   const updateSession = useStore((s) => s.updateSession)
   const deleteSession = useStore((s) => s.deleteSession)
   const selectEntity = useStore((s) => s.selectEntity)
-  const setActiveLayer = useStore((s) => s.setActiveLayer)
+  const goToLayer = useStore((s) => s.goToLayer)
 
   const [openId, setOpenId] = useState<string | null>(null)
   const sessions = campaign.sessions
 
   function openEntity(id: string) {
     const e = campaign.entities.find((x) => x.id === id)
-    if (e?.placement && e.placement.layerId !== campaign.activeLayerId) setActiveLayer(e.placement.layerId)
+    if (e?.placement) goToLayer(e.placement.layerId)
     selectEntity(id)
   }
 
