@@ -126,6 +126,14 @@ interface StoreState extends AppData {
   viewLayerId: string | null
   setViewLayerId: (id: string | null) => void
   /**
+   * Wird bei jedem setViewLayerId-Aufruf erhoeht, auch wenn sich die Id nicht aendert (z.B.
+   * erneuter Klick auf dieselbe eingeklappte Kartenpinnadel, nachdem man zwischenzeitlich
+   * manuell wieder herausgezoomt hat). Ohne das wuerde React den Zoom-Effekt in MapCanvas
+   * nicht erneut ausloesen, weil sich viewLayerId nicht veraendert hat - der Klick auf den
+   * Pin haette dann sichtbar keine Wirkung mehr.
+   */
+  viewLayerNonce: number
+  /**
    * Zaehler als einmaliger Befehl an MapCanvas, die aktive Karte komplett einzupassen
    * (herauszuzoomen, bis sie vollstaendig sichtbar ist). Wird bei jedem Aufruf erhoeht,
    * damit ein Effekt in MapCanvas auch mehrfach hintereinander darauf reagieren kann.
@@ -311,6 +319,7 @@ export const useStore = create<StoreState>()(
         placingEntityId: null,
         placingLayerId: null,
         viewLayerId: null,
+        viewLayerNonce: 0,
         fitToViewRequest: 0,
         undoStack: [],
         lastUndoPushAt: 0,
@@ -979,7 +988,7 @@ export const useStore = create<StoreState>()(
         setPendingEntityFields: (fields) => set({ pendingEntityFields: fields }),
         setPlacingEntity: (id) => set({ placingEntityId: id, tool: 'select' }),
         setPlacingLayer: (id) => set({ placingLayerId: id, tool: 'select' }),
-        setViewLayerId: (id) => set({ viewLayerId: id }),
+        setViewLayerId: (id) => set((s) => ({ viewLayerId: id, viewLayerNonce: s.viewLayerNonce + 1 })),
         requestFitToView: () => set((s) => ({ fitToViewRequest: s.fitToViewRequest + 1 })),
 
         undo: () =>

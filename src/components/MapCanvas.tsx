@@ -252,6 +252,7 @@ export function MapCanvas() {
   }, [])
 
   const viewLayerId = useStore((s) => s.viewLayerId)
+  const viewLayerNonce = useStore((s) => s.viewLayerNonce)
   const setViewLayerId = useStore((s) => s.setViewLayerId)
   const viewRef = useRef(view)
   viewRef.current = view
@@ -266,8 +267,11 @@ export function MapCanvas() {
     }
     const rect = computeLayerScreenRect(campaign.layers, layer.id, viewLayerId, viewRef.current)
     if (rect) zoomToScreenRect(rect.x, rect.y, rect.w, rect.h)
+    // viewLayerNonce mit in die Abhaengigkeiten, damit ein erneuter Klick auf dieselbe Karte
+    // (gleiche Id) den Zoom trotzdem erneut ausloest, auch wenn zwischenzeitlich manuell
+    // wieder herausgezoomt wurde.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewLayerId])
+  }, [viewLayerId, viewLayerNonce])
 
   // Eingebettete Karte per Ziehen auf eine andere (Vorfahren-)Karte fallen lassen: die
   // Pinnadel/Box einer eingebetteten Karte bestimmt so ihre hierarchische Einordnung. Zielt
