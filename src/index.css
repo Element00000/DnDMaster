@@ -579,6 +579,15 @@ button {
   box-shadow: 0 0 0 3px rgba(224, 193, 90, 0.7);
 }
 
+/* Pin, der eine eingebettete Karte repraesentiert: klar von normalen Objekten abgesetzt. */
+.map-pin.is-map-link .map-pin__head {
+  border: 3px solid #000;
+}
+
+.map-pin.is-map-link.is-selected .map-pin__head {
+  box-shadow: 0 0 0 3px rgba(224, 193, 90, 0.7), inset 0 0 0 1px #000;
+}
+
 /* ---------- Zoom-Steuerung ---------- */
 .zoom-controls {
   position: absolute;

@@ -838,6 +838,7 @@ function EmbeddedMap({
         selected={false}
         draggable={interactive && tool !== 'add'}
         scale={view.scale}
+        isMapLink
         onClick={() => onZoomTo(embLayer)}
         onMove={(dxWorld, dyWorld) => setEmbedRect(embLayer.id, embed.x + dxWorld, embed.y + dyWorld, embed.width, embed.height)}
       />

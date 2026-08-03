@@ -9,6 +9,8 @@ interface Props {
   selected: boolean
   draggable: boolean
   scale: number
+  /** Markiert Pins, die eine eingebettete Karte repraesentieren (visuell hervorgehoben). */
+  isMapLink?: boolean
   onClick: (e: React.PointerEvent) => void
   onMove: (dxWorld: number, dyWorld: number) => void
 }
@@ -26,6 +28,7 @@ export function MapPin({
   selected,
   draggable,
   scale,
+  isMapLink,
   onClick,
   onMove,
 }: Props) {
@@ -61,7 +64,7 @@ export function MapPin({
 
   return (
     <div
-      className={`map-pin${selected ? ' is-selected' : ''}${draggable ? ' is-draggable' : ''}`}
+      className={`map-pin${selected ? ' is-selected' : ''}${draggable ? ' is-draggable' : ''}${isMapLink ? ' is-map-link' : ''}`}
       style={{ left: screenX, top: screenY, ['--pin-color' as string]: color }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
