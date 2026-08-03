@@ -821,6 +821,49 @@ button {
   line-height: 1.5;
 }
 
+/* ---------- Kampfwerte (Feind-Charakter, Kampfmodus-Spalten) ---------- */
+.statgrid {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.statgrid--4 {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.statgrid--6 {
+  grid-template-columns: repeat(6, 1fr);
+}
+
+.statgrid--1 {
+  grid-template-columns: 1fr;
+  max-width: 33%;
+}
+
+.statfield {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.statfield span {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--ink-faint);
+  text-align: center;
+}
+
+.statfield .field__control {
+  text-align: center;
+  padding: 6px 4px;
+}
+
+.statfield--text {
+  margin-top: 6px;
+}
+
 .detail__coords {
   font-size: 12px;
   color: var(--ink-dim);
@@ -3327,6 +3370,110 @@ button {
   color: var(--ink-dim);
   line-height: 1.45;
   white-space: pre-wrap;
+}
+
+/* ---------- Kampfmodus-Tabelle (Kampfkarte, Spalten = Charaktere) ---------- */
+.battlemap__body {
+  flex: 1;
+  min-height: 0;
+  padding: 16px;
+  overflow: auto;
+}
+
+.battlemap__tablewrap {
+  overflow: auto;
+  max-width: 100%;
+}
+
+.battlemap__table {
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.battlemap__table th,
+.battlemap__table td {
+  border: 1px solid var(--border);
+  padding: 6px 8px;
+  text-align: left;
+  vertical-align: top;
+  white-space: nowrap;
+}
+
+.battlemap__table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--panel-2);
+  z-index: 1;
+}
+
+.battlemap__table tbody th {
+  position: sticky;
+  left: 0;
+  background: var(--panel-2);
+  color: var(--ink-dim);
+  font-weight: 550;
+  z-index: 1;
+}
+
+.battlemap__corner {
+  position: sticky;
+  left: 0;
+  top: 0;
+  z-index: 2;
+  background: var(--panel-2);
+}
+
+.battlemap__colhead {
+  color: var(--gold);
+  font-family: var(--font-display);
+  min-width: 120px;
+}
+
+.battlemap__table input,
+.battlemap__table textarea {
+  width: 100%;
+  min-width: 100px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 12px;
+  padding: 5px 7px;
+  white-space: normal;
+}
+
+.battlemap__table textarea {
+  min-height: 44px;
+  resize: vertical;
+}
+
+.battlemap__initrow th {
+  color: var(--gold);
+}
+
+.battlemap__init {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.battlemap__init input {
+  min-width: 50px;
+  text-align: center;
+}
+
+.battlemap__init button {
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+  padding: 4px 6px;
+}
+
+.battlemap__init button:hover {
+  border-color: var(--border-strong);
+  background: var(--elevated);
 }
 
 @media (max-width: 720px) {

@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import {
+  COMBAT_STAT_FIELDS,
   ENTITY_TYPES,
   FIELD_SCHEMA,
   FREUND_BERUFE,
@@ -642,6 +643,83 @@ function FeindFields({
           disabled={readOnly}
         />
       </label>
+
+      <CombatStatFields entity={entity} readOnly={readOnly} onFieldChange={onFieldChange} />
     </>
+  )
+}
+
+/**
+ * Kampfwerte eines Feindes (Speed/Uebungsbonus/RK/HP, Attribute, XP, Angriff/Faehigkeiten/
+ * Taktik). Erscheinen im Kampfmodus einer Kampfkarte als Spalte dieses Charakters.
+ */
+function CombatStatFields({
+  entity,
+  readOnly,
+  onFieldChange,
+}: {
+  entity: Entity
+  readOnly: boolean
+  onFieldChange: (key: string, value: string) => void
+}) {
+  const coreStats = COMBAT_STAT_FIELDS.slice(0, 4) // Speed, Uebungsbonus, RK, HP
+  const abilityScores = COMBAT_STAT_FIELDS.slice(4, 10) // STR..CHA
+  const xpField = COMBAT_STAT_FIELDS[10]
+  const textFields = COMBAT_STAT_FIELDS.slice(11) // Angriff, Bes. Faehigkeiten, Kampf-Taktik
+
+  return (
+    <div className="field">
+      <span className="field__label">Kampfwerte</span>
+      <div className="statgrid statgrid--4">
+        {coreStats.map((f) => (
+          <label key={f.key} className="statfield">
+            <span>{f.label}</span>
+            <input
+              className="field__control field__control--sm"
+              value={entity.fields[f.key] ?? ''}
+              onChange={(e) => onFieldChange(f.key, e.target.value)}
+              disabled={readOnly}
+            />
+          </label>
+        ))}
+      </div>
+      <div className="statgrid statgrid--6">
+        {abilityScores.map((f) => (
+          <label key={f.key} className="statfield">
+            <span>{f.label}</span>
+            <input
+              className="field__control field__control--sm"
+              value={entity.fields[f.key] ?? ''}
+              onChange={(e) => onFieldChange(f.key, e.target.value)}
+              disabled={readOnly}
+            />
+          </label>
+        ))}
+      </div>
+      <div className="statgrid statgrid--1">
+        <label className="statfield">
+          <span>{xpField.label}</span>
+          <input
+            className="field__control field__control--sm"
+            value={entity.fields[xpField.key] ?? ''}
+            onChange={(e) => onFieldChange(xpField.key, e.target.value)}
+            disabled={readOnly}
+          />
+        </label>
+      </div>
+
+      {textFields.map((f) => (
+        <label key={f.key} className="field statfield--text">
+          <span className="field__label">{f.label}</span>
+          <textarea
+            className="field__control field__textarea"
+            value={entity.fields[f.key] ?? ''}
+            onChange={(e) => onFieldChange(f.key, e.target.value)}
+            rows={3}
+            disabled={readOnly}
+          />
+        </label>
+      ))}
+    </div>
   )
 }

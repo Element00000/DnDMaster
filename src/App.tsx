@@ -9,6 +9,7 @@ import { StoryTree } from './components/StoryTree'
 import { ToolsPanel } from './components/tools/ToolsPanel'
 import { LayerBar } from './components/LayerBar'
 import { FightMode } from './components/FightMode'
+import { BattleMapMode } from './components/BattleMapMode'
 import { RelationGraph } from './components/RelationGraph'
 import { useStore } from './store/useStore'
 
@@ -19,6 +20,7 @@ export default function App() {
   const toolsOpen = useStore((s) => s.toolsOpen)
   const tableMode = useStore((s) => s.tableMode)
   const fightEventId = useStore((s) => s.fightEventId)
+  const battleModeLayerId = useStore((s) => s.battleModeLayerId)
   const undo = useStore((s) => s.undo)
 
   // Strg+Z (bzw. Cmd+Z): letzte Aenderung rueckgaengig machen. Wird in Text-
@@ -55,6 +57,7 @@ export default function App() {
         {!tableMode && <DetailPanel />}
       </div>
       {fightEventId && <FightMode />}
+      {battleModeLayerId && <BattleMapMode />}
     </div>
   )
 }

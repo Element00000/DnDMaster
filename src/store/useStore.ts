@@ -33,6 +33,7 @@ function makeLayer(name = 'Weltkarte'): MapLayer {
     fogEnabled: false,
     reveals: [],
     embed: null,
+    isBattleMap: false,
   }
 }
 
@@ -222,6 +223,11 @@ interface StoreState extends AppData {
   setLayerFog: (id: string, enabled: boolean) => void
   addReveal: (layerId: string, x: number, y: number, r: number) => void
   clearReveals: (layerId: string) => void
+  /** Ebene als Kampfkarte markieren/entmarkieren. */
+  setLayerBattleMap: (id: string, enabled: boolean) => void
+  /** Kampfmodus fuer eine Kampfkarte geoeffnet? Ebenen-ID oder null (nicht persistiert). */
+  battleModeLayerId: string | null
+  setBattleMode: (id: string | null) => void
 
   // Entitaeten (der aktiven Kampagne)
   addEntity: (input: { type: EntityType; placement?: Placement; name?: string; fields?: Record<string, string> }) => string
@@ -319,6 +325,7 @@ export const useStore = create<StoreState>()(
         placingEntityId: null,
         placingLayerId: null,
         viewLayerId: null,
+        battleModeLayerId: null,
         undoStack: [],
         lastUndoPushAt: 0,
         timeEnabled: false,
@@ -623,6 +630,12 @@ export const useStore = create<StoreState>()(
           patchActive((c) => ({
             ...c,
             layers: c.layers.map((l) => (l.id === id ? { ...l, fogEnabled: enabled } : l)),
+          })),
+
+        setLayerBattleMap: (id, enabled) =>
+          patchActive((c) => ({
+            ...c,
+            layers: c.layers.map((l) => (l.id === id ? { ...l, isBattleMap: enabled } : l)),
           })),
 
         addReveal: (layerId, x, y, r) =>
@@ -1031,6 +1044,7 @@ export const useStore = create<StoreState>()(
 
         fightEventId: null,
         setFightEvent: (id) => set({ fightEventId: id }),
+        setBattleMode: (id) => set({ battleModeLayerId: id }),
 
         // ---------- UI ----------
         setTool: (t) => set({ tool: t }),
@@ -1056,7 +1070,7 @@ export const useStore = create<StoreState>()(
     },
     {
       name: 'dnd-weltkarte',
-      version: 9,
+      version: 10,
       // Nur Daten persistieren, keinen fluechtigen UI-Zustand.
       partialize: (s): AppData => ({
         campaigns: s.campaigns,
@@ -1140,6 +1154,7 @@ function normalizeCampaign(c: Campaign): Campaign {
   const layers = (c.layers && c.layers.length > 0 ? c.layers : [makeLayer()]).map((l) => ({
     ...l,
     fogEnabled: l.fogEnabled ?? false,
+    isBattleMap: l.isBattleMap ?? false,
     reveals: l.reveals ?? [],
     // Eingebettete Karte nur behalten, wenn die referenzierte Eltern-Ebene noch existiert.
     embed: l.embed && validIds.has(l.embed.parentLayerId) ? l.embed : null,

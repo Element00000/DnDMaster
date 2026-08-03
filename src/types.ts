@@ -157,6 +157,8 @@ export interface MapLayer {
   reveals: RevealCircle[]
   /** Falls gesetzt: diese Ebene ist auf einer anderen Ebene eingebettet und dort erst ab genug Zoom sichtbar. */
   embed: EmbeddedPlacement | null
+  /** Als Kampfkarte markiert: der Kampfmodus listet alle auf ihr platzierten Feinde als Tabelle. */
+  isBattleMap: boolean
 }
 
 /** Sitzungsprotokoll-Eintrag (Phase 5). */
@@ -220,6 +222,34 @@ export const GESINNUNG_OPTIONS: { value: string; label: string }[] = [
   { value: 'freund', label: 'Freund' },
   { value: 'feind', label: 'Feind' },
   { value: 'neutral', label: 'Neutral / unklar' },
+]
+
+/**
+ * Kampfwerte eines Feindes (nsc, Gesinnung 'feind'), gespeichert als frei benannte
+ * Schluessel in Entity.fields (wie alle anderen Objekt-Felder). Initiative gehoert bewusst
+ * NICHT dazu: die wird pro Kampf im Kampfmodus gewuerfelt, nicht am Charakter hinterlegt.
+ */
+export interface CombatStatDef {
+  key: string
+  label: string
+  kind?: 'text' | 'textarea'
+}
+
+export const COMBAT_STAT_FIELDS: CombatStatDef[] = [
+  { key: 'speed', label: 'Speed' },
+  { key: 'proficiency', label: 'Übungsbonus' },
+  { key: 'ac', label: 'RK (AC)' },
+  { key: 'hp', label: 'HP' },
+  { key: 'str', label: 'STR' },
+  { key: 'dex', label: 'DEX' },
+  { key: 'con', label: 'CON' },
+  { key: 'int', label: 'INT' },
+  { key: 'wis', label: 'WIS' },
+  { key: 'cha', label: 'CHA' },
+  { key: 'xp', label: 'XP' },
+  { key: 'angriff', label: 'Angriff', kind: 'textarea' },
+  { key: 'besondereFaehigkeiten', label: 'Besondere Fähigkeiten', kind: 'textarea' },
+  { key: 'kampfTaktik', label: 'Kampf-Taktik', kind: 'textarea' },
 ]
 
 /** Art eines Gegenstands (Auswahl beim Anlegen und im Objekt-Feld "Art"). */
