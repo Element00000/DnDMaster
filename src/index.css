@@ -581,7 +581,7 @@ button {
 
 /* Pin, der eine eingebettete Karte repraesentiert: klar von normalen Objekten abgesetzt. */
 .map-pin.is-map-link .map-pin__head {
-  border: 3px solid #fffff0;
+  border: 2px solid #fffff0;
 }
 
 .map-pin.is-map-link.is-selected .map-pin__head {
