@@ -9,7 +9,7 @@ import {
   entityMeta,
   relationMeta,
 } from '../types'
-import type { Campaign, Entity, EntityType, RelationType, Visibility } from '../types'
+import type { Campaign, Entity, EntityType, RelationType } from '../types'
 import { useStore } from '../store/useStore'
 import { formatTime, parseTime } from '../utils/time'
 import { fileToScaledDataUrl } from '../utils/image'
@@ -285,18 +285,6 @@ export function DetailPanel() {
         {!readOnly && (
           <>
             <TimeFields entity={marker} onUpdate={(patch) => updateEntity(marker.id, patch)} />
-
-            <label className="field">
-              <span className="field__label">Sichtbarkeit</span>
-              <select
-                className="field__control"
-                value={marker.visibility}
-                onChange={(e) => updateEntity(marker.id, { visibility: e.target.value as Visibility })}
-              >
-                <option value="dm">Nur DM</option>
-                <option value="spieler">Fuer Spieler entdeckt</option>
-              </select>
-            </label>
 
             <div className="field field--row">
               <span className="field__label">Auf Karte</span>
