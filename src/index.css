@@ -90,9 +90,25 @@ button {
 }
 
 .topbar__mark {
-  color: var(--gold);
-  font-size: 20px;
-  filter: drop-shadow(0 0 10px rgba(227, 179, 65, 0.35));
+  display: flex;
+  align-items: center;
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  transition: transform 0.12s;
+}
+
+.topbar__mark:hover {
+  transform: scale(1.05);
+}
+
+.topbar__logo {
+  height: 30px;
+  width: auto;
+  display: block;
+  /* Bild ist bereits weiss mit transparentem Hintergrund (siehe assets/dnd-master-logo.png). */
+  filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.25));
 }
 
 .topbar__title {

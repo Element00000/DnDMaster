@@ -125,6 +125,13 @@ interface StoreState extends AppData {
    */
   viewLayerId: string | null
   setViewLayerId: (id: string | null) => void
+  /**
+   * Zaehler als einmaliger Befehl an MapCanvas, die aktive Karte komplett einzupassen
+   * (herauszuzoomen, bis sie vollstaendig sichtbar ist). Wird bei jedem Aufruf erhoeht,
+   * damit ein Effekt in MapCanvas auch mehrfach hintereinander darauf reagieren kann.
+   */
+  fitToViewRequest: number
+  requestFitToView: () => void
   /** Rueckgaengig-Verlauf der aktiven Kampagne (nicht persistiert). */
   undoStack: Campaign[]
   /** Zeitpunkt des letzten Undo-Snapshots, zum Zusammenfassen schneller Aenderungen. */
@@ -304,6 +311,7 @@ export const useStore = create<StoreState>()(
         placingEntityId: null,
         placingLayerId: null,
         viewLayerId: null,
+        fitToViewRequest: 0,
         undoStack: [],
         lastUndoPushAt: 0,
         timeEnabled: false,
@@ -972,6 +980,7 @@ export const useStore = create<StoreState>()(
         setPlacingEntity: (id) => set({ placingEntityId: id, tool: 'select' }),
         setPlacingLayer: (id) => set({ placingLayerId: id, tool: 'select' }),
         setViewLayerId: (id) => set({ viewLayerId: id }),
+        requestFitToView: () => set((s) => ({ fitToViewRequest: s.fitToViewRequest + 1 })),
 
         undo: () =>
           set((s) => {

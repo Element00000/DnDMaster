@@ -63,6 +63,7 @@ export function MapCanvas() {
   const embedLayer = useStore((s) => s.embedLayer)
   const setEmbedRect = useStore((s) => s.setEmbedRect)
   const setLayerImage = useStore((s) => s.setLayerImage)
+  const fitToViewRequest = useStore((s) => s.fitToViewRequest)
 
   const { width, height } = layer
   const mapImage = useAsset(layer.imageUrl)
@@ -135,6 +136,12 @@ export function MapCanvas() {
     setSelectedEmbedId(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [campaign.id, layer.id])
+
+  // Einmaliger Befehl von aussen (Logo-Klick in der TopBar), die Karte komplett einzupassen.
+  useEffect(() => {
+    if (fitToViewRequest > 0) fitToView()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fitToViewRequest])
 
   // Kartenauswahl (Eck-Ziehpunkte zum Skalieren) automatisch aufheben, sobald
   // ein anderes Werkzeug/Modus aktiv wird.

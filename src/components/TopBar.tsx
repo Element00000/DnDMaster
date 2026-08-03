@@ -5,6 +5,7 @@ import { downloadJson, readJsonFile, slugify, todayStamp } from '../utils/backup
 import { backupHint, markBackup } from '../utils/backupReminder'
 import { inlineAsset, internAsset, mapCampaignAssets } from '../utils/assets'
 import type { AppData, Campaign } from '../types'
+import logo from '../assets/dnd-master-logo.png'
 
 const BACKUP_APP = 'dnd-weltkarte'
 const BACKUP_VERSION = 6
@@ -32,6 +33,7 @@ export function TopBar() {
   const setRelationGraphOpen = useStore((s) => s.setRelationGraphOpen)
   const tableMode = useStore((s) => s.tableMode)
   const setTableMode = useStore((s) => s.setTableMode)
+  const requestFitToView = useStore((s) => s.requestFitToView)
 
   const [manageOpen, setManageOpen] = useState(false)
   const entityCount = activeCampaign.entities.length
@@ -123,7 +125,9 @@ export function TopBar() {
     return (
       <header className="topbar topbar--table">
         <div className="topbar__brand">
-          <span className="topbar__mark">&#9670;</span>
+          <button className="topbar__mark" onClick={requestFitToView} title="Ganze Weltkarte anzeigen">
+            <img className="topbar__logo" src={logo} alt="DnD Master" />
+          </button>
           <div>
             <div className="topbar__title">{activeCampaign.name}</div>
             <div className="topbar__subtitle">{layer.name} · Spieltisch</div>
@@ -139,7 +143,9 @@ export function TopBar() {
   return (
     <header className="topbar">
       <div className="topbar__brand">
-        <span className="topbar__mark">&#9670;</span>
+        <button className="topbar__mark" onClick={requestFitToView} title="Ganze Weltkarte anzeigen">
+          <img className="topbar__logo" src={logo} alt="DnD Master" />
+        </button>
         <div>
           <div className="topbar__title">DM Weltkarte</div>
           <div className="topbar__subtitle">{layer.name}</div>
