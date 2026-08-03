@@ -193,7 +193,12 @@ export function Sidebar() {
                 setMapsMenu({ top: r.bottom + 6, left: r.left })
               }}
             >
-              Meine Karten
+              <span className="sidebar-maps__label">
+                <span className="sidebar-maps__icon" aria-hidden="true">
+                  🗺
+                </span>
+                Meine Karten
+              </span>
               <span className="sidebar-maps__arrow" aria-hidden="true">
                 &#9662;
               </span>

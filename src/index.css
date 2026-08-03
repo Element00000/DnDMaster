@@ -250,8 +250,20 @@ button {
   margin-top: 0;
 }
 
+.sidebar-maps__label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sidebar-maps__icon {
+  font-size: 15px;
+  line-height: 1;
+}
+
 .sidebar-maps__arrow {
-  font-size: 10px;
+  font-size: 16px;
+  line-height: 1;
   color: var(--ink-dim);
   transition: transform 0.15s;
 }
