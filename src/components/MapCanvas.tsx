@@ -686,8 +686,10 @@ export function MapCanvas() {
 }
 
 function ZoomControls({ scale, onZoom, onFit }: { scale: number; onZoom: (dir: number) => void; onFit: () => void }) {
+  // stopPropagation: sonst faengt das darunterliegende Karten-Pointerdown (Verschieben/
+  // Rechteck-Markierung) den Klick ab, bevor er die Buttons erreicht.
   return (
-    <div className="zoom-controls">
+    <div className="zoom-controls" onPointerDown={(e) => e.stopPropagation()}>
       <button title="Hineinzoomen" onClick={() => onZoom(1)}>+</button>
       <span className="zoom-level">{Math.round(scale * 100)}%</span>
       <button title="Herauszoomen" onClick={() => onZoom(-1)}>&minus;</button>
