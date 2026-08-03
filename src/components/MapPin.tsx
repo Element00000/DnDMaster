@@ -13,6 +13,8 @@ interface Props {
   isMapLink?: boolean
   onClick: (e: React.PointerEvent) => void
   onMove: (dxWorld: number, dyWorld: number) => void
+  /** Nach einem Ziehen (nicht bei einem reinen Klick): Bildschirmkoordinaten des Loslassens. */
+  onDragEnd?: (clientX: number, clientY: number) => void
 }
 
 /**
@@ -31,6 +33,7 @@ export function MapPin({
   isMapLink,
   onClick,
   onMove,
+  onDragEnd,
 }: Props) {
   const state = useRef<{ lastX: number; lastY: number; moved: boolean } | null>(null)
 
@@ -62,6 +65,7 @@ export function MapPin({
       ;(e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId)
     }
     if (!s || !s.moved) onClick(e)
+    else onDragEnd?.(e.clientX, e.clientY)
   }
 
   // Bei verlorener Zeigererfassung (z.B. wenn der Pin waehrend des Ziehens durch eine

@@ -263,6 +263,39 @@ export function MapCanvas() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewLayerId])
 
+  // Eingebettete Karte per Ziehen auf eine andere (Vorfahren-)Karte fallen lassen: die
+  // Pinnadel/Box einer eingebetteten Karte bestimmt so ihre hierarchische Einordnung. Zielt
+  // der Ablegepunkt (Bildschirmkoordinaten) auf eine andere, aktuell aufgedeckte Karte als die
+  // bisherige Eltern-Karte, wird die Karte dorthin umgehaengt - Position/Groesse werden so
+  // umgerechnet, dass sie an derselben Bildschirmstelle in gleicher Groesse erscheint.
+  const onReparentEmbed = useCallback(
+    (draggedId: string, clientX: number, clientY: number) => {
+      const el = containerRef.current
+      if (!el) return
+      const dragged = campaign.layers.find((l) => l.id === draggedId)
+      if (!dragged?.embed) return
+      const rect = el.getBoundingClientRect()
+      const v = viewRef.current
+      const wx = (clientX - rect.left - v.tx) / v.scale
+      const wy = (clientY - rect.top - v.ty) / v.scale
+      const exclude = collectWithDescendants(campaign.layers, draggedId)
+      const result = resolveDeepTarget(campaign.layers, layer.id, wx, wy, v.scale, exclude)
+      if (result.layerId === dragged.embed.parentLayerId) return
+      const newParent = campaign.layers.find((l) => l.id === result.layerId)
+      if (!newParent) return
+      const oldEffScale = computeLayerEffScale(campaign.layers, layer.id, dragged.embed.parentLayerId, v.scale)
+      if (oldEffScale == null) return
+      const screenW = dragged.embed.width * oldEffScale
+      const screenH = dragged.embed.height * oldEffScale
+      const newWidth = Math.max(MIN_EMBED_SIZE, screenW / result.effScale)
+      const newHeight = Math.max(MIN_EMBED_SIZE, screenH / result.effScale)
+      const newX = clamp(result.x - newWidth / 2, 0, Math.max(0, newParent.width - newWidth))
+      const newY = clamp(result.y - newHeight / 2, 0, Math.max(0, newParent.height - newHeight))
+      embedLayer(draggedId, { parentLayerId: result.layerId, x: newX, y: newY, width: newWidth, height: newHeight })
+    },
+    [campaign.layers, layer.id, embedLayer],
+  )
+
   const onPointerDown = useCallback(
     (e: React.PointerEvent) => {
       const el = containerRef.current
@@ -680,6 +713,7 @@ export function MapCanvas() {
             selectEntity(null)
           }}
           onZoomTo={zoomToScreenRect}
+          onReparent={onReparentEmbed}
           onEntityClick={(id, ev) => {
             setMapSelected(false)
             setSelectedEmbedId(null)
@@ -818,10 +852,37 @@ function computeLayerScreenRect(
 }
 
 /**
+ * Bildschirm-Massstab (Pixel pro Welteinheit) einer (beliebig tief verschachtelten) Karte
+ * innerhalb der Wurzelkarte, rein aus den Hierarchie-Daten berechnet. null, wenn
+ * targetLayerId keine (verschachtelte) Unterkarte von rootLayerId ist.
+ */
+function computeLayerEffScale(
+  layers: MapLayer[],
+  rootLayerId: string,
+  targetLayerId: string,
+  rootScale: number,
+): number | null {
+  if (targetLayerId === rootLayerId) return rootScale
+  const chain: MapLayer[] = []
+  let current = layers.find((l) => l.id === targetLayerId)
+  while (current && current.id !== rootLayerId) {
+    if (!current.embed) return null
+    chain.unshift(current)
+    current = layers.find((l) => l.id === current!.embed!.parentLayerId)
+  }
+  if (!current) return null
+  let scale = rootScale
+  for (const l of chain) scale *= l.embed!.width / l.width
+  return scale
+}
+
+/**
  * Findet die am tiefsten verschachtelte, aktuell aufgedeckte eingebettete Karte an einem
  * Weltpunkt (rekursiv durch beliebig viele Ebenen). effScale ist der Bildschirm-Massstab
  * der Startebene (Pixel pro Welteinheit dieser Ebene, i.d.R. view.scale der Wurzelebene).
- * Liefert die Zielebene sowie den Punkt in deren eigenen Weltkoordinaten.
+ * Liefert die Zielebene, den Punkt in deren eigenen Weltkoordinaten sowie effScale der
+ * Zielebene. exclude ueberspringt bestimmte Ebenen (z.B. beim Verschieben einer Einbettung
+ * per Drag&Drop: sich selbst und die eigenen Unterkarten, sonst waeren Zyklen moeglich).
  */
 function resolveDeepTarget(
   layers: MapLayer[],
@@ -829,8 +890,10 @@ function resolveDeepTarget(
   wx: number,
   wy: number,
   effScale: number,
-): { layerId: string; x: number; y: number } {
+  exclude?: Set<string>,
+): { layerId: string; x: number; y: number; effScale: number } {
   for (const child of layers) {
+    if (exclude?.has(child.id)) continue
     const embed = child.embed
     if (!embed || embed.parentLayerId !== parentLayerId) continue
     if (wx < embed.x || wx > embed.x + embed.width || wy < embed.y || wy > embed.y + embed.height) continue
@@ -838,9 +901,25 @@ function resolveDeepTarget(
     const subX = ((wx - embed.x) / embed.width) * child.width
     const subY = ((wy - embed.y) / embed.height) * child.height
     const childEffScale = effScale * (embed.width / child.width)
-    return resolveDeepTarget(layers, child.id, subX, subY, childEffScale)
+    return resolveDeepTarget(layers, child.id, subX, subY, childEffScale, exclude)
   }
-  return { layerId: parentLayerId, x: wx, y: wy }
+  return { layerId: parentLayerId, x: wx, y: wy, effScale }
+}
+
+/** id sowie alle (beliebig tief) verschachtelten Unterkarten von id. */
+function collectWithDescendants(layers: MapLayer[], id: string): Set<string> {
+  const set = new Set([id])
+  let changed = true
+  while (changed) {
+    changed = false
+    for (const l of layers) {
+      if (!set.has(l.id) && l.embed && set.has(l.embed.parentLayerId)) {
+        set.add(l.id)
+        changed = true
+      }
+    }
+  }
+  return set
 }
 
 type EmbedResizeHandle = 'nw' | 'ne' | 'sw' | 'se'
@@ -866,6 +945,7 @@ function EmbeddedMap({
   selectedEmbedId,
   onSelect,
   onZoomTo,
+  onReparent,
   onEntityClick,
   onEntityMove,
   setEmbedRect,
@@ -887,6 +967,8 @@ function EmbeddedMap({
   selectedEmbedId: string | null
   onSelect: (id: string) => void
   onZoomTo: (sx: number, sy: number, sw: number, sh: number) => void
+  /** Nach dem Ziehen: prueft, ob die Karte auf eine andere (Vorfahren-)Karte umgehaengt werden soll. */
+  onReparent: (draggedId: string, clientX: number, clientY: number) => void
   onEntityClick: (id: string, ev: { ctrlKey: boolean; metaKey: boolean; shiftKey: boolean }) => void
   onEntityMove: (id: string, dxSub: number, dySub: number) => void
   setEmbedRect: (id: string, x: number, y: number, width: number, height: number) => void
@@ -944,6 +1026,7 @@ function EmbeddedMap({
       ;(e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId)
     }
     if (!d.moved) onSelect(embLayer.id)
+    else onReparent(embLayer.id, e.clientX, e.clientY)
   }
 
   const resizeRef = useRef<{
@@ -1018,6 +1101,7 @@ function EmbeddedMap({
         isMapLink
         onClick={() => onZoomTo(x, y, w, h)}
         onMove={(dxWorld, dyWorld) => setEmbedRect(embLayer.id, embed.x + dxWorld, embed.y + dyWorld, embed.width, embed.height)}
+        onDragEnd={(clientX, clientY) => onReparent(embLayer.id, clientX, clientY)}
       />
     )
   }
@@ -1101,6 +1185,7 @@ function EmbeddedMap({
           selectedEmbedId={selectedEmbedId}
           onSelect={onSelect}
           onZoomTo={onZoomTo}
+          onReparent={onReparent}
           onEntityClick={onEntityClick}
           onEntityMove={onEntityMove}
           setEmbedRect={setEmbedRect}
