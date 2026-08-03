@@ -536,9 +536,20 @@ export function MapCanvas() {
               onClick={() => mapUploadRef.current?.click()}
             >
               <span>Füge eine Weltkarte ein.</span>
-              <span className="map-empty__icon" aria-hidden="true">
-                &#11014;
-              </span>
+              <svg
+                className="map-empty__icon"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <line x1="12" y1="3" x2="12" y2="15" />
+                <polyline points="6 9 12 3 18 9" />
+                <line x1="5" y1="20" x2="19" y2="20" />
+              </svg>
             </button>
             <input ref={mapUploadRef} type="file" accept="image/*" onChange={onUploadMapImage} hidden />
           </>
