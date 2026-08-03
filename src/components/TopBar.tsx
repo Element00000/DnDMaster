@@ -75,6 +75,31 @@ export function TopBar() {
     }
   }
 
+  // Kartenhierarchie: Wurzel = nicht eingebettete Karten (Hauptkarte-Ebene), darunter
+  // rekursiv jede Karte, die auf einer anderen Karte eingebettet ist. So bildet die Liste
+  // ab, auf welcher Karten-Ebene sich eine Karte befindet.
+  function mapLayerRows(): { layer: MapLayer; depth: number }[] {
+    const byParent = new Map<string | null, MapLayer[]>()
+    activeCampaign.layers.forEach((l) => {
+      const parentId = l.embed?.parentLayerId ?? null
+      const siblings = byParent.get(parentId) ?? []
+      siblings.push(l)
+      byParent.set(parentId, siblings)
+    })
+    const rows: { layer: MapLayer; depth: number }[] = []
+    const seen = new Set<string>()
+    function visit(parentId: string | null, depth: number) {
+      for (const l of byParent.get(parentId) ?? []) {
+        if (seen.has(l.id)) continue
+        seen.add(l.id)
+        rows.push({ layer: l, depth })
+        visit(l.id, depth + 1)
+      }
+    }
+    visit(null, 0)
+    return rows
+  }
+
   function onNewCampaign() {
     const name = prompt('Name der neuen Kampagne / Welt:')
     if (name && name.trim()) addCampaign(name.trim())
@@ -234,14 +259,14 @@ export function TopBar() {
         </button>
         {mapsMenuOpen && (
           <div className="campaign-menu maps-menu" onMouseLeave={() => setMapsMenuOpen(false)}>
-            {activeCampaign.layers.map((l) => (
-              <div key={l.id} className="maps-menu__row">
+            {mapLayerRows().map(({ layer: l, depth }) => (
+              <div key={l.id} className="maps-menu__row" style={{ paddingLeft: 8 + depth * 18 }}>
                 <button
                   className={`maps-menu__name${l.id === layer.id ? ' is-active' : ''}`}
                   onClick={() => setActiveLayer(l.id)}
-                  title="Als aktive Karte anzeigen"
+                  title={depth === 0 ? 'Hauptkarten-Ebene' : `Eingebettet, Ebene ${depth + 1}`}
                 >
-                  {l.embed ? '↳ ' : ''}
+                  {depth > 0 ? '↳ ' : ''}
                   {l.name}
                 </button>
                 <button className="icon-btn icon-btn--sm" title="Umbenennen" onClick={() => onRenameLayer(l)}>
