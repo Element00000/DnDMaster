@@ -896,6 +896,17 @@ button {
   gap: 4px;
   padding: 6px 8px;
   border-bottom: 1px solid var(--border);
+  cursor: grab;
+  transition: background 0.12s, box-shadow 0.12s;
+}
+
+.maps-menu__row--dragging {
+  opacity: 0.4;
+}
+
+.maps-menu__row--drop-target {
+  background: var(--accent-tint);
+  box-shadow: inset 0 0 0 1px var(--accent);
 }
 
 .maps-menu__name {

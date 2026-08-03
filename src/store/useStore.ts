@@ -159,7 +159,7 @@ interface StoreState extends AppData {
   setLayerImage: (id: string, imageUrl: string, width: number, height: number) => void
   resetLayerImage: (id: string) => void
   resizeLayer: (id: string, width: number, height: number) => void
-  addLayer: (name: string) => void
+  addLayer: (name: string) => string
   renameLayer: (id: string, name: string) => void
   deleteLayer: (id: string) => void
   /** Ebene als eingebettete Karte auf einer anderen Ebene platzieren. */
@@ -508,6 +508,7 @@ export const useStore = create<StoreState>()(
           const layer = makeLayer(name.trim() || 'Neue Ebene')
           patchActive((c) => ({ ...c, layers: [...c.layers, layer], activeLayerId: layer.id }))
           set({ selectedEntityId: null, selectedIds: [] })
+          return layer.id
         },
 
         renameLayer: (id, name) =>

@@ -18,7 +18,7 @@ const MAX_SCALE = 30
 const DRAG_THRESHOLD = 4
 /** Ab dieser Bildschirmgroesse (kuerzere Seite, px) wird eine eingebettete Karte aufgedeckt. */
 const REVEAL_THRESHOLD = 160
-const MIN_EMBED_SIZE = 100
+export const MIN_EMBED_SIZE = 100
 
 export function MapCanvas() {
   const containerRef = useRef<HTMLDivElement>(null)

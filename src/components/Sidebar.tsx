@@ -6,6 +6,7 @@ import { useStore } from '../store/useStore'
 import type { ToolTab } from '../store/useStore'
 import { fileToScaledDataUrl } from '../utils/image'
 import { deleteAsset, putAsset } from '../utils/assets'
+import { MIN_EMBED_SIZE } from './MapCanvas'
 
 const TOOL_ITEMS: { tab: ToolTab; label: string; icon: string }[] = [
   { tab: 'wuerfel', label: 'Wuerfel', icon: '\u{1F3B2}' },
@@ -46,11 +47,15 @@ export function Sidebar() {
   const setActiveLayer = useStore((s) => s.setActiveLayer)
   const placingLayerId = useStore((s) => s.placingLayerId)
   const setPlacingLayer = useStore((s) => s.setPlacingLayer)
+  const embedLayer = useStore((s) => s.embedLayer)
 
   const [popup, setPopup] = useState<{ type: EntityType; top: number; left: number } | null>(null)
   const [mapsMenu, setMapsMenu] = useState<{ top: number; left: number } | null>(null)
+  const [draggingLayerId, setDraggingLayerId] = useState<string | null>(null)
+  const [dropTargetId, setDropTargetId] = useState<string | null>(null)
   const addSectionRef = useRef<HTMLElement>(null)
   const mapFileRef = useRef<HTMLInputElement>(null)
+  const newLayerFileRef = useRef<HTMLInputElement>(null)
 
   // "Objekt anlegen"-Menue (Ohne Karte anlegen/Abbrechen) automatisch schliessen, sobald
   // woanders hingeklickt wird - auf ein anderes Objekt (Liste oder Pin) oder allgemein
@@ -84,9 +89,19 @@ export function Sidebar() {
     void deleteAsset(prev)
   }
 
-  function onAddLayer() {
-    const name = prompt('Name der neuen Karte (z.B. Regionalkarte, Stadtplan):')
-    if (name && name.trim()) addLayer(name.trim())
+  // "+ Neue Karte": oeffnet direkt den Datei-Dialog. Der Dateiname (ohne Endung) wird als
+  // Kartenname uebernommen - ueber das Bearbeiten-Symbol spaeter jederzeit anpassbar. Die
+  // neue Karte ist zunaechst nicht eingebettet (ausserhalb der Hierarchie) und laesst sich
+  // per Drag & Drop auf eine bestehende Karte ziehen, um sie dort einzuordnen.
+  async function onNewLayerFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    const name = file.name.replace(/\.[^./\\]+$/, '').trim() || 'Neue Karte'
+    const id = addLayer(name)
+    const { url, width, height } = await fileToScaledDataUrl(file, { maxDim: 2400, quality: 0.85 })
+    const ref = await putAsset(url)
+    setLayerImage(id, ref, width, height)
   }
 
   function onRenameLayer(l: MapLayer) {
@@ -127,6 +142,28 @@ export function Sidebar() {
     }
     visit(null, 0)
     return rows
+  }
+
+  // Darf draggedId per Drag & Drop auf targetId eingebettet werden? Nicht auf sich selbst
+  // und nicht auf eine eigene (verschachtelte) Unterkarte, sonst entstuende ein Zyklus.
+  function canEmbedOnto(draggedId: string, targetId: string): boolean {
+    if (draggedId === targetId) return false
+    let current = campaign.layers.find((l) => l.id === targetId)
+    while (current?.embed) {
+      if (current.embed.parentLayerId === draggedId) return false
+      current = campaign.layers.find((l) => l.id === current!.embed!.parentLayerId)
+    }
+    return true
+  }
+
+  function onLayerDrop(draggedId: string, target: MapLayer) {
+    const moving = campaign.layers.find((l) => l.id === draggedId)
+    if (!moving || !canEmbedOnto(draggedId, target.id)) return
+    const w = Math.max(MIN_EMBED_SIZE, target.width * 0.25)
+    const h = Math.max(MIN_EMBED_SIZE, w * (moving.height / moving.width))
+    const x = Math.max(0, Math.min(target.width - w, (target.width - w) / 2))
+    const y = Math.max(0, Math.min(target.height - h, (target.height - h) / 2))
+    embedLayer(draggedId, { parentLayerId: target.id, x, y, width: w, height: h })
   }
 
   function openTool(tab: ToolTab) {
@@ -211,7 +248,36 @@ export function Sidebar() {
                   onMouseLeave={() => setMapsMenu(null)}
                 >
                 {mapLayerRows().map(({ layer: l, depth }) => (
-                  <div key={l.id} className="maps-menu__row" style={{ paddingLeft: 8 + depth * 18 }}>
+                  <div
+                    key={l.id}
+                    className={`maps-menu__row${dropTargetId === l.id ? ' maps-menu__row--drop-target' : ''}${draggingLayerId === l.id ? ' maps-menu__row--dragging' : ''}`}
+                    style={{ paddingLeft: 8 + depth * 18 }}
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData('text/plain', l.id)
+                      e.dataTransfer.effectAllowed = 'move'
+                      setDraggingLayerId(l.id)
+                    }}
+                    onDragEnd={() => {
+                      setDraggingLayerId(null)
+                      setDropTargetId(null)
+                    }}
+                    onDragOver={(e) => {
+                      if (!draggingLayerId || !canEmbedOnto(draggingLayerId, l.id)) return
+                      e.preventDefault()
+                      e.dataTransfer.dropEffect = 'move'
+                      setDropTargetId(l.id)
+                    }}
+                    onDragLeave={() => setDropTargetId((cur) => (cur === l.id ? null : cur))}
+                    onDrop={(e) => {
+                      e.preventDefault()
+                      const draggedId = e.dataTransfer.getData('text/plain')
+                      setDropTargetId(null)
+                      setDraggingLayerId(null)
+                      if (draggedId) onLayerDrop(draggedId, l)
+                    }}
+                    title="Ziehen, um diese Karte auf eine andere Karte einzubetten"
+                  >
                     <button
                       className={`maps-menu__name${l.id === layer.id ? ' is-active' : ''}`}
                       onClick={() => setActiveLayer(l.id)}
@@ -243,12 +309,13 @@ export function Sidebar() {
                   </div>
                 ))}
                   <div className="campaign-menu__sep" />
-                  <button onClick={onAddLayer}>+ Neue Karte</button>
+                  <button onClick={() => newLayerFileRef.current?.click()}>+ Neue Karte</button>
                   <button onClick={() => mapFileRef.current?.click()}>Bild fuer „{layer.name}“ hochladen</button>
                 </div>,
                 document.body,
               )}
             <input ref={mapFileRef} type="file" accept="image/*" onChange={onMapFile} hidden />
+            <input ref={newLayerFileRef} type="file" accept="image/*" onChange={onNewLayerFile} hidden />
           </div>
 
           <h2 className="sidebar__heading">Objekt anlegen</h2>
