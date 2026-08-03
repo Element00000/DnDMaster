@@ -15,12 +15,17 @@ interface View {
   ty: number
 }
 
-const MIN_SCALE = 0.1
-const MAX_SCALE = 30
+// Grosszuegig bemessen, damit auch mehrfach verschachtelte Karten (Welt > Region > Stadt >
+// Kampfkarte ...) noch weit genug herangezoomt werden koennen, um die innerste Ebene
+// praezise zu sehen und zu bearbeiten - ohne die eigentliche Wurzelkarte unbrauchbar
+// gross/klein werden zu lassen.
+const MIN_SCALE = 0.02
+const MAX_SCALE = 4000
 const DRAG_THRESHOLD = 4
 /** Ab dieser Bildschirmgroesse (kuerzere Seite, px) wird eine eingebettete Karte aufgedeckt. */
 const REVEAL_THRESHOLD = 160
-export const MIN_EMBED_SIZE = 100
+/** Minimale Kantenlaenge einer Einbettung, in Weltkoordinaten der Eltern-Ebene. */
+export const MIN_EMBED_SIZE = 20
 
 export function MapCanvas() {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -511,20 +516,20 @@ export function MapCanvas() {
           height,
         }}
       >
-        {layer.imageUrl ? (
-          mapImage && (
-            <img
-              src={mapImage}
-              width={width}
-              height={height}
-              draggable={false}
-              alt={layer.name}
-              style={{ display: 'block', pointerEvents: 'none' }}
-            />
-          )
-        ) : tableMode ? (
+        {layer.imageUrl && mapImage ? (
+          <img
+            src={mapImage}
+            width={width}
+            height={height}
+            draggable={false}
+            alt={layer.name}
+            style={{ display: 'block', pointerEvents: 'none' }}
+          />
+        ) : layer.imageUrl && mapImage === undefined ? null : tableMode ? (
           <div className="map-empty" style={{ width, height }}>
-            <span className="map-empty__text">Keine Weltkarte vorhanden.</span>
+            <span className="map-empty__text">
+              {layer.imageUrl ? 'Kartenbild konnte nicht geladen werden.' : 'Keine Weltkarte vorhanden.'}
+            </span>
           </div>
         ) : (
           <>
@@ -535,7 +540,9 @@ export function MapCanvas() {
               onPointerDown={(e) => e.stopPropagation()}
               onClick={() => mapUploadRef.current?.click()}
             >
-              <span>Füge eine Weltkarte ein.</span>
+              <span>
+                {layer.imageUrl ? 'Kartenbild konnte nicht geladen werden. Neu hochladen.' : 'Füge eine Weltkarte ein.'}
+              </span>
               <svg
                 className="map-empty__icon"
                 viewBox="0 0 24 24"
@@ -834,7 +841,13 @@ function EmbeddedMap({
   const y = embed.y * parentView.scale + parentView.ty
   const w = embed.width * parentView.scale
   const h = embed.height * parentView.scale
-  const revealed = Math.min(w, h) >= REVEAL_THRESHOLD
+  // Waehrend eines aktiven Ziehens am Eck-Griff bleibt die Karte immer "aufgedeckt", auch
+  // wenn sie unter die Aufdeck-Schwelle schrumpft. Sonst wuerden Bild und Eck-Griffe mitten
+  // im Ziehen aus dem DOM verschwinden (Wechsel auf die Pinnadel-Darstellung), die
+  // Zeigererfassung ginge stillschweigend verloren (kein pointerup mehr) und der naechste
+  // Hover ueber eine neu gemountete Ecke wuerde faelschlich mit dem alten resizeRef weiterziehen.
+  const [isResizing, setIsResizing] = useState(false)
+  const revealed = isResizing || Math.min(w, h) >= REVEAL_THRESHOLD
   const interactive = !tableMode && !fogEditing
 
   // Bildschirm- zu Weltkoordinaten der Eltern-Ebene, zum Ziehen der Eck-Griffe.
@@ -870,7 +883,9 @@ function EmbeddedMap({
     dragRef.current = null
     if (!d) return
     e.stopPropagation()
-    ;(e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId)
+    if ((e.currentTarget as HTMLElement).hasPointerCapture?.(e.pointerId)) {
+      ;(e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId)
+    }
     if (!d.moved) onSelect(embLayer.id)
   }
 
@@ -902,6 +917,7 @@ function EmbeddedMap({
         isLeft,
         isTop,
       }
+      setIsResizing(true)
     }
   }
   function onEmbResizeMove(e: React.PointerEvent) {
@@ -920,10 +936,15 @@ function EmbeddedMap({
     const newY = r.isTop ? r.anchorY : r.anchorY - newH
     setEmbedRect(embLayer.id, newX, newY, newW, newH)
   }
+  // Auch bei verlorener Zeigererfassung (z.B. Browser-Geste, Tab-Wechsel) oder
+  // pointercancel sauber aufraeumen - nicht nur beim regulaeren pointerup.
   function onEmbResizeUp(e: React.PointerEvent) {
     e.stopPropagation()
-    ;(e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId)
+    if ((e.currentTarget as HTMLElement).hasPointerCapture?.(e.pointerId)) {
+      ;(e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId)
+    }
     resizeRef.current = null
+    setIsResizing(false)
   }
 
   if (!revealed) {
@@ -972,10 +993,12 @@ function EmbeddedMap({
         onPointerDown={onBgPointerDown}
         onPointerMove={onBgPointerMove}
         onPointerUp={onBgPointerUp}
+        onPointerCancel={onBgPointerUp}
+        onLostPointerCapture={onBgPointerUp}
       >
-        {embLayer.imageUrl ? (
-          image && <img src={image} draggable={false} alt={embLayer.name} style={{ width: '100%', height: '100%', display: 'block', objectFit: 'fill' }} />
-        ) : (
+        {embLayer.imageUrl && image ? (
+          <img src={image} draggable={false} alt={embLayer.name} style={{ width: '100%', height: '100%', display: 'block', objectFit: 'fill' }} />
+        ) : embLayer.imageUrl && image === undefined ? null : (
           <div className="embedded-map__placeholder">
             <PlaceholderMap width={Math.max(1, Math.round(w))} height={Math.max(1, Math.round(h))} />
           </div>
@@ -1041,6 +1064,8 @@ function EmbeddedMap({
               onPointerDown={startEmbResize(hdl)}
               onPointerMove={onEmbResizeMove}
               onPointerUp={onEmbResizeUp}
+              onPointerCancel={onEmbResizeUp}
+              onLostPointerCapture={onEmbResizeUp}
             />
           ))}
         </>

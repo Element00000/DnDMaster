@@ -58,8 +58,17 @@ export function MapPin({
     const s = state.current
     state.current = null
     e.stopPropagation()
-    ;(e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId)
+    if ((e.currentTarget as HTMLElement).hasPointerCapture?.(e.pointerId)) {
+      ;(e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId)
+    }
     if (!s || !s.moved) onClick(e)
+  }
+
+  // Bei verlorener Zeigererfassung (z.B. wenn der Pin waehrend des Ziehens durch eine
+  // andere Darstellung ersetzt wird) den Ziehzustand zuruecksetzen statt ihn haengen zu
+  // lassen - sonst wuerde ein spaeterer reiner Hover faelschlich als Weiterziehen gewertet.
+  function onPointerCancelOrLost() {
+    state.current = null
   }
 
   return (
@@ -69,6 +78,8 @@ export function MapPin({
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
+      onPointerCancel={onPointerCancelOrLost}
+      onLostPointerCapture={onPointerCancelOrLost}
     >
       <div className="map-pin__head">
         <span className="map-pin__icon">{icon}</span>

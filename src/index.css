@@ -676,6 +676,10 @@ button {
   border-radius: 8px;
   padding: 4px;
   backdrop-filter: blur(3px);
+  /* Muss ueber jeglichem Karteninhalt liegen (eingebettete Karten, Pins, Eck-Griffe
+     haben positives z-index und wuerden sonst - unabhaengig von der DOM-Reihenfolge -
+     darueber gemalt, sobald sie diese Ecke ueberdecken). */
+  z-index: 20;
 }
 
 .zoom-controls button {
