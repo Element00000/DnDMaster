@@ -1012,6 +1012,16 @@ button {
   flex-shrink: 0;
 }
 
+.icon-btn--battle {
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--border));
+  color: var(--danger);
+}
+
+.icon-btn--battle:hover {
+  border-color: var(--danger);
+  background: var(--danger-tint);
+}
+
 .swap-image-icon {
   width: 15px;
   height: 15px;

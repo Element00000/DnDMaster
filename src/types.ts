@@ -157,8 +157,6 @@ export interface MapLayer {
   reveals: RevealCircle[]
   /** Falls gesetzt: diese Ebene ist auf einer anderen Ebene eingebettet und dort erst ab genug Zoom sichtbar. */
   embed: EmbeddedPlacement | null
-  /** Als Kampfkarte markiert: der Kampfmodus listet alle auf ihr platzierten Feinde als Tabelle. */
-  isBattleMap: boolean
 }
 
 /** Sitzungsprotokoll-Eintrag (Phase 5). */

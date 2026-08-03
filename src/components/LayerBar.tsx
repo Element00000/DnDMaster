@@ -11,8 +11,6 @@ export function LayerBar() {
   const setFogEditing = useStore((s) => s.setFogEditing)
   const fogBrush = useStore((s) => s.fogBrush)
   const setFogBrush = useStore((s) => s.setFogBrush)
-  const setLayerBattleMap = useStore((s) => s.setLayerBattleMap)
-  const setBattleMode = useStore((s) => s.setBattleMode)
 
   if (tableMode) return null
 
@@ -53,27 +51,6 @@ export function LayerBar() {
               Reset
             </button>
           </>
-        )}
-      </div>
-
-      <div className="layerbar__fog">
-        <label className="layerbar__fogtoggle" title="Diese Karte als Kampfkarte markieren">
-          <input
-            type="checkbox"
-            checked={layer.isBattleMap}
-            onChange={(e) => setLayerBattleMap(layer.id, e.target.checked)}
-          />
-          <span>Kampfkarte</span>
-        </label>
-
-        {layer.isBattleMap && (
-          <button
-            className="layerbar__btn"
-            title="Kampfmodus: alle Feinde auf dieser Karte als Tabelle"
-            onClick={() => setBattleMode(layer.id)}
-          >
-            ⚔ Kampfmodus
-          </button>
         )}
       </div>
     </div>

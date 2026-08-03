@@ -50,6 +50,7 @@ export function Sidebar() {
   const embedLayer = useStore((s) => s.embedLayer)
   const viewLayerId = useStore((s) => s.viewLayerId)
   const setViewLayerId = useStore((s) => s.setViewLayerId)
+  const setBattleMode = useStore((s) => s.setBattleMode)
 
   const [popup, setPopup] = useState<{ type: EntityType; top: number; left: number } | null>(null)
   const [mapsMenu, setMapsMenu] = useState<{ top: number; left: number } | null>(null)
@@ -186,6 +187,15 @@ export function Sidebar() {
       current = campaign.layers.find((x) => x.id === current!.embed!.parentLayerId)
     }
     return false
+  }
+
+  // Steht mindestens ein Feind auf dieser Karte? Bestimmt, ob das Kampfmodus-Symbol
+  // erscheint - der Kampfmodus wird nicht mehr manuell markiert, sondern ist automatisch
+  // fuer jede Karte mit darauf platzierten Feinden verfuegbar.
+  function layerHasEnemy(layerId: string): boolean {
+    return campaign.entities.some(
+      (e) => e.type === 'nsc' && e.fields.gesinnung === 'feind' && e.placement?.layerId === layerId,
+    )
   }
 
   // Karte in "Meine Karten" anklicken: bleibt in der Wurzelkarten-Instanz und schwenkt/zoomt
@@ -332,6 +342,18 @@ export function Sidebar() {
                       {depth > 0 ? '↳ ' : ''}
                       {l.name}
                     </button>
+                    {layerHasEnemy(l.id) && (
+                      <button
+                        className="icon-btn icon-btn--sm icon-btn--battle"
+                        title="Kampfmodus starten (Feinde auf dieser Karte)"
+                        onClick={() => {
+                          setBattleMode(l.id)
+                          setMapsMenu(null)
+                        }}
+                      >
+                        ⚔
+                      </button>
+                    )}
                     <button className="icon-btn icon-btn--sm" title="Kartenbild austauschen" onClick={() => onSwapImage(l)}>
                       <svg
                         className="swap-image-icon"
