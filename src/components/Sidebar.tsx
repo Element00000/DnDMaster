@@ -343,9 +343,9 @@ export function Sidebar() {
                         strokeLinejoin="round"
                         aria-hidden="true"
                       >
-                        <rect x="3" y="7" width="14" height="14" rx="2" />
-                        <path d="M21 3 A11 11 0 0 1 12 12" />
-                        <polyline points="7 9 12 15 17 9" />
+                        <line x1="12" y1="3" x2="12" y2="15" />
+                        <polyline points="6 9 12 3 18 9" />
+                        <line x1="5" y1="20" x2="19" y2="20" />
                       </svg>
                     </button>
                     <button className="icon-btn icon-btn--sm" title="Umbenennen" onClick={() => onRenameLayer(l)}>
