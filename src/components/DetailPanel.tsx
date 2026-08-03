@@ -131,23 +131,6 @@ export function DetailPanel() {
           </button>
         )}
 
-        {!readOnly && (
-          <label className="field">
-            <span className="field__label">Typ</span>
-            <select
-              className="field__control"
-              value={marker.type}
-              onChange={(e) => updateEntity(marker.id, { type: e.target.value as EntityType })}
-            >
-              {ENTITY_TYPES.map((t) => (
-                <option key={t.type} value={t.type}>
-                  {t.icon} {t.label}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
-
         {/* Typ-spezifische Felder */}
         {fields.map((f) => (
           <label key={f.key} className="field">
