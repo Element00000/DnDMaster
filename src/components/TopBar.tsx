@@ -15,7 +15,6 @@ export function TopBar() {
   const campaigns = useStore((s) => s.campaigns)
   const activeCampaignId = useStore((s) => s.activeCampaignId)
   const activeCampaign = campaigns.find((c) => c.id === activeCampaignId) ?? campaigns[0]
-  const layer = activeCampaign.layers.find((l) => l.id === activeCampaign.activeLayerId) ?? activeCampaign.layers[0]
 
   const setActiveCampaign = useStore((s) => s.setActiveCampaign)
   const addCampaign = useStore((s) => s.addCampaign)
@@ -128,10 +127,6 @@ export function TopBar() {
           <button className="topbar__mark" onClick={requestFitToView} title="Ganze Weltkarte anzeigen">
             <img className="topbar__logo" src={logo} alt="DnD Master" />
           </button>
-          <div>
-            <div className="topbar__title">{activeCampaign.name}</div>
-            <div className="topbar__subtitle">{layer.name} · Spieltisch</div>
-          </div>
         </div>
         <button className="btn btn--primary" onClick={() => setTableMode(false)}>
           Spieltisch verlassen
@@ -146,10 +141,6 @@ export function TopBar() {
         <button className="topbar__mark" onClick={requestFitToView} title="Ganze Weltkarte anzeigen">
           <img className="topbar__logo" src={logo} alt="DnD Master" />
         </button>
-        <div>
-          <div className="topbar__title">DM Weltkarte</div>
-          <div className="topbar__subtitle">{layer.name}</div>
-        </div>
       </div>
 
       <div className="campaign-switch">
