@@ -95,8 +95,22 @@ export function DetailPanel() {
       .filter((e) => e.id !== marker.id)
       .flatMap((e) => e.links.filter((l) => l.targetId === marker.id).map((l) => ({ from: e, relation: l.relation })))
 
-    detailContent = (
-    <div className="detail__panel" style={{ ['--chip-color' as string]: meta.color }}>
+    const portrait = marker.imageUrl ? (
+      <div className="detail__portrait">
+        <AssetImg refUrl={marker.imageUrl} alt={marker.name} />
+        {!readOnly && (
+          <button
+            className="detail__portrait-x"
+            title="Bild entfernen"
+            onClick={() => updateEntity(marker.id, { imageUrl: null })}
+          >
+            &times;
+          </button>
+        )}
+      </div>
+    ) : null
+
+    const header = (
       <div className="detail__header">
         <span className={`detail__icon${meta.iconInvert ? ' is-icon-invert' : ''}`}>{meta.icon}</span>
         <input
@@ -110,22 +124,31 @@ export function DetailPanel() {
           &times;
         </button>
       </div>
+    )
+
+    // Kampfmodus zeigt zu einem Feind ausschliesslich sein Kampfblatt - alles andere
+    // (Rolle, Motivation, Beschreibung, Geheimnis, Verknuepfungen ...) waere am Tisch
+    // waehrend eines Kampfes nur Ballast. Umgekehrt tauchen die Kampfwerte ausserhalb
+    // des Kampfmodus gar nicht auf.
+    const isFeind = marker.type === 'nsc' && marker.fields.gesinnung === 'feind'
+    detailContent = combatMode && isFeind ? (
+      <div className="detail__panel" style={{ ['--chip-color' as string]: meta.color }}>
+        {header}
+        <div className="detail__body">
+          {portrait}
+          <CombatStatFields
+            entity={marker}
+            readOnly={readOnly}
+            onFieldChange={(key, value) => setEntityField(marker.id, key, value)}
+          />
+        </div>
+      </div>
+    ) : (
+    <div className="detail__panel" style={{ ['--chip-color' as string]: meta.color }}>
+      {header}
 
       <div className="detail__body">
-        {marker.imageUrl && (
-          <div className="detail__portrait">
-            <AssetImg refUrl={marker.imageUrl} alt={marker.name} />
-            {!readOnly && (
-              <button
-                className="detail__portrait-x"
-                title="Bild entfernen"
-                onClick={() => updateEntity(marker.id, { imageUrl: null })}
-              >
-                &times;
-              </button>
-            )}
-          </div>
-        )}
+        {portrait}
 
         {!readOnly && (
           <button
@@ -239,7 +262,7 @@ export function DetailPanel() {
           </>
         )}
 
-        {marker.type === 'nsc' && marker.fields.gesinnung === 'feind' && (
+        {isFeind && (
           <FeindFields
             entity={marker}
             readOnly={readOnly}
@@ -365,7 +388,7 @@ export function DetailPanel() {
         <button
           className={`btn btn--sm${combatMode ? ' btn--active' : ''}`}
           onClick={() => setCombatMode((v) => !v)}
-          title="Kampfmodus: nur Feinde, mit Initiative"
+          title="Kampfmodus: nur Feinde, mit Initiative und Kampfwerten"
         >
           ⚔ Kampfmodus
         </button>
@@ -702,15 +725,14 @@ function FeindFields({
           disabled={readOnly}
         />
       </label>
-
-      <CombatStatFields entity={entity} readOnly={readOnly} onFieldChange={onFieldChange} />
     </>
   )
 }
 
 /**
  * Kampfwerte eines Feindes (Speed/Uebungsbonus/RK/HP, Attribute, XP, Angriff/Faehigkeiten/
- * Taktik). Erscheinen im Kampfmodus einer Kampfkarte als Spalte dieses Charakters.
+ * Taktik). Ausschliesslich im Kampfmodus zu sehen, dort dann als einziger Inhalt des
+ * Objekt-Dropdowns - siehe detailContent weiter oben.
  */
 function CombatStatFields({
   entity,
