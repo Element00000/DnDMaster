@@ -133,7 +133,11 @@ interface StoreState extends AppData {
    * Instanz, nur der sichtbare Ausschnitt aendert sich.
    */
   viewLayerId: string | null
-  setViewLayerId: (id: string | null) => void
+  /**
+   * @param zoom false = nur den Panel-Kontext umsetzen, ohne die Kartenansicht zu bewegen
+   * (z.B. Klick auf freie Kartenflaeche: der soll nicht die ganze Karte einpassen).
+   */
+  setViewLayerId: (id: string | null, zoom?: boolean) => void
   /**
    * Wird bei jedem setViewLayerId-Aufruf erhoeht, auch wenn sich die Id nicht aendert (z.B.
    * erneuter Klick auf dieselbe eingeklappte Kartenpinnadel, nachdem man zwischenzeitlich
@@ -1059,7 +1063,12 @@ export const useStore = create<StoreState>()(
         setPendingEntityFields: (fields) => set({ pendingEntityFields: fields }),
         setPlacingEntity: (id) => set({ placingEntityId: id, tool: 'select' }),
         setPlacingLayer: (id) => set({ placingLayerId: id, tool: 'select' }),
-        setViewLayerId: (id) => set((s) => ({ viewLayerId: id, viewLayerNonce: s.viewLayerNonce + 1 })),
+        setViewLayerId: (id, zoom = true) =>
+          set((s) => ({
+            viewLayerId: id,
+            // Nur der erhoehte Nonce loest in MapCanvas eine Kartenfahrt aus.
+            viewLayerNonce: zoom ? s.viewLayerNonce + 1 : s.viewLayerNonce,
+          })),
         requestFitToView: () => set((s) => ({ fitToViewRequest: s.fitToViewRequest + 1 })),
 
         undo: () =>

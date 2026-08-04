@@ -27,10 +27,23 @@ const DRAG_THRESHOLD = 4
 const REVEAL_THRESHOLD = 160
 /** Minimale Kantenlaenge einer Einbettung, in Weltkoordinaten der Eltern-Ebene. */
 export const MIN_EMBED_SIZE = 20
+/** Dauer einer Kartenfahrt (Sprung zu einer Karte/einem Objekt, Einpassen) in ms. */
+const VIEW_ANIM_MS = 500
+
+/** Sanft anfahren, in der Mitte am schnellsten, sanft abbremsen. */
+function easeInOutCubic(t: number): number {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
+}
 
 export function MapCanvas() {
   const containerRef = useRef<HTMLDivElement>(null)
   const [view, setView] = useState<View>({ scale: 1, tx: 0, ty: 0 })
+  // Immer der zuletzt gerenderte Stand - Ausgangspunkt fuer Kartenfahrten und Zoomziele,
+  // ohne sie von der view-Identitaet abhaengig zu machen.
+  const viewRef = useRef(view)
+  viewRef.current = view
+  /** Laufende Kartenfahrt (requestAnimationFrame-Handle); null = keine. */
+  const viewAnim = useRef<number | null>(null)
   const [fitted, setFitted] = useState(false)
 
   const campaign = useStore((s) => s.campaigns.find((c) => c.id === s.activeCampaignId) ?? s.campaigns[0])
@@ -119,26 +132,102 @@ export function MapCanvas() {
     [timeEnabled, timeOfDay, currentDay, moveScheduleEntry, moveEntity],
   )
 
-  const fitToView = useCallback(() => {
-    const el = containerRef.current
-    if (!el) return
-    const cw = el.clientWidth
-    const ch = el.clientHeight
-    if (cw === 0 || ch === 0) return
-    const scale = Math.min(cw / width, ch / height) * 0.92
-    setView({ scale, tx: (cw - width * scale) / 2, ty: (ch - height * scale) / 2 })
-  }, [width, height])
+  /**
+   * Ansicht setzen und viewRef sofort mitziehen. Ohne das saehe ein Effekt, der im selben
+   * Durchgang laeuft (z.B. der Navigations-Effekt direkt nach dem ersten Einpassen), noch
+   * den Stand vor dem Setzen und wuerde eine ueberfluessige Fahrt starten.
+   */
+  const applyView = useCallback((v: View) => {
+    viewRef.current = v
+    setView(v)
+  }, [])
+
+  /** Laufende Kartenfahrt abbrechen (neue Fahrt, manuelles Zoomen/Schieben, Unmount). */
+  const stopViewAnimation = useCallback(() => {
+    if (viewAnim.current != null) {
+      cancelAnimationFrame(viewAnim.current)
+      viewAnim.current = null
+    }
+  }, [])
+
+  useEffect(() => stopViewAnimation, [stopViewAnimation])
+
+  /**
+   * Weich zur Zielansicht fahren statt hart umzuschalten: Der Weltpunkt in der Bildmitte
+   * wandert sanft beschleunigend und wieder abbremsend zum Ziel, waehrend der Massstab
+   * geometrisch interpoliert wird. Linear interpoliert wuerde eine Fahrt ueber mehrere
+   * Zoomstufen anfangs davonrasen und am Ende kriechen.
+   */
+  const animateView = useCallback(
+    (target: View) => {
+      stopViewAnimation()
+      const el = containerRef.current
+      const from = viewRef.current
+      const cw = el?.clientWidth ?? 0
+      const ch = el?.clientHeight ?? 0
+      const alreadyThere =
+        Math.abs(from.scale - target.scale) < from.scale * 1e-4 &&
+        Math.abs(from.tx - target.tx) < 0.5 &&
+        Math.abs(from.ty - target.ty) < 0.5
+      if (cw === 0 || ch === 0 || alreadyThere) {
+        applyView(target)
+        return
+      }
+
+      // Weltpunkte, die zu Beginn bzw. am Ende in der Bildmitte stehen.
+      const fromCx = (cw / 2 - from.tx) / from.scale
+      const fromCy = (ch / 2 - from.ty) / from.scale
+      const toCx = (cw / 2 - target.tx) / target.scale
+      const toCy = (ch / 2 - target.ty) / target.scale
+      const ratio = target.scale / from.scale
+      const start = performance.now()
+
+      const step = (now: number) => {
+        const t = Math.min(1, (now - start) / VIEW_ANIM_MS)
+        const k = easeInOutCubic(t)
+        const scale = from.scale * Math.pow(ratio, k)
+        const cx = fromCx + (toCx - fromCx) * k
+        const cy = fromCy + (toCy - fromCy) * k
+        applyView({ scale, tx: cw / 2 - cx * scale, ty: ch / 2 - cy * scale })
+        viewAnim.current = t < 1 ? requestAnimationFrame(step) : null
+      }
+      viewAnim.current = requestAnimationFrame(step)
+    },
+    [stopViewAnimation, applyView],
+  )
+
+  /** Ganze Karte einpassen. Ohne Fahrt, wenn die Ansicht ohnehin gerade neu aufgebaut wird. */
+  const fitToView = useCallback(
+    (animate = true) => {
+      const el = containerRef.current
+      if (!el) return
+      const cw = el.clientWidth
+      const ch = el.clientHeight
+      if (cw === 0 || ch === 0) return
+      const scale = Math.min(cw / width, ch / height) * 0.92
+      const target: View = { scale, tx: (cw - width * scale) / 2, ty: (ch - height * scale) / 2 }
+      if (animate) {
+        animateView(target)
+      } else {
+        stopViewAnimation()
+        applyView(target)
+      }
+    },
+    [width, height, animateView, stopViewAnimation, applyView],
+  )
 
   useEffect(() => {
     if (!fitted) {
-      fitToView()
+      // Erster Aufbau: sofort einpassen, sonst faehrt die Karte beim Oeffnen los.
+      fitToView(false)
       setFitted(true)
     }
   }, [fitted, fitToView])
 
-  // Beim Kampagnen-/Ebenenwechsel neu einpassen.
+  // Beim Kampagnen-/Ebenenwechsel neu einpassen - ohne Fahrt, weil die vorherige Ansicht
+  // zu einer anderen Karte gehoerte und eine Fahrt dorthin nichts Nachvollziehbares zeigt.
   useEffect(() => {
-    fitToView()
+    fitToView(false)
     setMapSelected(false)
     setSelectedEmbedId(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -181,6 +270,8 @@ export function MapCanvas() {
   const onWheel = useCallback((e: React.WheelEvent) => {
     const el = containerRef.current
     if (!el) return
+    // Eigenes Zoomen hat Vorrang vor einer noch laufenden Kartenfahrt.
+    stopViewAnimation()
     const rect = el.getBoundingClientRect()
     const sx = e.clientX - rect.left
     const sy = e.clientY - rect.top
@@ -241,44 +332,49 @@ export function MapCanvas() {
   // knapp die Aufdeck-Schwelle ueberschreitet). sx/sy/sw/sh sind ihre aktuelle
   // Bildschirm-Position/-Groesse (bereits rekursiv aus allen Eltern-Transformationen
   // berechnet), also unabhaengig davon, wie tief sie verschachtelt ist.
-  const zoomToScreenRect = useCallback((sx: number, sy: number, sw: number, sh: number, targetScreen?: number) => {
-    const cont = containerRef.current
-    if (!cont) return
-    const cw = cont.clientWidth
-    const ch = cont.clientHeight
-    const target = targetScreen ?? Math.min(cw, ch) * 0.92
-    const neededFactor = target / Math.min(sw, sh)
-    const cx = sx + sw / 2
-    const cy = sy + sh / 2
-    setView((v) => {
+  const zoomToScreenRect = useCallback(
+    (sx: number, sy: number, sw: number, sh: number, targetScreen?: number) => {
+      const cont = containerRef.current
+      if (!cont) return
+      const cw = cont.clientWidth
+      const ch = cont.clientHeight
+      const target = targetScreen ?? Math.min(cw, ch) * 0.92
+      const neededFactor = target / Math.min(sw, sh)
+      const cx = sx + sw / 2
+      const cy = sy + sh / 2
+      const v = viewRef.current
       const newScale = clamp(v.scale * neededFactor, MIN_SCALE, MAX_SCALE)
       const wx = (cx - v.tx) / v.scale
       const wy = (cy - v.ty) / v.scale
-      return { scale: newScale, tx: cw / 2 - wx * newScale, ty: ch / 2 - wy * newScale }
-    })
-  }, [])
+      animateView({ scale: newScale, tx: cw / 2 - wx * newScale, ty: ch / 2 - wy * newScale })
+    },
+    [animateView],
+  )
 
   const viewLayerId = useStore((s) => s.viewLayerId)
   const viewLayerNonce = useStore((s) => s.viewLayerNonce)
   const setViewLayerId = useStore((s) => s.setViewLayerId)
-  const viewRef = useRef(view)
-  viewRef.current = view
+
+  const viewLayerIdRef = useRef(viewLayerId)
+  viewLayerIdRef.current = viewLayerId
 
   // "Meine Karten" -> Karte anklicken: nicht die aktive Ebene wechseln, sondern die aktuelle
   // Wurzelkarten-Instanz per Zoom/Schwenk so fuehren, dass die angeklickte (verschachtelte)
   // Karte moeglichst gross im sichtbaren Bereich erscheint. null = zurueck zur Wurzelansicht.
+  //
+  // Haengt bewusst nur am Nonce, nicht an viewLayerId: Der Nonce steigt bei jedem bewussten
+  // Navigationsbefehl (auch beim erneuten Klick auf dieselbe Karte, wenn man zwischendurch
+  // manuell herausgezoomt hat) - und eben nicht, wenn nur der Panel-Kontext nachgezogen wird.
   useEffect(() => {
-    if (viewLayerId == null) {
+    const id = viewLayerIdRef.current
+    if (id == null) {
       fitToView()
       return
     }
-    const rect = computeLayerScreenRect(campaign.layers, layer.id, viewLayerId, viewRef.current)
+    const rect = computeLayerScreenRect(campaign.layers, layer.id, id, viewRef.current)
     if (rect) zoomToScreenRect(rect.x, rect.y, rect.w, rect.h)
-    // viewLayerNonce mit in die Abhaengigkeiten, damit ein erneuter Klick auf dieselbe Karte
-    // (gleiche Id) den Zoom trotzdem erneut ausloest, auch wenn zwischenzeitlich manuell
-    // wieder herausgezoomt wurde.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewLayerId, viewLayerNonce])
+  }, [viewLayerNonce])
 
   // Eingebettete Karte per Ziehen auf eine andere (Vorfahren-)Karte fallen lassen: die
   // Pinnadel/Box einer eingebetteten Karte bestimmt so ihre hierarchische Einordnung. Zielt
@@ -349,8 +445,10 @@ export function MapCanvas() {
         return
       }
       if (e.button === 2) {
-        // Rechte Maustaste: Karte verschieben.
+        // Rechte Maustaste: Karte verschieben. Bricht eine laufende Kartenfahrt ab,
+        // damit sie nicht gegen die Handbewegung anlaeuft.
         e.preventDefault()
+        stopViewAnimation()
         el.setPointerCapture(e.pointerId)
         drag.current = { startX: e.clientX, startY: e.clientY, origTx: view.tx, origTy: view.ty, moved: false }
         setPanning(true)
@@ -364,7 +462,7 @@ export function MapCanvas() {
         marquee.current = { startX: e.clientX, startY: e.clientY, moved: false }
       }
     },
-    [view.tx, view.ty, fogEditing, paintReveal],
+    [view.tx, view.ty, fogEditing, paintReveal, stopViewAnimation],
   )
 
   const onPointerMove = useCallback(
@@ -515,8 +613,10 @@ export function MapCanvas() {
         setSelectedEmbedId(null)
         // Klick auf die Karte selbst waehlt sie aus (zeigt Eck-Ziehpunkte), Klick daneben hebt die Auswahl auf.
         setMapSelected(inside && !tableMode && !fogEditing)
-        // Klick auf die Wurzelkarte selbst zeigt wieder deren eigene Objekte im rechten Panel.
-        if (inside) setViewLayerId(null)
+        // Klick auf die Wurzelkarte selbst zeigt wieder deren eigene Objekte im rechten
+        // Panel - ohne die Ansicht zu bewegen, sonst wuerde jeder Klick auf freie Flaeche
+        // die ganze Karte einpassen und den mühsam gewaehlten Ausschnitt verwerfen.
+        if (inside) setViewLayerId(null, false)
       }
     },
     [
@@ -623,7 +723,6 @@ export function MapCanvas() {
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onContextMenu={(e) => e.preventDefault()}
-      onDoubleClick={() => fitToView()}
     >
       <div
         className="map-world"
@@ -876,7 +975,7 @@ export function MapCanvas() {
             return { scale: newScale, tx: cx - (cx - v.tx) * k, ty: cy - (cy - v.ty) * k }
           })
         }}
-        onFit={fitToView}
+        onFit={() => fitToView()}
       />
     </div>
   )
@@ -950,16 +1049,12 @@ function ZoomControls({ scale, onZoom, onFit }: { scale: number; onZoom: (dir: n
   const { bottom, snap } = useBottomPanelOffset(14)
 
   // stopPropagation: sonst faengt das darunterliegende Karten-Pointerdown (Verschieben/
-  // Rechteck-Markierung) den Klick ab, bevor er die Buttons erreicht. Ebenso wuerde ein
-  // schnelles Doppelklicken auf einen Button (z.B. zweimal "+" hintereinander) als
-  // natives dblclick bis zur Karte durchsickern und ueber deren Doppelklick-zum-Einpassen
-  // die Ansicht ungewollt zurueck auf die Einpass-Groesse setzen.
+  // Rechteck-Markierung) den Klick ab, bevor er die Buttons erreicht.
   return (
     <div
       className={`zoom-controls${snap ? ' is-snap' : ''}`}
       style={{ bottom }}
       onPointerDown={(e) => e.stopPropagation()}
-      onDoubleClick={(e) => e.stopPropagation()}
     >
       <button title="Hineinzoomen" onClick={() => onZoom(1)}>+</button>
       <span className="zoom-level">{Math.round(scale * 100)}%</span>
