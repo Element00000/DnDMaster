@@ -98,7 +98,11 @@ export function MapPin({
     >
       <div className="map-pin__head">
         {image ? (
-          <img className="map-pin__image" src={image} alt="" draggable={false} />
+          // Eigener Rahmen um das Bild: Er beschneidet den Ausschnitt rund und dreht
+          // gegen die Neigung des Pin-Kopfes zurueck (siehe .map-pin__portrait).
+          <span className="map-pin__portrait">
+            <img className="map-pin__image" src={image} alt="" draggable={false} />
+          </span>
         ) : (
           <span className="map-pin__icon">{icon}</span>
         )}

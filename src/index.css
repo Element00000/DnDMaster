@@ -725,12 +725,33 @@ button {
 
 /* Portraet im Pin: rund im tropfenfoermigen Kopf, gegen dessen Drehung zurueckgedreht.
    Der farbige Kopf bleibt als Rahmen sichtbar und zeigt weiterhin die Gesinnung an. */
-.map-pin__image {
+.map-pin__portrait {
+  position: relative;
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  object-fit: cover;
+  overflow: hidden;
   transform: rotate(45deg);
+  display: block;
+}
+
+/**
+ * Auf 150 % herangezoomt, damit das Gesicht den kleinen Kreis fuellt. Der Zoom ist auf
+ * horizontal die Mitte und vertikal ein Drittel von oben zentriert - dort sitzt bei einem
+ * Portraet der Kopf, waehrend die Bildmitte meist schon auf Brusthoehe liegt.
+ *
+ * Rechnung bei 24 px Kreis und 36 px Bild: "left/top: 50 %" setzt die Bildkante in die
+ * Kreismitte, das Verschieben um -50 % / -33,333 % der Bildgroesse zieht genau den
+ * gewuenschten Bildpunkt dorthin zurueck.
+ */
+.map-pin__image {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 150%;
+  height: 150%;
+  transform: translate(-50%, -33.333%);
+  object-fit: cover;
   display: block;
 }
 
