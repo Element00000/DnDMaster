@@ -704,6 +704,8 @@ button {
 
 /* ---------- Marker-Pin ---------- */
 .map-pin {
+  /* Kantenlaenge des Pin-Kopfes - Portraet und Icon leiten ihre Groesse davon ab. */
+  --pin-size: 34.5px;
   position: absolute;
   z-index: 5;
   transform: translate(-50%, -100%);
@@ -716,8 +718,8 @@ button {
 }
 
 .map-pin__head {
-  width: 30px;
-  height: 30px;
+  width: var(--pin-size);
+  height: var(--pin-size);
   border-radius: 50% 50% 50% 0;
   transform: rotate(-45deg);
   background: var(--pin-color, var(--gold));
@@ -734,7 +736,7 @@ button {
 
 .map-pin__icon {
   transform: rotate(45deg);
-  font-size: 14px;
+  font-size: calc(var(--pin-size) * 0.467);
   line-height: 1;
 }
 
@@ -748,8 +750,8 @@ button {
    Der farbige Kopf bleibt als Rahmen sichtbar und zeigt weiterhin die Gesinnung an. */
 .map-pin__portrait {
   position: relative;
-  width: 24px;
-  height: 24px;
+  width: calc(var(--pin-size) * 0.8);
+  height: calc(var(--pin-size) * 0.8);
   border-radius: 50%;
   overflow: hidden;
   transform: rotate(45deg);
