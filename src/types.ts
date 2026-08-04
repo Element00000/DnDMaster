@@ -1,3 +1,7 @@
+import type { ThumbCrop } from './utils/image'
+
+export type { ThumbCrop }
+
 // Zentrales Datenmodell der DM-Weltkarte (Phase 2).
 //
 // Struktur: App -> mehrere Kampagnen (Welten) -> je Kampagne eigene Karten-
@@ -113,6 +117,11 @@ export interface Entity {
    * Objekt noch aus einer Fassung ohne Miniaturbilder stammt.
    */
   thumbUrl: string | null
+  /**
+   * Selbst gewaehlter Bildausschnitt der Miniatur (Anteile 0..1 der Bildabmessungen).
+   * null = Vorgabe-Ausschnitt (siehe defaultThumbCrop).
+   */
+  thumbCrop: ThumbCrop | null
   links: EntityLink[]
   /** Typ-spezifische Felder (Schluessel siehe FIELD_SCHEMA). */
   fields: Record<string, string>

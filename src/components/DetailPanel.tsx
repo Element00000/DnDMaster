@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   COMBAT_STAT_FIELDS,
   ENTITY_TYPES,
@@ -9,13 +9,11 @@ import {
   entityMeta,
   relationMeta,
 } from '../types'
-import type { Campaign, Entity, EntityType, RelationType } from '../types'
+import type { Campaign, Entity, EntityType, RelationType, ThumbCrop } from '../types'
 import { useStore } from '../store/useStore'
-import { useAiStore } from '../store/useAiStore'
-import { fileToScaledDataUrl } from '../utils/image'
-import { discardEntityImage, storeEntityImage } from '../utils/entityImage'
-import { generateImage } from '../utils/imageGen'
-import { portraitPrompt } from '../utils/aiContext'
+import { defaultThumbCrop, fileToScaledDataUrl } from '../utils/image'
+import { deleteAsset } from '../utils/assets'
+import { discardEntityImage, restoreEntityThumb, storeEntityImage } from '../utils/entityImage'
 import { useAsset } from '../useAsset'
 import { rollDie } from '../utils/tools'
 import { DecisionEditor } from './DecisionEditor'
@@ -101,17 +99,21 @@ export function DetailPanel() {
 
     const portrait = <EntityImageField entity={marker} readOnly={readOnly} />
 
-    // Kein Typ-Icon mehr in der Kopfzeile: Direkt darunter steht das Portraet des Objekts,
-    // ein zweites Sinnbild daneben waere nur Doppelung.
+    // Weder Typ-Icon noch Name in der Kopfzeile: Das Portraet steht direkt darunter, und
+    // der Name steht in der Objektzeile darueber, wo er per Doppelklick geaendert wird.
+    // Nur wenn das Objekt gar nicht in der Liste steht (auf einer anderen Karte, ueber eine
+    // Verknuepfung ausgewaehlt), gaebe es sonst keine Stelle dafuer - dann hier.
     const header = (
       <div className="detail__header">
-        <input
-          className="detail__title-input"
-          value={marker.name}
-          onChange={(e) => updateEntity(marker.id, { name: e.target.value })}
-          placeholder="Name"
-          disabled={readOnly}
-        />
+        {!showInline && (
+          <input
+            className="detail__title-input"
+            value={marker.name}
+            onChange={(e) => updateEntity(marker.id, { name: e.target.value })}
+            placeholder="Name"
+            disabled={readOnly}
+          />
+        )}
         <button className="detail__close" onClick={() => selectEntity(null)} title="Schliessen">
           &times;
         </button>
@@ -150,9 +152,9 @@ export function DetailPanel() {
               setToolsTab('ki')
               setToolsOpen(true)
             }}
-            title="KI-Werkzeug fuer dieses Objekt oeffnen"
+            title="KI-Werkzeug fuer dieses Objekt oeffnen: Portrait, Erzaehltext, Dialog"
           >
-            ✨ KI: Text oder Dialog erzeugen
+            ✨ KI: Bilder und Texte erstellen
           </button>
         )}
 
@@ -672,24 +674,41 @@ function FactionField({
 
 /**
  * Bildbereich eines Objekts: immer ein Rechteck in fester Groesse - entweder mit dem
- * Portraet oder als Platzhalter, der zum Hochladen einlaedt. Darunter der Knopf, das
- * Bild stattdessen von der KI erzeugen zu lassen. Jedes gesetzte Bild wird zugleich als
- * Miniatur abgelegt, die auf Kartenpinnadeln und in Listen erscheint.
+ * Portraet oder als Platzhalter, der zum Hochladen einlaedt. Jedes gesetzte Bild wird
+ * zugleich als Miniatur abgelegt, die auf Kartenpinnadeln und in Listen erscheint; welcher
+ * Ausschnitt das ist, laesst sich ueber den Pinnadel-Knopf frei waehlen.
  */
 function EntityImageField({ entity, readOnly }: { entity: Entity; readOnly: boolean }) {
   const updateEntity = useStore((s) => s.updateEntity)
-  const imageProvider = useAiStore((s) => s.imageProvider)
-  const imageKey = useAiStore((s) => s.imageKey)
   const fileRef = useRef<HTMLInputElement>(null)
-  const [busy, setBusy] = useState<'upload' | 'ai' | null>(null)
+  const [busy, setBusy] = useState<'upload' | 'crop' | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [cropping, setCropping] = useState(false)
   const url = useAsset(entity.imageUrl)
 
   async function apply(dataUrl: string) {
     const prev = { imageUrl: entity.imageUrl, thumbUrl: entity.thumbUrl }
+    // Neues Bild: der bisherige Ausschnitt passt nicht mehr, also wieder die Vorgabe.
     const stored = await storeEntityImage(dataUrl)
     updateEntity(entity.id, stored)
     discardEntityImage(prev)
+  }
+
+  /** Nur den Ausschnitt der Miniatur neu setzen; das Portraet bleibt wie es ist. */
+  async function applyCrop(crop: ThumbCrop) {
+    if (!url) return
+    setError(null)
+    setBusy('crop')
+    const prevThumb = entity.thumbUrl
+    try {
+      updateEntity(entity.id, await restoreEntityThumb(url, crop))
+      if (prevThumb && prevThumb !== entity.imageUrl) void deleteAsset(prevThumb)
+      setCropping(false)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Ausschnitt konnte nicht gesetzt werden.')
+    } finally {
+      setBusy(null)
+    }
   }
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -708,21 +727,9 @@ function EntityImageField({ entity, readOnly }: { entity: Entity; readOnly: bool
     }
   }
 
-  async function onGenerate() {
-    setError(null)
-    setBusy('ai')
-    try {
-      await apply(await generateImage(portraitPrompt(entity), { provider: imageProvider, apiKey: imageKey }))
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Bild konnte nicht erzeugt werden.')
-    } finally {
-      setBusy(null)
-    }
-  }
-
   function onRemove() {
     discardEntityImage(entity)
-    updateEntity(entity.id, { imageUrl: null, thumbUrl: null })
+    updateEntity(entity.id, { imageUrl: null, thumbUrl: null, thumbCrop: null })
   }
 
   return (
@@ -752,12 +759,30 @@ function EntityImageField({ entity, readOnly }: { entity: Entity; readOnly: bool
               <polyline points="6 9 12 3 18 9" />
               <line x1="5" y1="20" x2="19" y2="20" />
             </svg>
-            <span>{busy === 'upload' ? 'Wird geladen …' : busy === 'ai' ? 'KI erzeugt Bild …' : 'Bild hochladen'}</span>
+            <span>{busy === 'upload' ? 'Wird geladen …' : 'Bild hochladen'}</span>
           </button>
         )}
 
-        {url && !readOnly && (
+        {url && cropping && (
+          <CropSelector
+            src={url}
+            crop={entity.thumbCrop}
+            busy={busy === 'crop'}
+            onCancel={() => setCropping(false)}
+            onApply={applyCrop}
+          />
+        )}
+
+        {url && !readOnly && !cropping && (
           <div className="entity-image__actions">
+            <button
+              className="entity-image__act entity-image__act--pin"
+              title="Ausschnitt fuer die Pinnadel waehlen"
+              disabled={busy != null}
+              onClick={() => setCropping(true)}
+            >
+              {'\u{1F4CD}'}
+            </button>
             <button
               className="entity-image__act"
               title="Bild ersetzen"
@@ -780,20 +805,144 @@ function EntityImageField({ entity, readOnly }: { entity: Entity; readOnly: bool
 
       <input ref={fileRef} type="file" accept="image/*" hidden onChange={onFile} />
 
-      {!readOnly && (
-        <button
-          className="btn btn--sm btn--full detail__ai"
-          disabled={busy != null}
-          onClick={onGenerate}
-          title="Portraet von der KI erzeugen lassen"
-        >
-          {busy === 'ai' ? '… Bild wird erzeugt' : '✨ Bild per KI erstellen'}
-        </button>
-      )}
-
       {error && <p className="entity-image__error">{error}</p>}
     </div>
   )
+}
+
+/** Kleinste Kantenlaenge der Auswahl, in Bildschirmpunkten des Rahmens. */
+const MIN_CROP_PX = 28
+
+/**
+ * Auswahl des Bildausschnitts, der auf der Kartenpinnadel erscheint. Liegt als Ueberlagerung
+ * ueber dem Portraet: Das Quadrat laesst sich verschieben und an der unteren rechten Ecke in
+ * der Groesse aendern, alles ausserhalb wird abgedunkelt.
+ */
+function CropSelector({
+  src,
+  crop,
+  busy,
+  onCancel,
+  onApply,
+}: {
+  src: string
+  crop: ThumbCrop | null
+  busy: boolean
+  onCancel: () => void
+  onApply: (crop: ThumbCrop) => void
+}) {
+  const boxRef = useRef<HTMLDivElement>(null)
+  /** Flaeche, die das Bild im Rahmen tatsaechlich einnimmt (es wird eingepasst, nicht gefuellt). */
+  const [area, setArea] = useState<{ left: number; top: number; width: number; height: number } | null>(null)
+  const [sel, setSel] = useState<{ x: number; y: number; size: number } | null>(null)
+  const drag = useRef<{
+    mode: 'move' | 'resize'
+    startX: number
+    startY: number
+    orig: { x: number; y: number; size: number }
+  } | null>(null)
+
+  useEffect(() => {
+    let alive = true
+    const img = new Image()
+    img.onload = () => {
+      const el = boxRef.current
+      if (!alive || !el) return
+      const cw = el.clientWidth
+      const ch = el.clientHeight
+      const scale = Math.min(cw / img.naturalWidth, ch / img.naturalHeight)
+      const width = img.naturalWidth * scale
+      const height = img.naturalHeight * scale
+      const a = { left: (cw - width) / 2, top: (ch - height) / 2, width, height }
+      const c = crop ?? defaultThumbCrop(img.naturalWidth, img.naturalHeight)
+      setArea(a)
+      setSel({ x: a.left + c.x * a.width, y: a.top + c.y * a.height, size: c.w * a.width })
+    }
+    img.src = src
+    return () => {
+      alive = false
+    }
+  }, [src, crop])
+
+  function onDown(e: React.PointerEvent, mode: 'move' | 'resize') {
+    if (!sel || e.button !== 0) return
+    e.preventDefault()
+    e.stopPropagation()
+    ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+    drag.current = { mode, startX: e.clientX, startY: e.clientY, orig: sel }
+  }
+
+  function onMove(e: React.PointerEvent) {
+    const d = drag.current
+    if (!d || !area || !(e.currentTarget as HTMLElement).hasPointerCapture(e.pointerId)) return
+    const dx = e.clientX - d.startX
+    const dy = e.clientY - d.startY
+
+    if (d.mode === 'move') {
+      // Innerhalb der Bildflaeche halten, damit der Ausschnitt keine leeren Raender enthaelt.
+      setSel({
+        x: clampNum(d.orig.x + dx, area.left, area.left + area.width - d.orig.size),
+        y: clampNum(d.orig.y + dy, area.top, area.top + area.height - d.orig.size),
+        size: d.orig.size,
+      })
+      return
+    }
+    const maxSize = Math.min(area.left + area.width - d.orig.x, area.top + area.height - d.orig.y)
+    setSel({ ...d.orig, size: clampNum(d.orig.size + Math.max(dx, dy), MIN_CROP_PX, maxSize) })
+  }
+
+  function onUp(e: React.PointerEvent) {
+    const el = e.currentTarget as HTMLElement
+    if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId)
+    drag.current = null
+  }
+
+  function commit() {
+    if (!sel || !area) return
+    onApply({
+      x: (sel.x - area.left) / area.width,
+      y: (sel.y - area.top) / area.height,
+      w: sel.size / area.width,
+      h: sel.size / area.height,
+    })
+  }
+
+  return (
+    <div className="crop" ref={boxRef}>
+      {sel && (
+        <div
+          className="crop__sel"
+          style={{ left: sel.x, top: sel.y, width: sel.size, height: sel.size }}
+          onPointerDown={(e) => onDown(e, 'move')}
+          onPointerMove={onMove}
+          onPointerUp={onUp}
+          onPointerCancel={onUp}
+        >
+          <span
+            className="crop__handle"
+            onPointerDown={(e) => onDown(e, 'resize')}
+            onPointerMove={onMove}
+            onPointerUp={onUp}
+            onPointerCancel={onUp}
+          />
+        </div>
+      )}
+
+      <div className="crop__bar">
+        <span className="crop__hint">Ausschnitt fuer die Pinnadel</span>
+        <button className="btn btn--sm" onClick={onCancel} disabled={busy}>
+          Abbrechen
+        </button>
+        <button className="btn btn--sm btn--primary" onClick={commit} disabled={busy || !sel}>
+          {busy ? '…' : 'Uebernehmen'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function clampNum(v: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, v))
 }
 
 /** Zusatzfelder eines Feindes ausserhalb des Kampfmodus (das Bild steckt oben im Kopf). */
@@ -899,6 +1048,101 @@ function CombatStatFields({
   )
 }
 
+/**
+ * Warten, bis feststeht, ob aus einem Klick noch ein Doppelklick wird. Ohne das wuerde ein
+ * Doppelklick zum Umbenennen die Detailanzeige zwischendurch auf- und wieder zuklappen.
+ * Etwas mehr als die uebliche Doppelklick-Schwelle der Betriebssysteme.
+ */
+const DOUBLE_CLICK_GRACE_MS = 260
+
+/**
+ * Trennt Einfach- von Doppelklick auf demselben Element: Der Einfachklick wird kurz
+ * zurueckgehalten und verworfen, sobald ein Doppelklick folgt.
+ */
+function useClickOrDouble(onClick: () => void, onDoubleClick: () => void) {
+  const timer = useRef<number | null>(null)
+
+  useEffect(
+    () => () => {
+      if (timer.current != null) clearTimeout(timer.current)
+    },
+    [],
+  )
+
+  return {
+    onClick: () => {
+      // Zweiter Klick innerhalb der Frist: nichts tun, gleich kommt der Doppelklick.
+      if (timer.current != null) return
+      timer.current = window.setTimeout(() => {
+        timer.current = null
+        onClick()
+      }, DOUBLE_CLICK_GRACE_MS)
+    },
+    onDoubleClick: () => {
+      if (timer.current != null) {
+        clearTimeout(timer.current)
+        timer.current = null
+      }
+      onDoubleClick()
+    },
+  }
+}
+
+/** Namensfeld einer Objektzeile, das per Doppelklick zur Eingabe wird. */
+function RowName({ entity, onSelect }: { entity: Entity; onSelect: (id: string) => void }) {
+  const updateEntity = useStore((s) => s.updateEntity)
+  const [draft, setDraft] = useState<string | null>(null)
+  const handlers = useClickOrDouble(
+    () => onSelect(entity.id),
+    () => setDraft(entity.name),
+  )
+
+  function commit() {
+    const name = (draft ?? '').trim()
+    if (name && name !== entity.name) updateEntity(entity.id, { name })
+    setDraft(null)
+  }
+
+  if (draft != null) {
+    return (
+      <input
+        className="marker-list__rename"
+        value={draft}
+        autoFocus
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') commit()
+          if (e.key === 'Escape') setDraft(null)
+        }}
+        onFocus={(e) => e.currentTarget.select()}
+        // Sonst wuerde jeder Klick ins Feld die umgebende Zeile aus- bzw. abwaehlen.
+        onClick={(e) => e.stopPropagation()}
+        onDoubleClick={(e) => e.stopPropagation()}
+      />
+    )
+  }
+
+  // stopPropagation: Die umgebende Zeile behandelt Klicks ebenfalls - ohne das wuerde die
+  // Auswahl doppelt ausgeloest.
+  return (
+    <span
+      className="marker-list__name"
+      title="Doppelklick zum Umbenennen"
+      onClick={(e) => {
+        e.stopPropagation()
+        handlers.onClick()
+      }}
+      onDoubleClick={(e) => {
+        e.stopPropagation()
+        handlers.onDoubleClick()
+      }}
+    >
+      {entity.name}
+    </span>
+  )
+}
+
 /** Zeile fuer ein Objekt der aktuell betrachteten Karte (nicht im Kampfmodus). */
 function EntityRow({
   entity,
@@ -912,16 +1156,27 @@ function EntityRow({
   dropdown?: React.ReactNode
 }) {
   const meta = entityDisplayMeta(entity)
+  const handlers = useClickOrDouble(() => onSelect(entity.id), () => {})
   return (
     <li className={dropdown ? 'marker-list__row--expanded' : undefined}>
-      <button
+      {/* Bewusst kein <button>: Der Name wird beim Umbenennen zum Eingabefeld, und ein
+          Eingabefeld in einem Knopf waere ungueltig und kaum bedienbar. */}
+      <div
         className={`marker-list__item${selected ? ' is-selected' : ''}`}
         style={{ ['--chip-color' as string]: meta.color }}
-        onClick={() => onSelect(entity.id)}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            onSelect(entity.id)
+          }
+        }}
+        {...handlers}
       >
         <EntityIcon entity={entity} className="marker-list__icon" />
-        <span className="marker-list__name">{entity.name}</span>
-      </button>
+        <RowName entity={entity} onSelect={onSelect} />
+      </div>
       {dropdown && <div className="marker-list__dropdown">{dropdown}</div>}
     </li>
   )
@@ -946,16 +1201,17 @@ function EnemyRow({
   dropdown?: React.ReactNode
 }) {
   const meta = entityDisplayMeta(entity)
+  const handlers = useClickOrDouble(() => onSelect(entity.id), () => {})
   return (
     <li className={dropdown ? 'marker-list__row--expanded' : undefined}>
       <div
         className={`marker-list__item enemyrow${selected ? ' is-selected' : ''}`}
         style={{ ['--chip-color' as string]: meta.color }}
       >
-        <button className="enemyrow__name" onClick={() => onSelect(entity.id)}>
+        <div className="enemyrow__name" role="button" tabIndex={0} {...handlers}>
           <EntityIcon entity={entity} className="marker-list__icon" />
-          <span className="marker-list__name">{entity.name}</span>
-        </button>
+          <RowName entity={entity} onSelect={onSelect} />
+        </div>
         <span className="enemyrow__init">
           <input
             type="number"

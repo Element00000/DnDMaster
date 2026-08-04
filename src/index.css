@@ -441,6 +441,8 @@ button {
   gap: 4px;
 }
 
+/* Kein <button>, damit der Name beim Umbenennen zum Eingabefeld werden kann - der
+   Zeigefinger muss deshalb hier gesetzt werden. */
 .marker-list__item {
   width: 100%;
   display: flex;
@@ -452,6 +454,7 @@ button {
   background: transparent;
   color: var(--ink);
   text-align: left;
+  cursor: pointer;
   border-left: 3px solid var(--chip-color, var(--border));
 }
 
@@ -519,6 +522,24 @@ button {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Eingabefeld, das beim Umbenennen an die Stelle des Namens tritt (Doppelklick). */
+.marker-list__rename {
+  flex: 1;
+  min-width: 0;
+  background: var(--panel);
+  border: 1px solid var(--accent);
+  border-radius: 5px;
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 13px;
+  padding: 2px 6px;
+}
+
+.marker-list__rename:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--accent-tint);
 }
 
 .marker-list__type {
@@ -735,22 +756,11 @@ button {
   display: block;
 }
 
-/**
- * Auf 150 % herangezoomt, damit das Gesicht den kleinen Kreis fuellt. Der Zoom ist auf
- * horizontal die Mitte und vertikal ein Drittel von oben zentriert - dort sitzt bei einem
- * Portraet der Kopf, waehrend die Bildmitte meist schon auf Brusthoehe liegt.
- *
- * Rechnung bei 24 px Kreis und 36 px Bild: "left/top: 50 %" setzt die Bildkante in die
- * Kreismitte, das Verschieben um -50 % / -33,333 % der Bildgroesse zieht genau den
- * gewuenschten Bildpunkt dorthin zurueck.
- */
+/* Der Ausschnitt steckt bereits in der Miniatur (siehe defaultThumbCrop bzw. die freie
+   Wahl per Pinnadel-Knopf im Detailpanel) - hier wird nur noch gefuellt. */
 .map-pin__image {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 150%;
-  height: 150%;
-  transform: translate(-50%, -33.333%);
+  width: 100%;
+  height: 100%;
   object-fit: cover;
   display: block;
 }
@@ -982,6 +992,7 @@ button {
   text-align: left;
   padding: 0;
   font: inherit;
+  cursor: pointer;
 }
 
 .enemyrow__init {
@@ -4370,11 +4381,67 @@ button {
   color: var(--danger);
 }
 
+.entity-image__act--pin {
+  font-size: 13px;
+}
+
 .entity-image__error {
   margin: 0;
   font-size: 11.5px;
   color: var(--danger);
   line-height: 1.4;
+}
+
+/* ---------- Ausschnitt fuer die Pinnadel waehlen ---------- */
+.crop {
+  position: absolute;
+  inset: 0;
+  touch-action: none;
+}
+
+/* Der riesige Schattenring dunkelt alles ausserhalb der Auswahl ab; der Rahmen
+   (.entity-image__frame) schneidet ihn auf seine Flaeche zu. */
+.crop__sel {
+  position: absolute;
+  border: 2px solid var(--accent);
+  border-radius: 50%;
+  box-shadow: 0 0 0 9999px rgba(6, 8, 12, 0.62);
+  cursor: move;
+}
+
+.crop__handle {
+  position: absolute;
+  right: -7px;
+  bottom: -7px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--panel);
+  cursor: nwse-resize;
+}
+
+.crop__bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  background: rgba(13, 15, 20, 0.88);
+  backdrop-filter: blur(3px);
+}
+
+.crop__hint {
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+  color: var(--ink-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .detail__ai {

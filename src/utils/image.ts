@@ -53,10 +53,42 @@ export function fileToScaledDataUrl(
 export const THUMB_SIZE = 64
 
 /**
- * Erzeugt aus einer Bild-data-URL ein quadratisches Miniaturbild (mittiger Ausschnitt,
- * damit Portraits nicht verzerrt werden).
+ * Bildausschnitt in Anteilen der Bildabmessungen (0..1), aus dem die Miniatur entsteht.
+ * Wird am Objekt gespeichert, damit sich die Wahl spaeter wieder anzeigen und aendern
+ * laesst - und damit die Miniatur nach einem Bildwechsel neu berechnet werden kann.
  */
-export function dataUrlToThumb(dataUrl: string, size = THUMB_SIZE): Promise<string> {
+export interface ThumbCrop {
+  x: number
+  y: number
+  w: number
+  h: number
+}
+
+/**
+ * Vorgabe-Ausschnitt eines Portraets: quadratisch, horizontal mittig, und so hoch gesetzt,
+ * dass ein Drittel der Bildhoehe im Mittelpunkt liegt - dort sitzt bei einem Portraet der
+ * Kopf, waehrend die Bildmitte meist schon auf Brusthoehe faellt. Die Kantenlaenge betraegt
+ * zwei Drittel der kuerzeren Seite, was einem Heranzoomen auf 150 % entspricht.
+ */
+export function defaultThumbCrop(naturalWidth: number, naturalHeight: number): ThumbCrop {
+  const side = (Math.min(naturalWidth, naturalHeight) * 2) / 3
+  const cx = naturalWidth / 2
+  const cy = naturalHeight / 3
+  // In den Bildgrenzen halten, damit keine leeren Raender entstehen.
+  const x = Math.max(0, Math.min(naturalWidth - side, cx - side / 2))
+  const y = Math.max(0, Math.min(naturalHeight - side, cy - side / 2))
+  return { x: x / naturalWidth, y: y / naturalHeight, w: side / naturalWidth, h: side / naturalHeight }
+}
+
+/**
+ * Erzeugt aus einer Bild-data-URL ein quadratisches Miniaturbild. Ohne Ausschnitt gilt die
+ * Vorgabe aus defaultThumbCrop.
+ */
+export function dataUrlToThumb(
+  dataUrl: string,
+  crop?: ThumbCrop | null,
+  size = THUMB_SIZE,
+): Promise<string> {
   return new Promise((resolve, reject) => {
     const img = new Image()
     img.onerror = () => reject(new Error('Bild konnte nicht geladen werden.'))
@@ -69,13 +101,20 @@ export function dataUrlToThumb(dataUrl: string, size = THUMB_SIZE): Promise<stri
         reject(new Error('Canvas nicht verfuegbar.'))
         return
       }
-      // Quadratischer Ausschnitt aus der Mitte, auf die volle Flaeche gezogen.
-      const side = Math.min(img.naturalWidth, img.naturalHeight)
-      const sx = (img.naturalWidth - side) / 2
-      const sy = (img.naturalHeight - side) / 2
+      const c = crop ?? defaultThumbCrop(img.naturalWidth, img.naturalHeight)
       ctx.fillStyle = '#12151d'
       ctx.fillRect(0, 0, size, size)
-      ctx.drawImage(img, sx, sy, side, side, 0, 0, size, size)
+      ctx.drawImage(
+        img,
+        c.x * img.naturalWidth,
+        c.y * img.naturalHeight,
+        c.w * img.naturalWidth,
+        c.h * img.naturalHeight,
+        0,
+        0,
+        size,
+        size,
+      )
       resolve(canvas.toDataURL('image/jpeg', 0.78))
     }
     img.src = dataUrl
