@@ -5,16 +5,13 @@ import {
   ENTITY_TYPES,
   FIELD_SCHEMA,
   FREUND_BERUFE,
-  RELATIONS,
   SKILLS,
   SKILLS_FIELD,
   entityDisplayMeta,
-  entityMeta,
   parseSkills,
-  relationMeta,
   serializeSkills,
 } from '../types'
-import type { Campaign, Entity, EntityType, RelationType, ThumbCrop } from '../types'
+import type { Entity, ThumbCrop } from '../types'
 import { useStore } from '../store/useStore'
 import { defaultThumbCrop, fileToScaledDataUrl } from '../utils/image'
 import { deleteAsset } from '../utils/assets'
@@ -35,10 +32,6 @@ export function DetailPanel() {
   const setEntityField = useStore((s) => s.setEntityField)
   const deleteEntity = useStore((s) => s.deleteEntity)
   const selectEntity = useStore((s) => s.selectEntity)
-  const addEntity = useStore((s) => s.addEntity)
-  const addLink = useStore((s) => s.addLink)
-  const removeLink = useStore((s) => s.removeLink)
-  const setPlacement = useStore((s) => s.setPlacement)
   const setPlacingEntity = useStore((s) => s.setPlacingEntity)
   const setActiveLayer = useStore((s) => s.setActiveLayer)
   const setToolsOpen = useStore((s) => s.setToolsOpen)
@@ -96,11 +89,6 @@ export function DetailPanel() {
   if (marker) {
     const meta = entityDisplayMeta(marker)
     const fields = FIELD_SCHEMA[marker.type]
-    const others = campaign.entities.filter((e) => e.id !== marker.id)
-    // Eingehende Verknuepfungen (andere Objekte, die auf dieses zeigen).
-    const incoming = campaign.entities
-      .filter((e) => e.id !== marker.id)
-      .flatMap((e) => e.links.filter((l) => l.targetId === marker.id).map((l) => ({ from: e, relation: l.relation })))
 
     const portrait = <EntityImageField entity={marker} readOnly={readOnly} />
 
@@ -108,17 +96,18 @@ export function DetailPanel() {
     // der Name steht in der Objektzeile darueber, wo er per Doppelklick geaendert wird.
     // Nur wenn das Objekt gar nicht in der Liste steht (auf einer anderen Karte, ueber eine
     // Verknuepfung ausgewaehlt), gaebe es sonst keine Stelle dafuer - dann hier.
-    const header = (
+    // Klappt das Objekt direkt unter seiner Listenzeile auf, entfaellt die Kopfzeile ganz:
+    // Der Name steht schon in der Zeile darueber, und geschlossen wird per erneutem Klick
+    // darauf. Sie wuerde nur Leerraum und eine Trennlinie ueber dem Bild erzeugen.
+    const header = showInline ? null : (
       <div className="detail__header">
-        {!showInline && (
-          <input
-            className="detail__title-input"
-            value={marker.name}
-            onChange={(e) => updateEntity(marker.id, { name: e.target.value })}
-            placeholder="Name"
-            disabled={readOnly}
-          />
-        )}
+        <input
+          className="detail__title-input"
+          value={marker.name}
+          onChange={(e) => updateEntity(marker.id, { name: e.target.value })}
+          placeholder="Name"
+          disabled={readOnly}
+        />
         <button className="detail__close" onClick={() => selectEntity(null)} title="Schliessen">
           &times;
         </button>
@@ -270,18 +259,8 @@ export function DetailPanel() {
           />
         )}
 
-        {/* Charakter: Fraktion waehlen oder neu anlegen */}
-        {marker.type === 'nsc' && (
-          <FactionField
-            entity={marker}
-            campaign={campaign}
-            readOnly={readOnly}
-            addEntity={addEntity}
-            addLink={addLink}
-            removeLink={removeLink}
-            selectEntity={selectEntity}
-          />
-        )}
+        {/* Fraktion und Verknuepfungen stehen in der unteren Leiste unter "Beziehungen",
+            der Tagesablauf unter "Zeitleiste" - siehe EntityRelations bzw. DaySchedule. */}
 
         {/* Entscheidung: Optionen & Folgen */}
         {marker.type === 'entscheidung' && (
@@ -299,36 +278,18 @@ export function DetailPanel() {
           </div>
         )}
 
-        {/* Verknuepfungen */}
-        <div className="field">
-          <span className="field__label">Verknuepfungen</span>
-          <LinksEditor
-            entity={marker}
-            others={others}
-            incoming={incoming}
-            readOnly={readOnly}
-            onAdd={addLink}
-            onRemove={removeLink}
-            onNavigate={selectEntity}
-          />
-        </div>
-
         {!readOnly && (
           <>
-            <TimeFields entity={marker} onUpdate={(patch) => updateEntity(marker.id, patch)} />
-
-            <div className="field field--row">
-              <span className="field__label">Auf Karte</span>
-              {marker.placement ? (
-                <button className="btn btn--ghost btn--sm" onClick={() => setPlacement(marker.id, null)}>
-                  Von Karte entfernen
-                </button>
-              ) : (
+            {/* Kein "Von Karte entfernen" mehr: Jedes Objekt gehoert auf eine Karte. Der
+                Knopf bleibt fuer Altbestand, der noch ohne Position angelegt wurde. */}
+            {!marker.placement && (
+              <div className="field field--row">
+                <span className="field__label">Auf Karte</span>
                 <button className="btn btn--sm" onClick={() => setPlacingEntity(marker.id)}>
                   Auf Karte platzieren
                 </button>
-              )}
-            </div>
+              </div>
+            )}
 
             {marker.type === 'ort' && (
               <label className="field">
@@ -461,221 +422,6 @@ export function DetailPanel() {
   )
 }
 
-function TimeFields({
-  entity,
-  onUpdate,
-}: {
-  entity: Entity
-  onUpdate: (patch: Partial<Entity>) => void
-}) {
-  const setBottomPanel = useStore((s) => s.setBottomPanel)
-
-  return (
-    <div className="field">
-      <span className="field__label">Zeit</span>
-      <div className="timefields">
-        <div className="timefields__row">
-          <label className="timefields__cell">
-            <span className="timefields__mini">Kalendertag</span>
-            <input
-              className="field__control field__control--sm"
-              type="number"
-              min={0}
-              value={entity.day ?? ''}
-              placeholder="z.B. 12"
-              onChange={(e) =>
-                onUpdate({ day: e.target.value === '' ? null : Number(e.target.value) })
-              }
-            />
-          </label>
-        </div>
-
-        {/* Der Tagesablauf selbst wird im Zeitstrahl unten bearbeitet - hier steht nur,
-            was hinterlegt ist, und der Weg dorthin. */}
-        <div className="schedule">
-          <span className="timefields__mini">Tagesablauf</span>
-          {!entity.placement ? (
-            <p className="timefields__hint">
-              Objekt erst auf der Karte platzieren, um Aufenthaltsorte nach Uhrzeit festzulegen.
-            </p>
-          ) : (
-            <>
-              <p className="timefields__hint">
-                {entity.schedule.length === 0
-                  ? 'Kein Zeitfenster hinterlegt — das Objekt bleibt immer an derselben Stelle.'
-                  : `${entity.schedule.length} Zeitfenster hinterlegt (${entity.schedule.filter((s) => s.day == null).length} taeglich).`}
-              </p>
-              <button className="chipbtn" onClick={() => setBottomPanel('zeitleiste')}>
-                {'\u{1F551}'} In der Zeitleiste bearbeiten
-              </button>
-            </>
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function LinksEditor({
-  entity,
-  others,
-  incoming,
-  readOnly,
-  onAdd,
-  onRemove,
-  onNavigate,
-}: {
-  entity: Entity
-  others: Entity[]
-  incoming: { from: Entity; relation: RelationType }[]
-  readOnly: boolean
-  onAdd: (fromId: string, targetId: string, relation: RelationType) => void
-  onRemove: (fromId: string, targetId: string, relation: RelationType) => void
-  onNavigate: (id: string) => void
-}) {
-  const [relation, setRelation] = useState<RelationType>('befindet_sich_in')
-  const [targetId, setTargetId] = useState('')
-
-  const byId = (id: string) => others.find((e) => e.id === id)
-
-  return (
-    <div className="links">
-      {entity.links.length === 0 && incoming.length === 0 && (
-        <p className="links__empty">Keine Verknuepfungen.</p>
-      )}
-
-      <ul className="links__list">
-        {entity.links.map((l) => {
-          const target = byId(l.targetId)
-          if (!target) return null
-          const tMeta = entityMeta(target.type)
-          return (
-            <li key={`${l.targetId}-${l.relation}`} className="links__item">
-              <span className="links__rel">{relationMeta(l.relation).label}</span>
-              <button className="links__target" onClick={() => onNavigate(target.id)} style={{ ['--chip-color' as string]: tMeta.color }}>
-                <span>{tMeta.icon}</span>
-                {target.name}
-              </button>
-              {!readOnly && (
-                <button
-                  className="links__remove"
-                  title="Verknuepfung entfernen"
-                  onClick={() => onRemove(entity.id, l.targetId, l.relation)}
-                >
-                  &times;
-                </button>
-              )}
-            </li>
-          )
-        })}
-
-        {/* Eingehend, nur zur Anzeige */}
-        {incoming.map(({ from, relation: rel }) => {
-          const fMeta = entityMeta(from.type)
-          return (
-            <li key={`in-${from.id}-${rel}`} className="links__item links__item--incoming">
-              <span className="links__rel">{relationMeta(rel).inverseLabel}</span>
-              <button className="links__target" onClick={() => onNavigate(from.id)} style={{ ['--chip-color' as string]: fMeta.color }}>
-                <span>{fMeta.icon}</span>
-                {from.name}
-              </button>
-            </li>
-          )
-        })}
-      </ul>
-
-      {!readOnly && others.length > 0 && (
-        <div className="links__add">
-          <select className="field__control field__control--sm" value={relation} onChange={(e) => setRelation(e.target.value as RelationType)}>
-            {RELATIONS.map((r) => (
-              <option key={r.relation} value={r.relation}>
-                {r.label}
-              </option>
-            ))}
-          </select>
-          <select className="field__control field__control--sm" value={targetId} onChange={(e) => setTargetId(e.target.value)}>
-            <option value="">Objekt waehlen ...</option>
-            {others.map((e) => (
-              <option key={e.id} value={e.id}>
-                {entityMeta(e.type).icon} {e.name}
-              </option>
-            ))}
-          </select>
-          <button
-            className="btn btn--sm"
-            disabled={!targetId}
-            onClick={() => {
-              if (targetId) {
-                onAdd(entity.id, targetId, relation)
-                setTargetId('')
-              }
-            }}
-          >
-            +
-          </button>
-        </div>
-      )}
-    </div>
-  )
-}
-
-function FactionField({
-  entity,
-  campaign,
-  readOnly,
-  addEntity,
-  addLink,
-  removeLink,
-  selectEntity,
-}: {
-  entity: Entity
-  campaign: Campaign
-  readOnly: boolean
-  addEntity: (input: { type: EntityType; name?: string }) => string
-  addLink: (fromId: string, targetId: string, relation: RelationType) => void
-  removeLink: (fromId: string, targetId: string, relation: RelationType) => void
-  selectEntity: (id: string | null) => void
-}) {
-  const factions = campaign.entities.filter((e) => e.type === 'fraktion')
-  const currentId =
-    entity.links.find(
-      (l) => l.relation === 'gehoert_zu' && campaign.entities.find((e) => e.id === l.targetId)?.type === 'fraktion',
-    )?.targetId ?? ''
-
-  function onChange(value: string) {
-    if (currentId) removeLink(entity.id, currentId, 'gehoert_zu')
-    if (value === '__new__') {
-      const name = prompt('Name der neuen Fraktion:')
-      if (name && name.trim()) {
-        const newId = addEntity({ type: 'fraktion', name: name.trim() })
-        addLink(entity.id, newId, 'gehoert_zu')
-        selectEntity(entity.id)
-      }
-    } else if (value) {
-      addLink(entity.id, value, 'gehoert_zu')
-    }
-  }
-
-  return (
-    <label className="field">
-      <span className="field__label">Fraktion</span>
-      <select
-        className="field__control"
-        value={currentId}
-        onChange={(e) => onChange(e.target.value)}
-        disabled={readOnly}
-      >
-        <option value="">&ndash; keine &ndash;</option>
-        {factions.map((f) => (
-          <option key={f.id} value={f.id}>
-            {f.name}
-          </option>
-        ))}
-        <option value="__new__">+ Neue Fraktion ...</option>
-      </select>
-    </label>
-  )
-}
 
 /**
  * Bildbereich eines Objekts: immer ein Rechteck in fester Groesse - entweder mit dem
@@ -740,8 +486,9 @@ function EntityImageField({ entity, readOnly }: { entity: Entity; readOnly: bool
   return (
     <div className="entity-image">
       <div className={`entity-image__frame${url ? ' has-image' : ''}`}>
+        {/* Waehrend der Ausschnittwahl bringt CropSelector sein eigenes, zoombares Bild mit. */}
         {url ? (
-          <img src={url} alt={entity.name} />
+          !cropping && <img src={url} alt={entity.name} />
         ) : (
           <button
             type="button"
@@ -816,8 +563,12 @@ function EntityImageField({ entity, readOnly }: { entity: Entity; readOnly: bool
   )
 }
 
-/** Kleinste Kantenlaenge der Auswahl, in Bildschirmpunkten des Rahmens. */
-const MIN_CROP_PX = 28
+/** Kleinste Kantenlaenge des Ausschnitts, in Bildpunkten des Originals. */
+const MIN_CROP_SIDE = 32
+/** Groesse, die der Ausschnitt im Rahmen anstrebt (Anteil der kuerzeren Rahmenseite). */
+const CROP_VIEW_TARGET = 0.6
+/** Obergrenze der Vergroesserung, damit ein kleiner Ausschnitt nicht zu Matsch wird. */
+const CROP_MAX_ZOOM = 6
 
 /**
  * Auswahl des Bildausschnitts, der auf der Kartenpinnadel erscheint. Liegt als Ueberlagerung
@@ -838,14 +589,15 @@ function CropSelector({
   onApply: (crop: ThumbCrop) => void
 }) {
   const boxRef = useRef<HTMLDivElement>(null)
-  /** Flaeche, die das Bild im Rahmen tatsaechlich einnimmt (es wird eingepasst, nicht gefuellt). */
-  const [area, setArea] = useState<{ left: number; top: number; width: number; height: number } | null>(null)
-  const [sel, setSel] = useState<{ x: number; y: number; size: number } | null>(null)
+  const [nat, setNat] = useState<{ w: number; h: number } | null>(null)
+  const [box, setBox] = useState<{ w: number; h: number } | null>(null)
+  /** Ausschnitt in Bildpunkten des Originals: Mittelpunkt und Kantenlaenge des Quadrats. */
+  const [sel, setSel] = useState<{ cx: number; cy: number; side: number } | null>(null)
   const drag = useRef<{
-    mode: 'move' | 'resize'
+    mode: 'pan' | 'resize'
     startX: number
     startY: number
-    orig: { x: number; y: number; size: number }
+    orig: { cx: number; cy: number; side: number }
   } | null>(null)
 
   useEffect(() => {
@@ -854,15 +606,14 @@ function CropSelector({
     img.onload = () => {
       const el = boxRef.current
       if (!alive || !el) return
-      const cw = el.clientWidth
-      const ch = el.clientHeight
-      const scale = Math.min(cw / img.naturalWidth, ch / img.naturalHeight)
-      const width = img.naturalWidth * scale
-      const height = img.naturalHeight * scale
-      const a = { left: (cw - width) / 2, top: (ch - height) / 2, width, height }
       const c = crop ?? defaultThumbCrop(img.naturalWidth, img.naturalHeight)
-      setArea(a)
-      setSel({ x: a.left + c.x * a.width, y: a.top + c.y * a.height, size: c.w * a.width })
+      setNat({ w: img.naturalWidth, h: img.naturalHeight })
+      setBox({ w: el.clientWidth, h: el.clientHeight })
+      setSel({
+        cx: (c.x + c.w / 2) * img.naturalWidth,
+        cy: (c.y + c.h / 2) * img.naturalHeight,
+        side: c.w * img.naturalWidth,
+      })
     }
     img.src = src
     return () => {
@@ -870,7 +621,29 @@ function CropSelector({
     }
   }, [src, crop])
 
-  function onDown(e: React.PointerEvent, mode: 'move' | 'resize') {
+  // Darstellung: Das Bild wird umso staerker vergroessert, je kleiner der Ausschnitt ist,
+  // damit ein kleines Quadrat nicht zur Fummelei wird. Die Wurzel daempft das - es wird
+  // "ein Stueck" herangezoomt, nicht bis der Ausschnitt den Rahmen fuellt.
+  const layout =
+    nat && box && sel
+      ? (() => {
+          const fit = Math.min(box.w / nat.w, box.h / nat.h)
+          const target = Math.min(box.w, box.h) * CROP_VIEW_TARGET
+          const zoom = clampNum(Math.sqrt(target / (sel.side * fit)), 1, CROP_MAX_ZOOM)
+          const scale = fit * zoom
+          return {
+            scale,
+            imgW: nat.w * scale,
+            imgH: nat.h * scale,
+            // Der Ausschnitt sitzt fest in der Mitte, das Bild wandert darunter.
+            imgLeft: box.w / 2 - sel.cx * scale,
+            imgTop: box.h / 2 - sel.cy * scale,
+            selPx: sel.side * scale,
+          }
+        })()
+      : null
+
+  function onDown(e: React.PointerEvent, mode: 'pan' | 'resize') {
     if (!sel || e.button !== 0) return
     e.preventDefault()
     e.stopPropagation()
@@ -880,21 +653,16 @@ function CropSelector({
 
   function onMove(e: React.PointerEvent) {
     const d = drag.current
-    if (!d || !area || !(e.currentTarget as HTMLElement).hasPointerCapture(e.pointerId)) return
-    const dx = e.clientX - d.startX
-    const dy = e.clientY - d.startY
+    if (!d || !nat || !layout || !(e.currentTarget as HTMLElement).hasPointerCapture(e.pointerId)) return
+    const dx = (e.clientX - d.startX) / layout.scale
+    const dy = (e.clientY - d.startY) / layout.scale
 
-    if (d.mode === 'move') {
-      // Innerhalb der Bildflaeche halten, damit der Ausschnitt keine leeren Raender enthaelt.
-      setSel({
-        x: clampNum(d.orig.x + dx, area.left, area.left + area.width - d.orig.size),
-        y: clampNum(d.orig.y + dy, area.top, area.top + area.height - d.orig.size),
-        size: d.orig.size,
-      })
+    if (d.mode === 'pan') {
+      // Das Bild folgt dem Zeiger, der Ausschnitt wandert also gegenlaeufig darueber.
+      setSel(clampSel({ ...d.orig, cx: d.orig.cx - dx, cy: d.orig.cy - dy }, nat))
       return
     }
-    const maxSize = Math.min(area.left + area.width - d.orig.x, area.top + area.height - d.orig.y)
-    setSel({ ...d.orig, size: clampNum(d.orig.size + Math.max(dx, dy), MIN_CROP_PX, maxSize) })
+    setSel(clampSel({ ...d.orig, side: d.orig.side + Math.max(dx, dy) * 2 }, nat))
   }
 
   function onUp(e: React.PointerEvent) {
@@ -904,22 +672,36 @@ function CropSelector({
   }
 
   function commit() {
-    if (!sel || !area) return
+    if (!sel || !nat) return
     onApply({
-      x: (sel.x - area.left) / area.width,
-      y: (sel.y - area.top) / area.height,
-      w: sel.size / area.width,
-      h: sel.size / area.height,
+      x: (sel.cx - sel.side / 2) / nat.w,
+      y: (sel.cy - sel.side / 2) / nat.h,
+      w: sel.side / nat.w,
+      h: sel.side / nat.h,
     })
   }
 
   return (
     <div className="crop" ref={boxRef}>
-      {sel && (
+      {layout && (
+        <img
+          className="crop__img"
+          src={src}
+          alt=""
+          draggable={false}
+          style={{ left: layout.imgLeft, top: layout.imgTop, width: layout.imgW, height: layout.imgH }}
+          onPointerDown={(e) => onDown(e, 'pan')}
+          onPointerMove={onMove}
+          onPointerUp={onUp}
+          onPointerCancel={onUp}
+        />
+      )}
+
+      {layout && (
         <div
           className="crop__sel"
-          style={{ left: sel.x, top: sel.y, width: sel.size, height: sel.size }}
-          onPointerDown={(e) => onDown(e, 'move')}
+          style={{ width: layout.selPx, height: layout.selPx }}
+          onPointerDown={(e) => onDown(e, 'pan')}
           onPointerMove={onMove}
           onPointerUp={onUp}
           onPointerCancel={onUp}
@@ -935,7 +717,7 @@ function CropSelector({
       )}
 
       <div className="crop__bar">
-        <span className="crop__hint">Ausschnitt fuer die Pinnadel</span>
+        <span className="crop__hint">Bild schieben · Ecke ziehen</span>
         <button className="btn btn--sm" onClick={onCancel} disabled={busy}>
           Abbrechen
         </button>
@@ -945,6 +727,19 @@ function CropSelector({
       </div>
     </div>
   )
+}
+
+/** Ausschnitt in den Bildgrenzen halten, damit er keine leeren Raender enthaelt. */
+function clampSel(
+  sel: { cx: number; cy: number; side: number },
+  nat: { w: number; h: number },
+): { cx: number; cy: number; side: number } {
+  const side = clampNum(sel.side, MIN_CROP_SIDE, Math.min(nat.w, nat.h))
+  return {
+    side,
+    cx: clampNum(sel.cx, side / 2, nat.w - side / 2),
+    cy: clampNum(sel.cy, side / 2, nat.h - side / 2),
+  }
 }
 
 function clampNum(v: number, min: number, max: number): number {

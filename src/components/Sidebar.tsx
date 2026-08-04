@@ -30,12 +30,10 @@ export function Sidebar() {
   const layer = campaign.layers.find((l) => l.id === campaign.activeLayerId) ?? campaign.layers[0]
   const tool = useStore((s) => s.tool)
   const pendingType = useStore((s) => s.pendingEntityType)
-  const pendingFields = useStore((s) => s.pendingEntityFields)
   const tableMode = useStore((s) => s.tableMode)
   const setTool = useStore((s) => s.setTool)
   const setPendingType = useStore((s) => s.setPendingEntityType)
   const setPendingFields = useStore((s) => s.setPendingEntityFields)
-  const addEntity = useStore((s) => s.addEntity)
   const toolsOpen = useStore((s) => s.toolsOpen)
   const toolsTab = useStore((s) => s.toolsTab)
   const setToolsOpen = useStore((s) => s.setToolsOpen)
@@ -407,18 +405,11 @@ export function Sidebar() {
               </>,
               document.body,
             )}
+          {/* Ein Objekt entsteht immer durch einen Klick auf die Karte - es gibt keinen Weg
+              mehr, eines ohne Position anzulegen. */}
           {tool === 'add' ? (
             <div className="sidebar__actions">
-              <button
-                className="btn btn--ghost btn--full"
-                onClick={() => {
-                  addEntity({ type: pendingType, fields: pendingFields })
-                  setTool('select')
-                }}
-                title="Objekt ohne Kartenposition anlegen"
-              >
-                Ohne Karte anlegen
-              </button>
+              <p className="sidebar__hint">Klicke auf die Karte, um das Objekt dort anzulegen.</p>
               <button className="btn btn--ghost btn--full" onClick={() => setTool('select')}>
                 Abbrechen
               </button>

@@ -60,6 +60,7 @@ export function Timeline() {
 /** Tagesablauf-Ansicht eines Objekts inkl. Kopfzeile mit Objektnamen. */
 function ObjectSchedule({ entity }: { entity: Entity }) {
   const setPlacingEntity = useStore((s) => s.setPlacingEntity)
+  const updateEntity = useStore((s) => s.updateEntity)
   const meta = entityDisplayMeta(entity)
 
   if (!entity.placement) {
@@ -82,6 +83,21 @@ function ObjectSchedule({ entity }: { entity: Entity }) {
       <div className="timeline__subject" style={{ ['--chip-color' as string]: meta.color }}>
         <EntityIcon entity={entity} className="timeline__subject-icon" />
         <span className="timeline__subject-name">{entity.name}</span>
+        {/* Kalendertag des Objekts: bestimmt, unter welchem Tag es in der Kampagnen-
+            Zeitleiste einsortiert wird. Stand frueher im Detailpanel. */}
+        <label className="timeline__day-field">
+          <span>Kalendertag</span>
+          <input
+            className="field__control field__control--sm"
+            type="number"
+            min={0}
+            value={entity.day ?? ''}
+            placeholder="ohne"
+            onChange={(e) =>
+              updateEntity(entity.id, { day: e.target.value === '' ? null : Number(e.target.value) })
+            }
+          />
+        </label>
         <span className="timeline__subject-hint">
           Ausserhalb aller Zeitfenster steht das Objekt an seiner normalen Position.
         </span>

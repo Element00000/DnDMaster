@@ -2,7 +2,7 @@ import { useCallback, useRef } from 'react'
 import { useStore } from '../store/useStore'
 import { Timeline } from './Timeline'
 import { StoryTree } from './StoryTree'
-import { RelationGraph } from './RelationGraph'
+import { RelationsPanel } from './RelationsPanel'
 
 /**
  * Rahmen der unteren, hochfahrenden Leiste: stellt Schliessen-Knopf und den Ziehgriff zum
@@ -65,7 +65,7 @@ export function BottomPanel() {
       <div className="bottompanel__content">
         {panel === 'zeitleiste' && <Timeline />}
         {panel === 'handlungsbaum' && <StoryTree />}
-        {panel === 'beziehungen' && <RelationGraph />}
+        {panel === 'beziehungen' && <RelationsPanel />}
       </div>
     </div>
   )

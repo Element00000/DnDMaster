@@ -2078,6 +2078,87 @@ button {
   color: var(--ink-faint);
 }
 
+/* Kalendertag des Objekts, frueher im Detailpanel. */
+.timeline__day-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--ink-faint);
+  white-space: nowrap;
+}
+
+.timeline__day-field input {
+  width: 74px;
+}
+
+/* ---------- Beziehungen-Panel (untere Leiste) ---------- */
+.relpanel {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.relpanel__body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.relations {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 14px 16px;
+  max-width: 760px;
+}
+
+.relations__subject {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-left: 10px;
+  border-left: 3px solid var(--chip-color, var(--gold));
+}
+
+.relations__subject-icon {
+  font-size: 17px;
+}
+
+.relations__subject-icon--image {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex: none;
+}
+
+.relations__subject-name {
+  font-family: var(--font-display);
+  font-size: 15px;
+  color: var(--ink);
+}
+
+.relations__subject-type {
+  font-size: 11.5px;
+  color: var(--ink-faint);
+}
+
+.links__target-icon {
+  font-size: 13px;
+}
+
+.links__target-icon--image {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex: none;
+}
+
 .timeline__empty {
   padding: 24px 16px;
   color: var(--ink-faint);
@@ -4560,14 +4641,34 @@ button {
   touch-action: none;
 }
 
+/* Das Bild wandert unter dem fest sitzenden Ausschnitt - je kleiner der Ausschnitt, desto
+   groesser wird es dargestellt (siehe CROP_VIEW_TARGET). */
+.crop__img {
+  position: absolute;
+  max-width: none;
+  cursor: grab;
+  user-select: none;
+}
+
+.crop__img:active {
+  cursor: grabbing;
+}
+
 /* Der riesige Schattenring dunkelt alles ausserhalb der Auswahl ab; der Rahmen
    (.entity-image__frame) schneidet ihn auf seine Flaeche zu. */
 .crop__sel {
   position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
   border: 2px solid var(--accent);
   border-radius: 50%;
   box-shadow: 0 0 0 9999px rgba(6, 8, 12, 0.62);
-  cursor: move;
+  cursor: grab;
+}
+
+.crop__sel:active {
+  cursor: grabbing;
 }
 
 .crop__handle {

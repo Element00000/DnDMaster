@@ -169,7 +169,7 @@ export function RelationGraph() {
 
       {nodes.length === 0 ? (
         <p className="graph__empty">
-          Keine Beziehungen vorhanden. Verknuepfe Objekte im Detailpanel (Abschnitt „Verknuepfungen").
+          Keine Beziehungen vorhanden. Verknuepfe Objekte im Reiter „Objekt" nebenan.
         </p>
       ) : (
         <div
