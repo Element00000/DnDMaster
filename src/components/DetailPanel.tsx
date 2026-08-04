@@ -563,6 +563,13 @@ function EntityImageField({ entity, readOnly }: { entity: Entity; readOnly: bool
   )
 }
 
+/**
+ * Zeichengrenze der kurzen Kampfwerte (Speed, Uebung, RK, HP, STR..CHA). Bewusst Zeichen
+ * statt reiner Ziffern, damit Boni wie "+3" weiterhin eingetragen werden koennen. XP und
+ * die Textfelder bleiben unbegrenzt.
+ */
+const SHORT_STAT_LENGTH = 3
+
 /** Kleinste Kantenlaenge des Ausschnitts, in Bildpunkten des Originals. */
 const MIN_CROP_SIDE = 32
 /** Groesse, die der Ausschnitt im Rahmen anstrebt (Anteil der kuerzeren Rahmenseite). */
@@ -787,7 +794,7 @@ function CombatStatFields({
   readOnly: boolean
   onFieldChange: (key: string, value: string) => void
 }) {
-  const coreStats = COMBAT_STAT_FIELDS.slice(0, 4) // Speed, Uebungsbonus, RK, HP
+  const coreStats = COMBAT_STAT_FIELDS.slice(0, 4) // Speed, Uebung, RK, HP
   const abilityScores = COMBAT_STAT_FIELDS.slice(4, 10) // STR..CHA
   const xpField = COMBAT_STAT_FIELDS[10]
   const textFields = COMBAT_STAT_FIELDS.slice(11) // Angriff, Bes. Faehigkeiten, Kampf-Taktik
@@ -802,6 +809,7 @@ function CombatStatFields({
             <input
               className="field__control field__control--sm"
               value={entity.fields[f.key] ?? ''}
+              maxLength={SHORT_STAT_LENGTH}
               onChange={(e) => onFieldChange(f.key, e.target.value)}
               disabled={readOnly}
             />
@@ -815,6 +823,7 @@ function CombatStatFields({
             <input
               className="field__control field__control--sm"
               value={entity.fields[f.key] ?? ''}
+              maxLength={SHORT_STAT_LENGTH}
               onChange={(e) => onFieldChange(f.key, e.target.value)}
               disabled={readOnly}
             />
