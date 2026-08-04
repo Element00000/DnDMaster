@@ -132,7 +132,7 @@ function CampaignDays() {
     .filter((e) => e.day != null)
     .filter((e) => !tableMode || e.visibility === 'spieler')
     .filter((e) => !filterId || related(e, filterId))
-    .sort((a, b) => (a.day! - b.day!) || (a.schedule[0]?.timeStart ?? -1) - (b.schedule[0]?.timeStart ?? -1))
+    .sort((a, b) => (a.day! - b.day!) || (a.schedule[0]?.time ?? -1) - (b.schedule[0]?.time ?? -1))
 
   // Nach Tag gruppieren.
   const days: { day: number; items: Entity[] }[] = []
@@ -203,7 +203,9 @@ function CampaignDays() {
                           <span
                             className="timeline__event-time"
                             title={e.schedule
-                              .map((s) => `${formatTime(s.timeStart)}–${formatTime(s.timeEnd)}`)
+                              .slice()
+                              .sort((a, b) => a.time - b.time)
+                              .map((s) => `ab ${formatTime(s.time)}${s.label ? ` ${s.label}` : ''}`)
                               .join(', ')}
                           >
                             {'\u{1F55B}'} wechselt Ort

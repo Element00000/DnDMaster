@@ -77,18 +77,19 @@ export interface EntityLink {
 }
 
 /**
- * Zeitfenster, in dem sich ein Objekt an einer anderen Stelle der Karte befindet
- * (gleiche Ebene wie die Basis-Platzierung). Ausserhalb aller Fenster gilt die
- * normale Platzierung. start>end laeuft ueber Mitternacht.
+ * Schluesselpunkt im Tagesablauf eines Objekts: Ab dieser Uhrzeit steht es an dieser
+ * Stelle der Karte (gleiche Ebene wie die Basis-Platzierung), bis der naechste
+ * Schluesselpunkt kommt. Vor dem ersten gilt die Basis-Platzierung - sie ist damit der
+ * feste Schluesselpunkt um 0 Uhr.
  *
- * Zwei Ebenen von Eintraegen (siehe activeScheduleEntry in utils/time.ts):
+ * Zwei Ebenen von Punkten (siehe activeScheduleKey in utils/time.ts):
  * - day === null: Standard-Tagesablauf, gilt an jedem Kampagnentag.
  * - day === <Zahl>: Ausnahme, gilt nur an diesem Kalendertag und hat dann Vorrang.
  */
-export interface ScheduleEntry {
+export interface ScheduleKey {
   id: string
-  timeStart: number
-  timeEnd: number
+  /** Uhrzeit in Minuten seit Mitternacht, ab der diese Position gilt. */
+  time: number
   x: number
   y: number
   /** Freie Beschriftung des Aufenthaltsorts fuer die Zeitleiste, z.B. "Marktplatz". */
@@ -131,8 +132,8 @@ export interface Entity {
   event: EventData | null
   /** Kampagnen-Kalendertag fuer die Zeitleiste; null = ohne Datum. */
   day: number | null
-  /** Zeitabhaengige Positionswechsel (z.B. vormittags Marktplatz, nachmittags Gaststaette). */
-  schedule: ScheduleEntry[]
+  /** Tagesablauf als Schluesselpunkte (z.B. ab 8 Uhr Marktplatz, ab 14 Uhr Gaststaette). */
+  schedule: ScheduleKey[]
   createdAt: number
 }
 

@@ -1,6 +1,6 @@
 // Hilfsfunktionen fuer die Tageszeit (Minuten seit Mitternacht, 0..1439).
 
-import type { ScheduleEntry } from '../types'
+import type { ScheduleKey } from '../types'
 
 export const MINUTES_PER_DAY = 24 * 60
 
@@ -34,40 +34,43 @@ export function inWindow(now: number, start: number | null, end: number | null):
 }
 
 /**
- * Welcher Zeitplan-Eintrag gilt zur Uhrzeit "minutes" am Kalendertag "day"?
- *
- * Ausnahmen des konkreten Tages schlagen den Standard-Tagesablauf: Steht die Wirtin
- * normalerweise ab 6 Uhr im Schankraum, an Tag 12 aber auf dem Fest, gewinnt der
- * Eintrag mit day === 12. Gibt es fuer die Uhrzeit gar keinen Eintrag, liefert die
- * Funktion undefined und es gilt die Basis-Platzierung des Objekts.
+ * Alle Schluesselpunkte, die am Kalendertag "day" gelten, chronologisch sortiert:
+ * der Standard-Tagesablauf plus die Ausnahmen dieses Tages. Fallen beide auf dieselbe
+ * Uhrzeit, steht die Ausnahme hinten und gewinnt damit in activeScheduleKey.
  */
-export function activeScheduleEntry(
-  schedule: ScheduleEntry[],
-  minutes: number,
-  day: number,
-): ScheduleEntry | undefined {
-  const exception = schedule.find((s) => s.day === day && inWindow(minutes, s.timeStart, s.timeEnd))
-  if (exception) return exception
-  return schedule.find((s) => s.day == null && inWindow(minutes, s.timeStart, s.timeEnd))
+export function scheduleForDay(schedule: ScheduleKey[], day: number): ScheduleKey[] {
+  return schedule
+    .filter((s) => s.day == null || s.day === day)
+    .slice()
+    .sort((a, b) => a.time - b.time || (a.day == null ? 0 : 1) - (b.day == null ? 0 : 1))
 }
 
 /**
- * Zerlegt ein Zeitfenster in die Abschnitte, die es auf einem 0-24-Uhr-Balken belegt.
- * Fenster ueber Mitternacht (22:00-06:00) ergeben zwei Abschnitte, alle anderen einen.
+ * Welcher Schluesselpunkt gilt zur Uhrzeit "minutes" am Kalendertag "day"? Das ist der
+ * zuletzt vergangene - ein Objekt bleibt also stehen, bis der naechste Punkt es
+ * weiterschickt. Liegt vor der Uhrzeit keiner, liefert die Funktion undefined: Dann gilt
+ * die Basis-Platzierung, die als fester Punkt um 0 Uhr zu verstehen ist.
  */
-export function windowSegments(start: number, end: number): { from: number; to: number }[] {
-  if (start === end) return [{ from: 0, to: MINUTES_PER_DAY }]
-  if (start < end) return [{ from: start, to: end }]
-  return [
-    { from: start, to: MINUTES_PER_DAY },
-    { from: 0, to: end },
-  ]
+export function activeScheduleKey(
+  schedule: ScheduleKey[],
+  minutes: number,
+  day: number,
+): ScheduleKey | undefined {
+  const keys = scheduleForDay(schedule, day)
+  let active: ScheduleKey | undefined
+  for (const k of keys) {
+    if (k.time > minutes) break
+    active = k
+  }
+  return active
 }
 
-/** Laenge eines Zeitfensters in Minuten (ueber Mitternacht mitgerechnet). */
-export function windowDuration(start: number, end: number): number {
-  if (start === end) return MINUTES_PER_DAY
-  return ((end - start) % MINUTES_PER_DAY + MINUTES_PER_DAY) % MINUTES_PER_DAY
+/**
+ * Bis wann ein Schluesselpunkt gilt: bis zum naechsten, sonst bis Mitternacht. Nur fuer
+ * die Darstellung des Zeitstrahls gedacht.
+ */
+export function keyEndsAt(keys: ScheduleKey[], index: number): number {
+  return keys[index + 1]?.time ?? MINUTES_PER_DAY
 }
 
 /** Minuten auf 0..1439 normieren (auch fuer negative Werte). */

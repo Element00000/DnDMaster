@@ -15,13 +15,13 @@ import type {
   MapLayer,
   Placement,
   RelationType,
-  ScheduleEntry,
+  ScheduleKey,
   Session,
   UndoEntry,
 } from '../types'
 import { emptyDecision, emptyEvent } from '../types'
 import { uid } from '../utils/id'
-import { MINUTES_PER_DAY } from '../utils/time'
+import { activeScheduleKey } from '../utils/time'
 
 function makeLayer(name = 'Weltkarte'): MapLayer {
   return {
@@ -168,9 +168,8 @@ interface StoreState extends AppData {
   /** Letzte Aenderung an der aktiven Kampagne rueckgaengig machen (Strg+Z). */
   undo: () => void
 
-  // Zeit (Phase 3)
-  /** Tageszeit-Filter aktiv? */
-  timeEnabled: boolean
+  // Zeit (Phase 3). Tageszeit und Tag/Nacht-Einfaerbung sind immer aktiv - die frueheren
+  // Schalter dafuer gibt es nicht mehr.
   /** Aktuelle Tageszeit in Minuten (0..1439). */
   timeOfDay: number
   /**
@@ -178,12 +177,8 @@ interface StoreState extends AppData {
    * Tag sich neu angelegte Ausnahmen beziehen.
    */
   currentDay: number
-  /** Tag/Nacht-Einfaerbung der Karte. */
-  dayNight: boolean
-  setTimeEnabled: (on: boolean) => void
   setTimeOfDay: (minutes: number) => void
   setCurrentDay: (day: number) => void
-  setDayNight: (on: boolean) => void
 
   // Untere, hochfahrende Leiste (Zeitleiste / Handlungsbaum / Beziehungen)
   /** Geoeffnete Ansicht; null = Leiste zu. */
@@ -267,23 +262,24 @@ interface StoreState extends AppData {
   /** Platzierte Entitaet um ein Weltkoordinaten-Delta verschieben. */
   moveEntity: (id: string, dxWorld: number, dyWorld: number) => void
 
-  // Zeitabhaengige Positionswechsel
+  // Tagesablauf als Schluesselpunkte
   /**
-   * Neues Zeitfenster anlegen; startet an der aktuellen Basis-Position. Ohne Angaben von
-   * der aktuellen Uhrzeit an zwei Stunden lang im Standard-Tagesablauf.
-   * Liefert die Id des neuen Eintrags (oder null, wenn das Objekt nicht platziert ist).
+   * Schluesselpunkt setzen: Ab dieser Uhrzeit steht das Objekt an der Position, an der es
+   * gerade steht. Ohne Angaben zur aktuellen Uhrzeit im Standard-Tagesablauf. Liegt dort
+   * schon einer, wird dessen Position aktualisiert statt ein zweiter angelegt.
+   * Liefert die Id (oder null, wenn das Objekt nicht platziert ist).
    */
-  addScheduleEntry: (
+  addScheduleKey: (
     entityId: string,
-    init?: { timeStart?: number; timeEnd?: number; day?: number | null; label?: string },
+    init?: { time?: number; day?: number | null; label?: string; x?: number; y?: number },
   ) => string | null
-  updateScheduleEntry: (entityId: string, scheduleId: string, patch: Partial<Omit<ScheduleEntry, 'id'>>) => void
-  removeScheduleEntry: (entityId: string, scheduleId: string) => void
-  moveScheduleEntry: (entityId: string, scheduleId: string, dxWorld: number, dyWorld: number) => void
-  /** Zeitfenster, dessen Position der naechste Kartenklick setzt; null = kein Setzmodus. */
+  updateScheduleKey: (entityId: string, keyId: string, patch: Partial<Omit<ScheduleKey, 'id'>>) => void
+  removeScheduleKey: (entityId: string, keyId: string) => void
+  moveScheduleKey: (entityId: string, keyId: string, dxWorld: number, dyWorld: number) => void
+  /** Schluesselpunkt, dessen Position der naechste Kartenklick setzt; null = kein Setzmodus. */
   placingScheduleId: { entityId: string; scheduleId: string } | null
   setPlacingSchedule: (target: { entityId: string; scheduleId: string } | null) => void
-  /** Position eines Zeitfensters direkt setzen (Kartenklick im Setzmodus). */
+  /** Position eines Schluesselpunkts direkt setzen (Kartenklick im Setzmodus). */
   setSchedulePosition: (entityId: string, scheduleId: string, x: number, y: number) => void
 
   // Entscheidungen (Phase 4)
@@ -363,14 +359,10 @@ export const useStore = create<StoreState>()(
         fitToViewRequest: 0,
         undoStack: [],
         lastUndoPushAt: 0,
-        timeEnabled: false,
         timeOfDay: 12 * 60,
         currentDay: 1,
-        dayNight: false,
-        setTimeEnabled: (on) => set({ timeEnabled: on }),
         setTimeOfDay: (minutes) => set({ timeOfDay: Math.max(0, Math.min(1439, Math.round(minutes))) }),
         setCurrentDay: (day) => set({ currentDay: Math.max(0, Math.round(day)) }),
-        setDayNight: (on) => set({ dayNight: on }),
 
         // ---------- Untere Leiste ----------
         bottomPanel: null,
@@ -769,29 +761,41 @@ export const useStore = create<StoreState>()(
             ),
           })),
 
-        // ---------- Zeitabhaengige Positionswechsel ----------
-        addScheduleEntry: (entityId, init) => {
-          const entity = get().activeCampaign().entities.find((e) => e.id === entityId)
+        // ---------- Tagesablauf als Schluesselpunkte ----------
+        addScheduleKey: (entityId, init) => {
+          const s = get()
+          const entity = s.activeCampaign().entities.find((e) => e.id === entityId)
           if (!entity?.placement) return null
-          // Neue Station startet auf der zuletzt bekannten Position des Objekts, damit sie
+          const time = init?.time ?? s.timeOfDay
+          const day = init?.day ?? null
+          // Zur selben Uhrzeit auf derselben Ebene gibt es nur einen Punkt - ein zweiter
+          // waere nie erreichbar. Ein erneutes Setzen aktualisiert also den vorhandenen.
+          const existing = entity.schedule.find((k) => k.time === time && k.day === day)
+          // Der neue Punkt uebernimmt die Stelle, an der das Objekt gerade steht, damit er
           // sofort sichtbar ist und nur noch verschoben werden muss.
-          const timeStart = init?.timeStart ?? get().timeOfDay
-          const entry: ScheduleEntry = {
-            id: uid('sched-'),
-            timeStart,
-            timeEnd: init?.timeEnd ?? (timeStart + 120) % MINUTES_PER_DAY,
-            x: entity.placement.x,
-            y: entity.placement.y,
-            label: init?.label ?? '',
-            day: init?.day ?? null,
+          const current = activeScheduleKey(entity.schedule, time, s.currentDay)
+          const key: ScheduleKey = {
+            id: existing?.id ?? uid('key-'),
+            time,
+            x: init?.x ?? current?.x ?? entity.placement.x,
+            y: init?.y ?? current?.y ?? entity.placement.y,
+            label: init?.label ?? existing?.label ?? '',
+            day,
           }
           patchActive((c) => ({
             ...c,
             entities: c.entities.map((e) =>
-              e.id === entityId ? { ...e, schedule: [...e.schedule, entry] } : e,
+              e.id !== entityId
+                ? e
+                : {
+                    ...e,
+                    schedule: existing
+                      ? e.schedule.map((k) => (k.id === existing.id ? key : k))
+                      : [...e.schedule, key],
+                  },
             ),
           }))
-          return entry.id
+          return key.id
         },
 
         placingScheduleId: null,
@@ -807,7 +811,7 @@ export const useStore = create<StoreState>()(
             ),
           })),
 
-        updateScheduleEntry: (entityId, scheduleId, patch) =>
+        updateScheduleKey: (entityId, scheduleId, patch) =>
           patchActive((c) => ({
             ...c,
             entities: c.entities.map((e) =>
@@ -817,7 +821,7 @@ export const useStore = create<StoreState>()(
             ),
           })),
 
-        removeScheduleEntry: (entityId, scheduleId) =>
+        removeScheduleKey: (entityId, scheduleId) =>
           patchActive((c) => ({
             ...c,
             entities: c.entities.map((e) =>
@@ -825,7 +829,7 @@ export const useStore = create<StoreState>()(
             ),
           })),
 
-        moveScheduleEntry: (entityId, scheduleId, dxWorld, dyWorld) =>
+        moveScheduleKey: (entityId, scheduleId, dxWorld, dyWorld) =>
           patchActive((c) => ({
             ...c,
             entities: c.entities.map((e) =>
@@ -1145,6 +1149,22 @@ interface OldMarker {
   createdAt?: number
 }
 
+/**
+ * Schluesselpunkt eines Tagesablaufs auffuellen. Frueher waren das Zeitfenster mit
+ * timeStart/timeEnd; deren Beginn wird zum Zeitpunkt des Punktes, das Ende ergibt sich
+ * nun aus dem jeweils naechsten Punkt.
+ */
+function normalizeScheduleKey(s: Partial<ScheduleKey> & { timeStart?: number }): ScheduleKey {
+  return {
+    id: s.id ?? uid('key-'),
+    time: s.time ?? s.timeStart ?? 0,
+    x: s.x ?? 0,
+    y: s.y ?? 0,
+    label: s.label ?? '',
+    day: s.day ?? null,
+  }
+}
+
 /** Fuellt fehlende Felder einer (evtl. aelteren) Entitaet mit Standardwerten. */
 function normalizeEntity(e: Partial<Entity> & { id: string; type: EntityType; name: string }): Entity {
   return {
@@ -1166,9 +1186,7 @@ function normalizeEntity(e: Partial<Entity> & { id: string; type: EntityType; na
     decision: e.decision ?? (e.type === 'entscheidung' ? emptyDecision() : null),
     event: e.event ?? (e.type === 'ereignis' ? emptyEvent() : null),
     day: e.day ?? null,
-    // Aeltere Zeitfenster kannten weder Beschriftung noch Kalendertag: Sie gelten
-    // weiterhin an jedem Tag (day === null) und bleiben unbeschriftet.
-    schedule: (e.schedule ?? []).map((s) => ({ ...s, label: s.label ?? '', day: s.day ?? null })),
+    schedule: (e.schedule ?? []).map(normalizeScheduleKey),
     createdAt: e.createdAt ?? Date.now(),
   }
 }

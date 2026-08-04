@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useStore } from '../store/useStore'
 import { entityDisplayMeta } from '../types'
 import type { Entity, MapLayer } from '../types'
-import { activeScheduleEntry, dayNightOverlay, formatTime } from '../utils/time'
+import { activeScheduleKey, dayNightOverlay, formatTime, scheduleForDay } from '../utils/time'
 import { useAsset } from '../useAsset'
 import { useBottomPanelOffset } from '../useBottomPanelOffset'
 import { PlaceholderMap } from './PlaceholderMap'
@@ -60,17 +60,15 @@ export function MapCanvas() {
   const setPlacement = useStore((s) => s.setPlacement)
   const setPlacingEntity = useStore((s) => s.setPlacingEntity)
   const moveEntity = useStore((s) => s.moveEntity)
-  const moveScheduleEntry = useStore((s) => s.moveScheduleEntry)
+  const moveScheduleKey = useStore((s) => s.moveScheduleKey)
   const selectEntity = useStore((s) => s.selectEntity)
   const selectedIds = useStore((s) => s.selectedIds)
   const setSelectedIds = useStore((s) => s.setSelectedIds)
   const toggleSelectedId = useStore((s) => s.toggleSelectedId)
   const deleteEntity = useStore((s) => s.deleteEntity)
   const setTool = useStore((s) => s.setTool)
-  const timeEnabled = useStore((s) => s.timeEnabled)
   const timeOfDay = useStore((s) => s.timeOfDay)
   const currentDay = useStore((s) => s.currentDay)
-  const dayNight = useStore((s) => s.dayNight)
   const placingScheduleId = useStore((s) => s.placingScheduleId)
   const setPlacingSchedule = useStore((s) => s.setPlacingSchedule)
   const setSchedulePosition = useStore((s) => s.setSchedulePosition)
@@ -115,23 +113,23 @@ export function MapCanvas() {
   // Effektive Position eines Objekts: aktiver Zeitplan-Eintrag (falls vorhanden), sonst Basis-Platzierung.
   const effectivePos = useCallback(
     (e: Entity): { x: number; y: number } => {
-      if (timeEnabled && e.schedule.length > 0) {
-        const active = activeScheduleEntry(e.schedule, timeOfDay, currentDay)
+      if (e.schedule.length > 0) {
+        const active = activeScheduleKey(e.schedule, timeOfDay, currentDay)
         if (active) return { x: active.x, y: active.y }
       }
       return { x: e.placement!.x, y: e.placement!.y }
     },
-    [timeEnabled, timeOfDay, currentDay],
+    [timeOfDay, currentDay],
   )
 
   // Bewegt bei aktivem Zeitplan-Eintrag dessen Position, sonst die Basis-Platzierung.
   const moveEntityTimed = useCallback(
     (e: Entity, dxWorld: number, dyWorld: number) => {
-      const active = timeEnabled ? activeScheduleEntry(e.schedule, timeOfDay, currentDay) : undefined
-      if (active) moveScheduleEntry(e.id, active.id, dxWorld, dyWorld)
+      const active = activeScheduleKey(e.schedule, timeOfDay, currentDay)
+      if (active) moveScheduleKey(e.id, active.id, dxWorld, dyWorld)
       else moveEntity(e.id, dxWorld, dyWorld)
     },
-    [timeEnabled, timeOfDay, currentDay, moveScheduleEntry, moveEntity],
+    [timeOfDay, currentDay, moveScheduleKey, moveEntity],
   )
 
   /**
@@ -423,7 +421,7 @@ export function MapCanvas() {
       if (!el) return
       const ent = entities.find((x) => x.id === entityId)
       if (!ent?.placement) return
-      const active = timeEnabled ? activeScheduleEntry(ent.schedule, timeOfDay, currentDay) : undefined
+      const active = activeScheduleKey(ent.schedule, timeOfDay, currentDay)
       if (active) return
       const rect = el.getBoundingClientRect()
       const v = viewRef.current
@@ -433,7 +431,7 @@ export function MapCanvas() {
       if (result.layerId === ent.placement.layerId) return
       setPlacement(entityId, { layerId: result.layerId, x: result.x, y: result.y })
     },
-    [entities, campaign.layers, layer.id, setPlacement, timeEnabled, timeOfDay, currentDay],
+    [entities, campaign.layers, layer.id, setPlacement, timeOfDay, currentDay],
   )
 
   const onPointerDown = useCallback(
@@ -835,12 +833,8 @@ export function MapCanvas() {
         )}
       </div>
 
-      {timeEnabled && dayNight && (
-        <div
-          className="map-daynight"
-          style={{ background: dayNightOverlay(timeOfDay) }}
-        />
-      )}
+      {/* Tag/Nacht-Einfaerbung liegt immer ueber der Karte. */}
+      <div className="map-daynight" style={{ background: dayNightOverlay(timeOfDay) }} />
 
       <div className="map-markers">
         {pins.map((e) => {
@@ -911,7 +905,6 @@ export function MapCanvas() {
           tool={tool}
           tableMode={tableMode}
           fogEditing={fogEditing}
-          timeEnabled={timeEnabled}
           timeOfDay={timeOfDay}
           entities={entities}
           selectedIds={selectedIds}
@@ -1040,14 +1033,11 @@ function ScheduleOverlay({
   if (!lv) return null
 
   // Nur was heute wirklich gilt: Standardplan plus die Ausnahmen des aktuellen Tages.
-  const stops = entity.schedule
-    .filter((s) => s.day == null || s.day === currentDay)
-    .slice()
-    .sort((a, b) => a.timeStart - b.timeStart)
+  const stops = scheduleForDay(entity.schedule, currentDay)
   if (stops.length === 0) return null
 
   const meta = entityDisplayMeta(entity)
-  const active = activeScheduleEntry(entity.schedule, timeOfDay, currentDay)
+  const active = activeScheduleKey(entity.schedule, timeOfDay, currentDay)
   const points = stops.map((s) => ({ x: s.x * lv.scale + lv.tx, y: s.y * lv.scale + lv.ty }))
 
   return (
@@ -1067,7 +1057,7 @@ function ScheduleOverlay({
         >
           <span className="schedule-stop__dot">{i + 1}</span>
           <span className="schedule-stop__label">
-            {formatTime(s.timeStart)}
+            {formatTime(s.time)}
             {s.label ? ` · ${s.label}` : ''}
           </span>
         </div>
@@ -1239,7 +1229,6 @@ function EmbeddedMap({
   tool,
   tableMode,
   fogEditing,
-  timeEnabled,
   timeOfDay,
   entities,
   selectedIds,
@@ -1263,7 +1252,6 @@ function EmbeddedMap({
   tool: string
   tableMode: boolean
   fogEditing: boolean
-  timeEnabled: boolean
   timeOfDay: number
   entities: Entity[]
   selectedIds: string[]
@@ -1430,8 +1418,8 @@ function EmbeddedMap({
   )
 
   function embEffectivePos(e: Entity): { x: number; y: number } {
-    if (timeEnabled && e.schedule.length > 0) {
-      const active = activeScheduleEntry(e.schedule, timeOfDay, currentDay)
+    if (e.schedule.length > 0) {
+      const active = activeScheduleKey(e.schedule, timeOfDay, currentDay)
       if (active) return { x: active.x, y: active.y }
     }
     return { x: e.placement!.x, y: e.placement!.y }
@@ -1497,7 +1485,6 @@ function EmbeddedMap({
           tool={tool}
           tableMode={tableMode}
           fogEditing={fogEditing}
-          timeEnabled={timeEnabled}
           timeOfDay={timeOfDay}
           entities={entities}
           selectedIds={selectedIds}

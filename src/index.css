@@ -2338,71 +2338,96 @@ button {
     var(--border) 0 1px,
     transparent 1px calc(100% / 24)
   );
-  cursor: copy;
+  /* Klick auf die Spur setzt den Zeitpunkt, wie ein Abspielkopf. */
+  cursor: ew-resize;
   touch-action: none;
-  overflow: hidden;
 }
 
-.dayseg {
+/* Abschnitt, den ein Schluesselpunkt abdeckt: von ihm bis zum naechsten. Nur zur
+   Orientierung - angefasst wird die Raute. */
+.daykey__span {
   position: absolute;
-  top: 3px;
-  bottom: 3px;
+  top: 6px;
+  bottom: 6px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--chip-color) 30%, transparent);
+  pointer-events: none;
+}
+
+.daykey__span.is-exception {
+  background: color-mix(in srgb, var(--gold) 26%, transparent);
+}
+
+/* Der Schluesselpunkt selbst - eine Raute auf der Zeitachse, wie in Animationswerkzeugen. */
+.daykey {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  transform: translateX(-50%);
   display: flex;
+  flex-direction: column;
   align-items: center;
-  padding: 0 8px;
-  border-radius: 6px;
-  background: color-mix(in srgb, var(--chip-color) 42%, var(--panel));
-  border: 1px solid var(--chip-color, var(--border));
-  color: var(--ink);
+  justify-content: center;
+  gap: 2px;
+  padding: 0 4px;
+  border: none;
+  background: transparent;
   cursor: grab;
-  overflow: hidden;
-}
-
-.dayseg:active {
-  cursor: grabbing;
-}
-
-.dayseg.is-selected {
-  box-shadow: 0 0 0 2px var(--accent), var(--shadow-sm);
   z-index: 2;
 }
 
-/* Ausnahmen eines einzelnen Tages heben sich schraffiert vom Standardplan ab. */
-.dayseg--exception {
-  background-image: repeating-linear-gradient(
-    45deg,
-    rgba(255, 255, 255, 0.14) 0 5px,
-    transparent 5px 10px
-  );
-  border-color: var(--gold);
+.daykey:active {
+  cursor: grabbing;
 }
 
-.dayseg__label {
-  font-size: 11px;
+.daykey__diamond {
+  width: 12px;
+  height: 12px;
+  flex: none;
+  transform: rotate(45deg);
+  background: var(--chip-color, var(--gold));
+  border: 1.5px solid rgba(0, 0, 0, 0.45);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+.daykey--exception .daykey__diamond {
+  background: var(--gold);
+}
+
+.daykey.is-selected .daykey__diamond {
+  box-shadow: 0 0 0 3px var(--accent-tint), 0 0 0 1.5px var(--accent);
+}
+
+.daykey__label {
+  max-width: 80px;
+  font-size: 9.5px;
+  color: var(--ink-dim);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   pointer-events: none;
 }
 
-.dayseg__handle {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 9px;
-  cursor: ew-resize;
+/* Kopfzeile des Zeitstrahls: Zeitpunkt waehlen und Punkt setzen. */
+.dayschedule__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
-.dayseg__handle--start {
-  left: 0;
+.dayschedule__clock {
+  font-family: var(--font-display);
+  font-size: 15px;
+  color: var(--gold-soft);
+  font-variant-numeric: tabular-nums;
+  min-width: 52px;
 }
 
-.dayseg__handle--end {
-  right: 0;
-}
-
-.dayseg__handle:hover {
-  background: rgba(255, 255, 255, 0.22);
+.dayschedule__range {
+  flex: 1;
+  min-width: 140px;
+  accent-color: var(--gold);
 }
 
 /* Aktuell eingestellte Uhrzeit als Marker ueber allen Spuren. */
@@ -2418,27 +2443,10 @@ button {
   z-index: 3;
 }
 
-.dayschedule__banner {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-  padding: 8px 12px;
-  border: 1px solid color-mix(in srgb, var(--gold) 45%, var(--border));
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--gold) 10%, var(--panel-2));
-  font-size: 12px;
-  color: var(--ink-dim);
-}
-
 .dayschedule__hint {
   font-size: 11.5px;
   color: var(--ink-faint);
   line-height: 1.5;
-}
-
-.dayschedule__warn {
-  color: var(--gold-soft);
 }
 
 .dayschedule__empty {

@@ -1,24 +1,18 @@
 import { useStore } from '../store/useStore'
 import { formatTime } from '../utils/time'
 
-/** Uhrzeit-Regler ueber der Karte (Abschnitt 5 des Konzepts). */
+/**
+ * Uhrzeit-Regler ueber der Karte. Tageszeit und Tag/Nacht-Einfaerbung sind immer aktiv -
+ * es gibt keine Schalter mehr dafuer, die Zeit ist fester Teil der Karte.
+ */
 export function TimeSlider() {
-  const enabled = useStore((s) => s.timeEnabled)
   const timeOfDay = useStore((s) => s.timeOfDay)
   const currentDay = useStore((s) => s.currentDay)
-  const dayNight = useStore((s) => s.dayNight)
-  const setEnabled = useStore((s) => s.setTimeEnabled)
   const setTime = useStore((s) => s.setTimeOfDay)
   const setCurrentDay = useStore((s) => s.setCurrentDay)
-  const setDayNight = useStore((s) => s.setDayNight)
 
   return (
-    <div className={`time-slider${enabled ? ' is-enabled' : ''}`}>
-      <label className="time-slider__toggle" title="Tageszeit-Filter ein-/ausschalten">
-        <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
-        <span>Tageszeit</span>
-      </label>
-
+    <div className="time-slider is-enabled">
       {/* Kampagnentag: bestimmt, welche Tagesplan-Ausnahmen der Objekte greifen. */}
       <div className="time-slider__day" title="Aktueller Kampagnentag">
         <button
@@ -48,21 +42,10 @@ export function TimeSlider() {
           max={1439}
           step={5}
           value={timeOfDay}
-          disabled={!enabled}
           onChange={(e) => setTime(Number(e.target.value))}
         />
         <span className="time-slider__clock">{formatTime(timeOfDay)}</span>
       </div>
-
-      <label className="time-slider__daynight" title="Karte nach Tageszeit einfaerben">
-        <input
-          type="checkbox"
-          checked={dayNight}
-          disabled={!enabled}
-          onChange={(e) => setDayNight(e.target.checked)}
-        />
-        <span>Tag/Nacht</span>
-      </label>
     </div>
   )
 }
