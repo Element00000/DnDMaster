@@ -168,7 +168,9 @@ function CampaignDays() {
               </button>
               <div className="timeline__events">
                 {group.items.map((e) => {
-                  const meta = entityMeta(e.type)
+                  // entityDisplayMeta statt entityMeta: beruecksichtigt die Gesinnung eines
+                  // Charakters (Freund gruen, Feind rot, neutral grau, Spieler dunkelgruen).
+                  const meta = entityDisplayMeta(e)
                   const places = e.links
                     .map((l) => byId(l.targetId))
                     .filter((t): t is Entity => !!t && t.type === 'ort')
@@ -180,7 +182,9 @@ function CampaignDays() {
                       onClick={() => openEntity(e)}
                     >
                       <div className="timeline__event-head">
-                        <span>{meta.icon}</span>
+                        <span className={meta.iconInvert ? 'is-icon-invert' : undefined}>
+                          {meta.icon}
+                        </span>
                         <span className="timeline__event-name">{e.name}</span>
                         {e.schedule.length > 0 && (
                           <span

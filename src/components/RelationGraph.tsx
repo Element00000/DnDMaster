@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from '../store/useStore'
-import { entityMeta, relationMeta } from '../types'
+import { entityDisplayMeta, relationMeta } from '../types'
 import type { Entity, RelationType } from '../types'
 
 interface Node {
@@ -214,7 +214,9 @@ export function RelationGraph() {
                 })}
                 {nodes.map((n) => {
                   const p = positions[n.id]
-                  const meta = entityMeta(n.entity.type)
+                  // entityDisplayMeta statt entityMeta: beruecksichtigt die Gesinnung eines
+                  // Charakters (Freund gruen, Feind rot, neutral grau, Spieler dunkelgruen).
+                  const meta = entityDisplayMeta(n.entity)
                   return (
                     <g
                       key={n.id}
@@ -224,7 +226,11 @@ export function RelationGraph() {
                       onPointerUp={(e) => onNodePointerUp(e, n.id)}
                     >
                       <circle r="24" fill="#1c202a" stroke={meta.color} strokeWidth="2.5" />
-                      <text className="graph__node-icon" textAnchor="middle" dy="6">
+                      <text
+                        className={`graph__node-icon${meta.iconInvert ? ' is-icon-invert' : ''}`}
+                        textAnchor="middle"
+                        dy="6"
+                      >
                         {meta.icon}
                       </text>
                       <text className="graph__node-label" textAnchor="middle" y="40">

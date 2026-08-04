@@ -1929,6 +1929,11 @@ button {
   font-size: 13px;
 }
 
+/* Weisses statt farbiges Icon (Spieler-Charaktere, siehe entityDisplayMeta). */
+.timeline__event-head .is-icon-invert {
+  filter: brightness(0) invert(1);
+}
+
 .timeline__event-name {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -4038,6 +4043,11 @@ button {
 
 .graph__node-icon {
   font-size: 18px;
+}
+
+/* Weisses statt farbiges Icon (Spieler-Charaktere, siehe entityDisplayMeta). */
+.graph__node-icon.is-icon-invert {
+  filter: brightness(0) invert(1);
 }
 
 .graph__node-label {

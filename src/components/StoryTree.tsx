@@ -1,4 +1,4 @@
-import { entityMeta } from '../types'
+import { entityDisplayMeta } from '../types'
 import type { Entity } from '../types'
 import { useStore } from '../store/useStore'
 
@@ -94,7 +94,8 @@ function DecisionNode({
   onOpen: (id: string) => void
 }) {
   const d = entity.decision!
-  const meta = entityMeta(entity.type)
+  // Einheitlich wie ueberall sonst: beruecksichtigt die Gesinnung eines Charakters.
+  const meta = entityDisplayMeta(entity)
   return (
     <div className="dnode" style={{ ['--chip-color' as string]: meta.color }}>
       <button className="dnode__title" onClick={() => onOpen(entity.id)}>
