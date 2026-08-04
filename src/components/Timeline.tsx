@@ -4,6 +4,7 @@ import type { Entity } from '../types'
 import { useStore } from '../store/useStore'
 import { formatTime } from '../utils/time'
 import { DaySchedule } from './DaySchedule'
+import { EntityIcon } from './EntityIcon'
 
 type Tab = 'objekt' | 'kampagne'
 
@@ -79,9 +80,7 @@ function ObjectSchedule({ entity }: { entity: Entity }) {
   return (
     <div className="timeline__schedule">
       <div className="timeline__subject" style={{ ['--chip-color' as string]: meta.color }}>
-        <span className={`timeline__subject-icon${meta.iconInvert ? ' is-icon-invert' : ''}`}>
-          {meta.icon}
-        </span>
+        <EntityIcon entity={entity} className="timeline__subject-icon" />
         <span className="timeline__subject-name">{entity.name}</span>
         <span className="timeline__subject-hint">
           Ausserhalb aller Zeitfenster steht das Objekt an seiner normalen Position.
@@ -182,9 +181,7 @@ function CampaignDays() {
                       onClick={() => openEntity(e)}
                     >
                       <div className="timeline__event-head">
-                        <span className={meta.iconInvert ? 'is-icon-invert' : undefined}>
-                          {meta.icon}
-                        </span>
+                        <EntityIcon entity={e} className="timeline__event-icon" />
                         <span className="timeline__event-name">{e.name}</span>
                         {e.schedule.length > 0 && (
                           <span

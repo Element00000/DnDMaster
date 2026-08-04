@@ -4,8 +4,9 @@ import { AI_MODELS, IMAGE_PROVIDERS, useAiStore } from '../../store/useAiStore'
 import type { AiModel, ImageProvider } from '../../store/useAiStore'
 import { generateSvgDataUrl, generateText } from '../../utils/ai'
 import { generateImage } from '../../utils/imageGen'
-import { buildCampaignContext } from '../../utils/aiContext'
+import { buildCampaignContext, portraitPrompt } from '../../utils/aiContext'
 import { putAsset, deleteAsset } from '../../utils/assets'
+import { discardEntityImage, storeEntityImage } from '../../utils/entityImage'
 import { entityMeta } from '../../types'
 
 export function AiTool() {
@@ -89,6 +90,13 @@ export function AiTool() {
     })
   }
 
+  /** Neues Objektbild setzen: legt Portraet und Miniatur an und raeumt das alte weg. */
+  async function setEntityImage(dataUrl: string) {
+    const prev = { imageUrl: selected!.imageUrl, thumbUrl: selected!.thumbUrl }
+    updateEntity(selected!.id, await storeEntityImage(dataUrl))
+    discardEntityImage(prev)
+  }
+
   async function genSvgPortrait() {
     if (!selected) return
     await run('svgportrait', async () => {
@@ -98,37 +106,18 @@ export function AiTool() {
         model,
         `Stilisiertes SVG-Portrait (viewBox 0 0 400 400) fuer diesen ${meta.label}: "${selected.name}". ${selected.description ?? ''}`,
       )
-      const ref = await putAsset(url)
-      const prev = selected.imageUrl
-      updateEntity(selected.id, { imageUrl: ref })
-      void deleteAsset(prev)
+      await setEntityImage(url)
       setStatus(`SVG-Portrait fuer "${selected.name}" gespeichert.`)
     })
   }
 
   // ---------- Bild (Server-Proxy, Key bleibt geheim) ----------
-  function portraitPrompt(): string {
-    const meta = entityMeta(selected!.type)
-    const bits = [
-      `Fantasy TTRPG character portrait, head and shoulders, of ${selected!.name}`,
-      selected!.fields.rolle ? `role: ${selected!.fields.rolle}` : '',
-      selected!.description ? selected!.description : '',
-      `type: ${meta.label}`,
-      'detailed digital painting, dramatic lighting, high quality',
-    ]
-    return bits.filter(Boolean).join('. ')
-  }
-
   const imgOpts = { provider: imageProvider, apiKey: imageKey }
 
   async function genPhotoPortrait() {
     if (!selected) return
     await run('imgportrait', async () => {
-      const url = await generateImage(portraitPrompt(), imgOpts)
-      const ref = await putAsset(url)
-      const prev = selected.imageUrl
-      updateEntity(selected.id, { imageUrl: ref })
-      void deleteAsset(prev)
+      await setEntityImage(await generateImage(portraitPrompt(selected), imgOpts))
       setStatus(`Bild fuer "${selected.name}" erzeugt und gespeichert.`)
     })
   }

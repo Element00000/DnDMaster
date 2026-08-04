@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useStore } from '../../store/useStore'
-import { entityMeta } from '../../types'
+import { entityDisplayMeta, entityMeta } from '../../types'
+import { EntityIcon } from '../EntityIcon'
 
 export function SessionNotes() {
   const campaign = useStore((s) => s.campaigns.find((c) => c.id === s.activeCampaignId) ?? s.campaigns[0])
@@ -76,11 +77,11 @@ export function SessionNotes() {
                           {s.refs.map((rid) => {
                             const e = campaign.entities.find((x) => x.id === rid)
                             if (!e) return null
-                            const meta = entityMeta(e.type)
+                            const meta = entityDisplayMeta(e)
                             return (
                               <span key={rid} className="session__chip" style={{ ['--chip-color' as string]: meta.color }}>
                                 <button className="session__chip-open" onClick={() => openEntity(rid)}>
-                                  {meta.icon} {e.name}
+                                  <EntityIcon entity={e} className="session__chip-icon" /> {e.name}
                                 </button>
                                 <button
                                   className="session__chip-x"

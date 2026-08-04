@@ -44,3 +44,40 @@ export function fileToScaledDataUrl(
     reader.readAsDataURL(file)
   })
 }
+
+/**
+ * Kantenlaenge der Miniaturbilder, die auf Kartenpinnadeln und in Listen stecken.
+ * Bewusst winzig: Auf einer Karte haengen schnell dutzende Pins, die sonst alle das
+ * volle Portrait laden und skalieren muessten. 64 px reichen, um ein Gesicht zu erkennen.
+ */
+export const THUMB_SIZE = 64
+
+/**
+ * Erzeugt aus einer Bild-data-URL ein quadratisches Miniaturbild (mittiger Ausschnitt,
+ * damit Portraits nicht verzerrt werden).
+ */
+export function dataUrlToThumb(dataUrl: string, size = THUMB_SIZE): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.onerror = () => reject(new Error('Bild konnte nicht geladen werden.'))
+    img.onload = () => {
+      const canvas = document.createElement('canvas')
+      canvas.width = size
+      canvas.height = size
+      const ctx = canvas.getContext('2d')
+      if (!ctx) {
+        reject(new Error('Canvas nicht verfuegbar.'))
+        return
+      }
+      // Quadratischer Ausschnitt aus der Mitte, auf die volle Flaeche gezogen.
+      const side = Math.min(img.naturalWidth, img.naturalHeight)
+      const sx = (img.naturalWidth - side) / 2
+      const sy = (img.naturalHeight - side) / 2
+      ctx.fillStyle = '#12151d'
+      ctx.fillRect(0, 0, size, size)
+      ctx.drawImage(img, sx, sy, side, side, 0, 0, size, size)
+      resolve(canvas.toDataURL('image/jpeg', 0.78))
+    }
+    img.src = dataUrl
+  })
+}

@@ -828,6 +828,8 @@ export function MapCanvas() {
               screenX={pos.x * view.scale + view.tx}
               screenY={pos.y * view.scale + view.ty}
               icon={meta.icon}
+              // Miniatur bevorzugen; aeltere Objekte ohne sie zeigen ersatzweise das Portraet.
+              imageRef={e.thumbUrl ?? e.imageUrl}
               color={meta.color}
               iconInvert={meta.iconInvert}
               label={e.name}
@@ -1430,6 +1432,7 @@ function EmbeddedMap({
             screenX={pos.x * childView.scale + childView.tx}
             screenY={pos.y * childView.scale + childView.ty}
             icon={meta.icon}
+            imageRef={e.thumbUrl ?? e.imageUrl}
             color={meta.color}
             iconInvert={meta.iconInvert}
             label={e.name}

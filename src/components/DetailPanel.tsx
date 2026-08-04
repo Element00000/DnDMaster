@@ -11,12 +11,16 @@ import {
 } from '../types'
 import type { Campaign, Entity, EntityType, RelationType } from '../types'
 import { useStore } from '../store/useStore'
+import { useAiStore } from '../store/useAiStore'
 import { fileToScaledDataUrl } from '../utils/image'
-import { deleteAsset, putAsset } from '../utils/assets'
+import { discardEntityImage, storeEntityImage } from '../utils/entityImage'
+import { generateImage } from '../utils/imageGen'
+import { portraitPrompt } from '../utils/aiContext'
+import { useAsset } from '../useAsset'
 import { rollDie } from '../utils/tools'
 import { DecisionEditor } from './DecisionEditor'
 import { EventEditor } from './EventEditor'
-import { AssetImg } from './AssetImg'
+import { EntityIcon } from './EntityIcon'
 
 export function DetailPanel() {
   const campaign = useStore((s) => s.campaigns.find((c) => c.id === s.activeCampaignId) ?? s.campaigns[0])
@@ -95,24 +99,12 @@ export function DetailPanel() {
       .filter((e) => e.id !== marker.id)
       .flatMap((e) => e.links.filter((l) => l.targetId === marker.id).map((l) => ({ from: e, relation: l.relation })))
 
-    const portrait = marker.imageUrl ? (
-      <div className="detail__portrait">
-        <AssetImg refUrl={marker.imageUrl} alt={marker.name} />
-        {!readOnly && (
-          <button
-            className="detail__portrait-x"
-            title="Bild entfernen"
-            onClick={() => updateEntity(marker.id, { imageUrl: null })}
-          >
-            &times;
-          </button>
-        )}
-      </div>
-    ) : null
+    const portrait = <EntityImageField entity={marker} readOnly={readOnly} />
 
+    // Kein Typ-Icon mehr in der Kopfzeile: Direkt darunter steht das Portraet des Objekts,
+    // ein zweites Sinnbild daneben waere nur Doppelung.
     const header = (
       <div className="detail__header">
-        <span className={`detail__icon${meta.iconInvert ? ' is-icon-invert' : ''}`}>{meta.icon}</span>
         <input
           className="detail__title-input"
           value={marker.name}
@@ -135,7 +127,8 @@ export function DetailPanel() {
       <div className="detail__panel" style={{ ['--chip-color' as string]: meta.color }}>
         {header}
         <div className="detail__body">
-          {portrait}
+          {/* Im Kampf nur zur Wiedererkennung - gesetzt wird das Bild in der normalen Ansicht. */}
+          {marker.imageUrl && <EntityImageField entity={marker} readOnly />}
           <CombatStatFields
             entity={marker}
             readOnly={readOnly}
@@ -159,7 +152,7 @@ export function DetailPanel() {
             }}
             title="KI-Werkzeug fuer dieses Objekt oeffnen"
           >
-            ✨ KI: Text, Dialog oder Portrait erzeugen
+            ✨ KI: Text oder Dialog erzeugen
           </button>
         )}
 
@@ -266,7 +259,6 @@ export function DetailPanel() {
           <FeindFields
             entity={marker}
             readOnly={readOnly}
-            onImageChange={(ref) => updateEntity(marker.id, { imageUrl: ref })}
             onFieldChange={(key, value) => setEntityField(marker.id, key, value)}
           />
         )}
@@ -678,42 +670,144 @@ function FactionField({
   )
 }
 
-function FeindFields({
-  entity,
-  readOnly,
-  onImageChange,
-  onFieldChange,
-}: {
-  entity: Entity
-  readOnly: boolean
-  onImageChange: (ref: string) => void
-  onFieldChange: (key: string, value: string) => void
-}) {
+/**
+ * Bildbereich eines Objekts: immer ein Rechteck in fester Groesse - entweder mit dem
+ * Portraet oder als Platzhalter, der zum Hochladen einlaedt. Darunter der Knopf, das
+ * Bild stattdessen von der KI erzeugen zu lassen. Jedes gesetzte Bild wird zugleich als
+ * Miniatur abgelegt, die auf Kartenpinnadeln und in Listen erscheint.
+ */
+function EntityImageField({ entity, readOnly }: { entity: Entity; readOnly: boolean }) {
+  const updateEntity = useStore((s) => s.updateEntity)
+  const imageProvider = useAiStore((s) => s.imageProvider)
+  const imageKey = useAiStore((s) => s.imageKey)
   const fileRef = useRef<HTMLInputElement>(null)
+  const [busy, setBusy] = useState<'upload' | 'ai' | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const url = useAsset(entity.imageUrl)
+
+  async function apply(dataUrl: string) {
+    const prev = { imageUrl: entity.imageUrl, thumbUrl: entity.thumbUrl }
+    const stored = await storeEntityImage(dataUrl)
+    updateEntity(entity.id, stored)
+    discardEntityImage(prev)
+  }
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     e.target.value = ''
     if (!file) return
-    const prev = entity.imageUrl
-    const { url } = await fileToScaledDataUrl(file, { maxDim: 900, quality: 0.82 })
-    const ref = await putAsset(url)
-    onImageChange(ref)
-    void deleteAsset(prev)
+    setError(null)
+    setBusy('upload')
+    try {
+      const { url: scaled } = await fileToScaledDataUrl(file, { maxDim: 900, quality: 0.82 })
+      await apply(scaled)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Bild konnte nicht geladen werden.')
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  async function onGenerate() {
+    setError(null)
+    setBusy('ai')
+    try {
+      await apply(await generateImage(portraitPrompt(entity), { provider: imageProvider, apiKey: imageKey }))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Bild konnte nicht erzeugt werden.')
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  function onRemove() {
+    discardEntityImage(entity)
+    updateEntity(entity.id, { imageUrl: null, thumbUrl: null })
   }
 
   return (
-    <>
-      {!readOnly && (
-        <div className="field field--row">
-          <span className="field__label">Bild</span>
-          <input ref={fileRef} type="file" accept="image/*" hidden onChange={onFile} />
-          <button className="btn btn--sm" onClick={() => fileRef.current?.click()}>
-            {entity.imageUrl ? 'Bild ersetzen' : 'Bild hochladen'}
+    <div className="entity-image">
+      <div className={`entity-image__frame${url ? ' has-image' : ''}`}>
+        {url ? (
+          <img src={url} alt={entity.name} />
+        ) : (
+          <button
+            type="button"
+            className="entity-image__drop"
+            disabled={readOnly || busy != null}
+            onClick={() => fileRef.current?.click()}
+            title="Bild hochladen"
+          >
+            <svg
+              className="entity-image__upload-icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <line x1="12" y1="3" x2="12" y2="15" />
+              <polyline points="6 9 12 3 18 9" />
+              <line x1="5" y1="20" x2="19" y2="20" />
+            </svg>
+            <span>{busy === 'upload' ? 'Wird geladen …' : busy === 'ai' ? 'KI erzeugt Bild …' : 'Bild hochladen'}</span>
           </button>
-        </div>
+        )}
+
+        {url && !readOnly && (
+          <div className="entity-image__actions">
+            <button
+              className="entity-image__act"
+              title="Bild ersetzen"
+              disabled={busy != null}
+              onClick={() => fileRef.current?.click()}
+            >
+              {'↻'}
+            </button>
+            <button
+              className="entity-image__act entity-image__act--danger"
+              title="Bild entfernen"
+              disabled={busy != null}
+              onClick={onRemove}
+            >
+              &times;
+            </button>
+          </div>
+        )}
+      </div>
+
+      <input ref={fileRef} type="file" accept="image/*" hidden onChange={onFile} />
+
+      {!readOnly && (
+        <button
+          className="btn btn--sm btn--full detail__ai"
+          disabled={busy != null}
+          onClick={onGenerate}
+          title="Portraet von der KI erzeugen lassen"
+        >
+          {busy === 'ai' ? '… Bild wird erzeugt' : '✨ Bild per KI erstellen'}
+        </button>
       )}
 
+      {error && <p className="entity-image__error">{error}</p>}
+    </div>
+  )
+}
+
+/** Zusatzfelder eines Feindes ausserhalb des Kampfmodus (das Bild steckt oben im Kopf). */
+function FeindFields({
+  entity,
+  readOnly,
+  onFieldChange,
+}: {
+  entity: Entity
+  readOnly: boolean
+  onFieldChange: (key: string, value: string) => void
+}) {
+  return (
+    <>
       <label className="field">
         <span className="field__label">Einleitungstext fuer die Begegnung</span>
         <textarea
@@ -825,7 +919,7 @@ function EntityRow({
         style={{ ['--chip-color' as string]: meta.color }}
         onClick={() => onSelect(entity.id)}
       >
-        <span className={`marker-list__icon${meta.iconInvert ? ' is-icon-invert' : ''}`}>{meta.icon}</span>
+        <EntityIcon entity={entity} className="marker-list__icon" />
         <span className="marker-list__name">{entity.name}</span>
       </button>
       {dropdown && <div className="marker-list__dropdown">{dropdown}</div>}
@@ -859,7 +953,7 @@ function EnemyRow({
         style={{ ['--chip-color' as string]: meta.color }}
       >
         <button className="enemyrow__name" onClick={() => onSelect(entity.id)}>
-          <span className={`marker-list__icon${meta.iconInvert ? ' is-icon-invert' : ''}`}>{meta.icon}</span>
+          <EntityIcon entity={entity} className="marker-list__icon" />
           <span className="marker-list__name">{entity.name}</span>
         </button>
         <span className="enemyrow__init">

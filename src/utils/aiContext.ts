@@ -9,6 +9,22 @@ function clip(s: string, n = 240): string {
   return t.length > n ? t.slice(0, n) + '…' : t
 }
 
+/**
+ * Bildbeschreibung fuer das Portraet eines Objekts. Wird sowohl vom Bildfeld im
+ * Detailpanel als auch vom KI-Werkzeug genutzt, damit beide dasselbe Ergebnis liefern.
+ */
+export function portraitPrompt(entity: Entity): string {
+  const meta = entityMeta(entity.type)
+  const bits = [
+    `Fantasy TTRPG character portrait, head and shoulders, of ${entity.name}`,
+    entity.fields.rolle ? `role: ${entity.fields.rolle}` : '',
+    entity.description ? entity.description : '',
+    `type: ${meta.label}`,
+    'detailed digital painting, dramatic lighting, high quality',
+  ]
+  return bits.filter(Boolean).join('. ')
+}
+
 function entityLine(e: Entity, campaign: Campaign): string {
   const meta = entityMeta(e.type)
   const fields = Object.entries(e.fields)

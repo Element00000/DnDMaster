@@ -657,6 +657,7 @@ export const useStore = create<StoreState>()(
             placement: placement ?? null,
             subMapId: null,
             imageUrl: null,
+            thumbUrl: null,
             links: [],
             fields: fields ?? {},
             decision: type === 'entscheidung' ? emptyDecision() : null,
@@ -1155,6 +1156,9 @@ function normalizeEntity(e: Partial<Entity> & { id: string; type: EntityType; na
     placement: e.placement ?? null,
     subMapId: e.subMapId ?? null,
     imageUrl: e.imageUrl ?? null,
+    // Aeltere Objekte kannten noch kein Miniaturbild; Pins/Listen fallen dann auf das
+    // volle Portraet zurueck, bis das Bild einmal neu gesetzt wird.
+    thumbUrl: e.thumbUrl ?? null,
     links: e.links ?? [],
     fields: e.fields ?? {},
     decision: e.decision ?? (e.type === 'entscheidung' ? emptyDecision() : null),

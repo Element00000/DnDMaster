@@ -1,11 +1,14 @@
 import { useMemo, useRef, useState } from 'react'
 import { useStore } from '../store/useStore'
-import { entityMeta } from '../types'
+import { entityDisplayMeta } from '../types'
+import { useAsset } from '../useAsset'
 
 interface Hit {
   id: string
   kind: 'entity' | 'session'
   icon: string
+  /** Miniatur des Objekts; ersetzt das Icon, wenn ein Portraet hinterlegt ist. */
+  thumbRef: string | null
   color: string
   name: string
   detail: string
@@ -33,11 +36,12 @@ export function SearchBar() {
       if (tableMode && e.visibility !== 'spieler') continue
       const haystack = [e.name, e.description, ...Object.values(e.fields)].join(' ').toLowerCase()
       if (haystack.includes(q)) {
-        const meta = entityMeta(e.type)
+        const meta = entityDisplayMeta(e)
         out.push({
           id: e.id,
           kind: 'entity',
           icon: meta.icon,
+          thumbRef: e.thumbUrl ?? e.imageUrl,
           color: meta.color,
           name: e.name,
           detail: meta.label,
@@ -48,7 +52,7 @@ export function SearchBar() {
     if (!tableMode) {
       for (const s of campaign.sessions) {
         if (`${s.title} ${s.body} ${s.inGameDate}`.toLowerCase().includes(q)) {
-          out.push({ id: s.id, kind: 'session', icon: '\u{1F4D3}', color: '#7c83ff', name: s.title || 'Sitzung', detail: 'Notiz', layerId: null })
+          out.push({ id: s.id, kind: 'session', icon: '\u{1F4D3}', thumbRef: null, color: '#7c83ff', name: s.title || 'Sitzung', detail: 'Notiz', layerId: null })
         }
       }
     }
@@ -101,7 +105,7 @@ export function SearchBar() {
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => choose(h)}
               >
-                <span className="search__hit-icon">{h.icon}</span>
+                <HitIcon hit={h} />
                 <span className="search__hit-name">{h.name}</span>
                 <span className="search__hit-detail">{h.detail}</span>
               </button>
@@ -111,4 +115,11 @@ export function SearchBar() {
       )}
     </div>
   )
+}
+
+/** Portraet des Treffers, sonst sein Typ-Icon. */
+function HitIcon({ hit }: { hit: Hit }) {
+  const image = useAsset(hit.thumbRef)
+  if (image) return <img className="search__hit-icon search__hit-icon--image" src={image} alt="" />
+  return <span className="search__hit-icon">{hit.icon}</span>
 }

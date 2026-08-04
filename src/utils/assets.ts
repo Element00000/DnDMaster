@@ -95,7 +95,8 @@ export async function mapCampaignAssets(
   const entities = await Promise.all(
     (campaign.entities ?? []).map(async (e) => {
       const imageUrl = e.imageUrl ? await fn(e.imageUrl) : e.imageUrl
-      if (!e.event) return { ...e, imageUrl }
+      const thumbUrl = e.thumbUrl ? await fn(e.thumbUrl) : e.thumbUrl
+      if (!e.event) return { ...e, imageUrl, thumbUrl }
       const ev = e.event
       const battleMapUrl = ev.battleMapUrl ? await fn(ev.battleMapUrl) : ev.battleMapUrl
       const blocks = await Promise.all(
@@ -104,7 +105,7 @@ export async function mapCampaignAssets(
       const creatures = await Promise.all(
         ev.creatures.map(async (cr) => (cr.imageUrl ? { ...cr, imageUrl: await fn(cr.imageUrl) } : cr)),
       )
-      return { ...e, imageUrl, event: { ...ev, battleMapUrl, blocks, creatures } }
+      return { ...e, imageUrl, thumbUrl, event: { ...ev, battleMapUrl, blocks, creatures } }
     }),
   )
   return { ...campaign, layers, entities }

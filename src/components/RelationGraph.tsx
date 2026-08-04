@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from '../store/useStore'
 import { entityDisplayMeta, relationMeta } from '../types'
 import type { Entity, RelationType } from '../types'
+import { useAsset } from '../useAsset'
 
 interface Node {
   id: string
@@ -226,13 +227,7 @@ export function RelationGraph() {
                       onPointerUp={(e) => onNodePointerUp(e, n.id)}
                     >
                       <circle r="24" fill="#1c202a" stroke={meta.color} strokeWidth="2.5" />
-                      <text
-                        className={`graph__node-icon${meta.iconInvert ? ' is-icon-invert' : ''}`}
-                        textAnchor="middle"
-                        dy="6"
-                      >
-                        {meta.icon}
-                      </text>
+                      <NodeFace entity={n.entity} icon={meta.icon} iconInvert={meta.iconInvert} />
                       <text className="graph__node-label" textAnchor="middle" y="40">
                         {n.entity.name}
                       </text>
@@ -246,6 +241,40 @@ export function RelationGraph() {
         </div>
       )}
     </div>
+  )
+}
+
+/**
+ * Innenleben eines Knotens: das Portraet des Objekts, rund beschnitten, sonst sein
+ * Typ-Icon. Der Beschnitt braucht eine eigene clipPath je Knoten, daher als Komponente.
+ */
+function NodeFace({ entity, icon, iconInvert }: { entity: Entity; icon: string; iconInvert?: boolean }) {
+  const image = useAsset(entity.thumbUrl ?? entity.imageUrl)
+  if (!image) {
+    return (
+      <text className={`graph__node-icon${iconInvert ? ' is-icon-invert' : ''}`} textAnchor="middle" dy="6">
+        {icon}
+      </text>
+    )
+  }
+  const clipId = `nodeclip-${entity.id}`
+  return (
+    <>
+      <defs>
+        <clipPath id={clipId}>
+          <circle r="22" />
+        </clipPath>
+      </defs>
+      <image
+        href={image}
+        x="-22"
+        y="-22"
+        width="44"
+        height="44"
+        preserveAspectRatio="xMidYMid slice"
+        clipPath={`url(#${clipId})`}
+      />
+    </>
   )
 }
 

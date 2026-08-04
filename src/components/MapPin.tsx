@@ -1,9 +1,15 @@
 import { useRef } from 'react'
+import { useAsset } from '../useAsset'
 
 interface Props {
   screenX: number
   screenY: number
   icon: string
+  /**
+   * Miniaturbild des Objekts (Asset-Referenz). Ist eines hinterlegt, zeigt der Pin das
+   * Portraet statt des Typ-Icons.
+   */
+  imageRef?: string | null
   color: string
   label: string
   selected: boolean
@@ -27,6 +33,7 @@ export function MapPin({
   screenX,
   screenY,
   icon,
+  imageRef,
   color,
   label,
   selected,
@@ -39,6 +46,7 @@ export function MapPin({
   onDragEnd,
 }: Props) {
   const state = useRef<{ lastX: number; lastY: number; moved: boolean } | null>(null)
+  const image = useAsset(imageRef)
 
   function onPointerDown(e: React.PointerEvent) {
     if (e.button !== 0) return
@@ -80,7 +88,7 @@ export function MapPin({
 
   return (
     <div
-      className={`map-pin${selected ? ' is-selected' : ''}${draggable ? ' is-draggable' : ''}${isMapLink ? ' is-map-link' : ''}${iconInvert ? ' is-icon-invert' : ''}`}
+      className={`map-pin${selected ? ' is-selected' : ''}${draggable ? ' is-draggable' : ''}${isMapLink ? ' is-map-link' : ''}${iconInvert ? ' is-icon-invert' : ''}${image ? ' has-image' : ''}`}
       style={{ left: screenX, top: screenY, ['--pin-color' as string]: color }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
@@ -89,7 +97,11 @@ export function MapPin({
       onLostPointerCapture={onPointerCancelOrLost}
     >
       <div className="map-pin__head">
-        <span className="map-pin__icon">{icon}</span>
+        {image ? (
+          <img className="map-pin__image" src={image} alt="" draggable={false} />
+        ) : (
+          <span className="map-pin__icon">{icon}</span>
+        )}
       </div>
       <div className="map-pin__label">{label}</div>
     </div>

@@ -107,6 +107,12 @@ export interface Entity {
   subMapId: string | null
   /** Portraet/Bild des Objekts (Asset-Referenz oder data-URL); z.B. KI-generiert. */
   imageUrl: string | null
+  /**
+   * Winziges Miniaturbild desselben Portraets (siehe THUMB_SIZE) fuer Kartenpinnadeln und
+   * Listen. Wird beim Setzen des Bildes miterzeugt; null, wenn es kein Bild gibt oder das
+   * Objekt noch aus einer Fassung ohne Miniaturbilder stammt.
+   */
+  thumbUrl: string | null
   links: EntityLink[]
   /** Typ-spezifische Felder (Schluessel siehe FIELD_SCHEMA). */
   fields: Record<string, string>
