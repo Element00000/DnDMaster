@@ -4,17 +4,13 @@ import { Sidebar } from './components/Sidebar'
 import { MapCanvas } from './components/MapCanvas'
 import { DetailPanel } from './components/DetailPanel'
 import { TimeSlider } from './components/TimeSlider'
-import { Timeline } from './components/Timeline'
-import { StoryTree } from './components/StoryTree'
+import { BottomBar } from './components/BottomBar'
+import { BottomPanel } from './components/BottomPanel'
 import { LayerBar } from './components/LayerBar'
 import { FightMode } from './components/FightMode'
-import { RelationGraph } from './components/RelationGraph'
 import { useStore } from './store/useStore'
 
 export default function App() {
-  const timelineOpen = useStore((s) => s.timelineOpen)
-  const storyTreeOpen = useStore((s) => s.storyTreeOpen)
-  const relationGraphOpen = useStore((s) => s.relationGraphOpen)
   const tableMode = useStore((s) => s.tableMode)
   const fightEventId = useStore((s) => s.fightEventId)
   const undo = useStore((s) => s.undo)
@@ -45,9 +41,8 @@ export default function App() {
           <LayerBar />
           <TimeSlider />
           <MapCanvas />
-          {timelineOpen && <Timeline />}
-          {storyTreeOpen && <StoryTree />}
-          {relationGraphOpen && <RelationGraph />}
+          <BottomPanel />
+          {!tableMode && <BottomBar />}
         </main>
         {!tableMode && <DetailPanel />}
       </div>

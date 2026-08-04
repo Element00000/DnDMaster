@@ -21,7 +21,6 @@ interface Pos {
 export function RelationGraph() {
   const campaign = useStore((s) => s.campaigns.find((c) => c.id === s.activeCampaignId) ?? s.campaigns[0])
   const tableMode = useStore((s) => s.tableMode)
-  const setOpen = useStore((s) => s.setRelationGraphOpen)
   const selectEntity = useStore((s) => s.selectEntity)
   const goToLayer = useStore((s) => s.goToLayer)
   const [onlyChars, setOnlyChars] = useState(false)
@@ -165,9 +164,6 @@ export function RelationGraph() {
           <input type="checkbox" checked={onlyChars} onChange={(e) => setOnlyChars(e.target.checked)} />
           Nur Charaktere &amp; Fraktionen
         </label>
-        <button className="graph__close" onClick={() => setOpen(false)} title="Schliessen">
-          &times;
-        </button>
       </div>
 
       {nodes.length === 0 ? (

@@ -1440,6 +1440,50 @@ button {
   gap: 10px;
 }
 
+/* Kampagnentag: steuert, welche Tagesplan-Ausnahmen der Objekte greifen. */
+.time-slider__day {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--panel-2);
+}
+
+.time-slider__daybtn {
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--ink-dim);
+  font-size: 14px;
+  line-height: 1;
+}
+
+.time-slider__daybtn:hover:not(:disabled) {
+  background: var(--elevated);
+  color: var(--ink);
+}
+
+.time-slider__daybtn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.time-slider__daylabel {
+  min-width: 52px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 .time-slider__icon {
   font-size: 16px;
 }
@@ -1549,14 +1593,64 @@ button {
 }
 
 /* ---------- Zeitleiste ---------- */
-.timeline {
+/* ---------- Untere Leiste: Schaltflaechen ---------- */
+/* Gegenstueck zur Tageszeit-Leiste oben. "bottom" setzt BottomBar inline, damit die
+   Leiste beim Aufklappen auf der Oberkante des Panels sitzt statt darunter zu verschwinden. */
+.bottombar {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 19;
+  display: flex;
+  gap: 6px;
+  background: rgba(20, 24, 33, 0.9);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 6px;
+  backdrop-filter: blur(4px);
+  box-shadow: var(--shadow);
+  transition: bottom 0.14s ease-out;
+  max-width: calc(100% - 24px);
+}
+
+.bottombar__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 13px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--ink-dim);
+  font-family: inherit;
+  font-size: 12.5px;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.bottombar__btn:hover {
+  background: var(--elevated);
+  color: var(--ink);
+}
+
+.bottombar__btn.is-active {
+  border-color: var(--accent);
+  background: var(--accent-tint);
+  color: var(--accent-soft);
+}
+
+.bottombar__icon {
+  font-size: 14px;
+}
+
+/* ---------- Untere Leiste: Panel-Rahmen ---------- */
+.bottompanel {
   position: absolute;
   left: 0;
   right: 0;
   bottom: 0;
   z-index: 18;
-  height: 220px;
-  background: rgba(18, 21, 29, 0.96);
+  background: rgba(18, 21, 29, 0.97);
   border-top: 1px solid var(--border);
   box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.5);
   display: flex;
@@ -1564,11 +1658,72 @@ button {
   backdrop-filter: blur(4px);
 }
 
+/* Ziehgriff: liegt auf der Oberkante und ragt etwas darueber hinaus, damit er gut
+   greifbar ist, ohne Platz vom Inhalt zu nehmen. */
+.bottompanel__grip {
+  position: absolute;
+  top: -3px;
+  left: 0;
+  right: 0;
+  height: 9px;
+  cursor: ns-resize;
+  touch-action: none;
+}
+
+.bottompanel__grip::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 46px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--border-strong);
+  transition: background 0.15s;
+}
+
+.bottompanel__grip:hover::after {
+  background: var(--accent);
+}
+
+.bottompanel__close {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  z-index: 2;
+  background: transparent;
+  border: none;
+  color: var(--ink-dim);
+  font-size: 22px;
+  line-height: 1;
+}
+
+.bottompanel__close:hover {
+  color: var(--ink);
+}
+
+.bottompanel__content {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ---------- Zeitleiste ---------- */
+.timeline {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 .timeline__header {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 16px;
+  gap: 14px;
+  padding: 10px 46px 10px 16px;
   border-bottom: 1px solid var(--border);
 }
 
@@ -1579,21 +1734,113 @@ button {
   margin: 0;
 }
 
+.timeline__tabs {
+  display: flex;
+  gap: 4px;
+}
+
+.timeline__tab {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  color: var(--ink-dim);
+  font-family: inherit;
+  font-size: 12.5px;
+  max-width: 320px;
+}
+
+.timeline__tab:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  color: var(--ink);
+}
+
+.timeline__tab.is-active {
+  border-color: var(--accent);
+  background: var(--accent-tint);
+  color: var(--accent-soft);
+}
+
+.timeline__tab:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.timeline__tabname {
+  font-size: 11px;
+  color: var(--ink-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.timeline__body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.timeline__toolbar {
+  padding: 10px 16px 0;
+}
+
 .timeline__filter {
   max-width: 240px;
 }
 
-.timeline__close {
-  margin-left: auto;
-  background: transparent;
-  border: none;
+.timeline__notice {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  max-width: 620px;
+  font-size: 13px;
+  line-height: 1.6;
   color: var(--ink-dim);
-  font-size: 22px;
-  line-height: 1;
 }
 
-.timeline__close:hover {
+.timeline__notice p {
+  margin: 0;
+}
+
+.timeline__schedule {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 16px;
+}
+
+.timeline__subject {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-left: 10px;
+  border-left: 3px solid var(--chip-color, var(--gold));
+}
+
+.timeline__subject-icon {
+  font-size: 17px;
+}
+
+.timeline__subject-icon.is-icon-invert {
+  filter: brightness(0) invert(1);
+}
+
+.timeline__subject-name {
+  font-family: var(--font-display);
+  font-size: 15px;
   color: var(--ink);
+}
+
+.timeline__subject-hint {
+  font-size: 11.5px;
+  color: var(--ink-faint);
 }
 
 .timeline__empty {
@@ -1625,11 +1872,26 @@ button {
   border-right: none;
 }
 
+/* Klickbar: setzt diesen Tag als aktuellen Kampagnentag (steuert Tagesplan-Ausnahmen). */
 .timeline__daymark {
+  align-self: flex-start;
+  padding: 3px 9px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
   font-family: var(--font-display);
   font-size: 13px;
   color: var(--gold);
   letter-spacing: 0.5px;
+}
+
+.timeline__daymark:hover {
+  border-color: var(--gold);
+}
+
+.timeline__day.is-current .timeline__daymark {
+  border-color: var(--gold);
+  background: color-mix(in srgb, var(--gold) 18%, transparent);
 }
 
 .timeline__events {
@@ -1682,6 +1944,280 @@ button {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* ---------- Tagesablauf: 24-Stunden-Zeitstrahl ---------- */
+.dayschedule {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.daytrack {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Stundenbeschriftung: eigene Zeile, damit die Spuren selbst frei von Text bleiben.
+   Der linke Einzug entspricht der Breite der Spurenbeschriftung. */
+.daytrack__hours {
+  position: relative;
+  height: 15px;
+  margin-left: 104px;
+}
+
+.daytrack__hour {
+  position: absolute;
+  transform: translateX(-50%);
+  font-size: 10px;
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.daytrack__row {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.daytrack__lanelabel {
+  width: 96px;
+  flex: none;
+  align-self: center;
+  font-size: 11px;
+  color: var(--ink-dim);
+  line-height: 1.2;
+}
+
+.daytrack__lanelabel--exception {
+  color: var(--gold-soft);
+}
+
+/* Die Spur selbst: Stundenraster als Hintergrund, Zeitfenster absolut darin. */
+.daytrack__lane {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  height: 40px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background-color: var(--panel-2);
+  background-image: repeating-linear-gradient(
+    to right,
+    var(--border) 0 1px,
+    transparent 1px calc(100% / 24)
+  );
+  cursor: copy;
+  touch-action: none;
+  overflow: hidden;
+}
+
+.dayseg {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--chip-color) 42%, var(--panel));
+  border: 1px solid var(--chip-color, var(--border));
+  color: var(--ink);
+  cursor: grab;
+  overflow: hidden;
+}
+
+.dayseg:active {
+  cursor: grabbing;
+}
+
+.dayseg.is-selected {
+  box-shadow: 0 0 0 2px var(--accent), var(--shadow-sm);
+  z-index: 2;
+}
+
+/* Ausnahmen eines einzelnen Tages heben sich schraffiert vom Standardplan ab. */
+.dayseg--exception {
+  background-image: repeating-linear-gradient(
+    45deg,
+    rgba(255, 255, 255, 0.14) 0 5px,
+    transparent 5px 10px
+  );
+  border-color: var(--gold);
+}
+
+.dayseg__label {
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+
+.dayseg__handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 9px;
+  cursor: ew-resize;
+}
+
+.dayseg__handle--start {
+  left: 0;
+}
+
+.dayseg__handle--end {
+  right: 0;
+}
+
+.dayseg__handle:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+/* Aktuell eingestellte Uhrzeit als Marker ueber allen Spuren. */
+.daytrack__now {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--gold);
+  box-shadow: 0 0 6px var(--gold);
+  pointer-events: none;
+  z-index: 3;
+}
+
+.dayschedule__banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 8px 12px;
+  border: 1px solid color-mix(in srgb, var(--gold) 45%, var(--border));
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--gold) 10%, var(--panel-2));
+  font-size: 12px;
+  color: var(--ink-dim);
+}
+
+.dayschedule__hint {
+  font-size: 11.5px;
+  color: var(--ink-faint);
+  line-height: 1.5;
+}
+
+.dayschedule__warn {
+  color: var(--gold-soft);
+}
+
+.dayschedule__empty {
+  margin: 0;
+  font-size: 12px;
+  color: var(--ink-faint);
+}
+
+/* Bearbeitungszeile des ausgewaehlten Zeitfensters. */
+.dayedit {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--panel-2);
+}
+
+.dayedit__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.dayedit__field > span {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--ink-faint);
+}
+
+.dayedit__field--grow {
+  flex: 1;
+  min-width: 140px;
+}
+
+/* ---------- Stationen-Route auf der Karte ---------- */
+.schedule-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 12;
+  pointer-events: none;
+}
+
+.schedule-overlay__lines {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.schedule-overlay__lines polyline {
+  fill: none;
+  stroke: var(--chip-color, var(--gold));
+  stroke-width: 2;
+  stroke-dasharray: 5 5;
+  opacity: 0.65;
+}
+
+.schedule-stop {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.schedule-stop__dot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex: none;
+  border-radius: 50%;
+  border: 2px solid var(--chip-color, var(--gold));
+  background: rgba(13, 15, 20, 0.85);
+  color: var(--ink);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.schedule-stop__label {
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: rgba(13, 15, 20, 0.82);
+  color: var(--ink-dim);
+  font-size: 10.5px;
+  white-space: nowrap;
+}
+
+/* Station, an der das Objekt zur eingestellten Uhrzeit gerade steht. */
+.schedule-stop.is-now .schedule-stop__dot {
+  background: var(--chip-color, var(--gold));
+  box-shadow: 0 0 10px var(--chip-color, var(--gold));
+}
+
+.schedule-stop.is-exception .schedule-stop__dot {
+  border-color: var(--gold);
+  border-style: dashed;
+}
+
+/* Station, deren Ort gerade per Kartenklick gesetzt wird. */
+.schedule-stop.is-target .schedule-stop__dot {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-tint);
 }
 
 /* ---------- Entscheidungs-Editor ---------- */
@@ -1927,21 +2463,19 @@ button {
 }
 
 /* ---------- Handlungsbaum ---------- */
+/* Sitzt im Rahmen der unteren Leiste (BottomPanel), fuellt ihn vollstaendig aus. */
 .storytree {
-  position: absolute;
-  inset: 0;
-  z-index: 19;
-  background: rgba(13, 15, 20, 0.97);
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  backdrop-filter: blur(3px);
 }
 
 .storytree__header {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 18px;
+  padding: 12px 46px 12px 18px;
   border-bottom: 1px solid var(--border);
 }
 
@@ -1980,6 +2514,7 @@ button {
 
 .storytree__board {
   flex: 1;
+  min-height: 0;
   display: flex;
   gap: 26px;
   padding: 20px;
@@ -3395,21 +3930,19 @@ button {
 }
 
 /* ---------- Beziehungsgraph ---------- */
+/* Sitzt im Rahmen der unteren Leiste (BottomPanel), fuellt ihn vollstaendig aus. */
 .graph {
-  position: absolute;
-  inset: 0;
-  z-index: 19;
-  background: rgba(13, 15, 20, 0.98);
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  backdrop-filter: blur(3px);
 }
 
 .graph__header {
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 12px 18px;
+  padding: 12px 46px 12px 18px;
   border-bottom: 1px solid var(--border);
 }
 
@@ -3462,6 +3995,7 @@ button {
 .graph__canvas {
   position: relative;
   flex: 1;
+  min-height: 0;
   overflow: hidden;
   cursor: grab;
   touch-action: none;

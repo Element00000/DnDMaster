@@ -24,12 +24,6 @@ export function TopBar() {
   const replaceAllData = useStore((s) => s.replaceAllData)
   const placingLayerId = useStore((s) => s.placingLayerId)
   const setPlacingLayer = useStore((s) => s.setPlacingLayer)
-  const timelineOpen = useStore((s) => s.timelineOpen)
-  const setTimelineOpen = useStore((s) => s.setTimelineOpen)
-  const storyTreeOpen = useStore((s) => s.storyTreeOpen)
-  const setStoryTreeOpen = useStore((s) => s.setStoryTreeOpen)
-  const relationGraphOpen = useStore((s) => s.relationGraphOpen)
-  const setRelationGraphOpen = useStore((s) => s.setRelationGraphOpen)
   const tableMode = useStore((s) => s.tableMode)
   const setTableMode = useStore((s) => s.setTableMode)
   const requestFitToView = useStore((s) => s.requestFitToView)
@@ -199,28 +193,9 @@ export function TopBar() {
 
       <div className="topbar__meta">{entityCount} Objekte</div>
 
+      {/* Zeitleiste, Handlungsbaum und Beziehungen sitzen in der schwebenden Leiste am
+          unteren Kartenrand (BottomBar), nicht mehr hier oben. */}
       <div className="topbar__actions">
-        <button
-          className={`btn${timelineOpen ? ' btn--active' : ''}`}
-          onClick={() => setTimelineOpen(!timelineOpen)}
-          title="Kampagnen-Zeitleiste ein-/ausblenden"
-        >
-          Zeitleiste
-        </button>
-        <button
-          className={`btn${storyTreeOpen ? ' btn--active' : ''}`}
-          onClick={() => setStoryTreeOpen(!storyTreeOpen)}
-          title="Handlungsbaum ein-/ausblenden"
-        >
-          Handlungsbaum
-        </button>
-        <button
-          className={`btn${relationGraphOpen ? ' btn--active' : ''}`}
-          onClick={() => setRelationGraphOpen(!relationGraphOpen)}
-          title="Beziehungsgraph ein-/ausblenden"
-        >
-          Beziehungen
-        </button>
         <button
           className="btn"
           onClick={() => setTableMode(true)}

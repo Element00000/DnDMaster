@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useStore } from '../store/useStore'
 import { entityDisplayMeta } from '../types'
 import type { Entity, MapLayer } from '../types'
-import { dayNightOverlay, inWindow } from '../utils/time'
+import { activeScheduleEntry, dayNightOverlay, formatTime } from '../utils/time'
 import { useAsset } from '../useAsset'
 import { PlaceholderMap } from './PlaceholderMap'
 import { MapPin } from './MapPin'
@@ -53,7 +53,13 @@ export function MapCanvas() {
   const setTool = useStore((s) => s.setTool)
   const timeEnabled = useStore((s) => s.timeEnabled)
   const timeOfDay = useStore((s) => s.timeOfDay)
+  const currentDay = useStore((s) => s.currentDay)
   const dayNight = useStore((s) => s.dayNight)
+  const placingScheduleId = useStore((s) => s.placingScheduleId)
+  const setPlacingSchedule = useStore((s) => s.setPlacingSchedule)
+  const setSchedulePosition = useStore((s) => s.setSchedulePosition)
+  const selectedEntityId = useStore((s) => s.selectedEntityId)
+  const bottomPanel = useStore((s) => s.bottomPanel)
   const fogEditing = useStore((s) => s.fogEditing)
   const fogBrush = useStore((s) => s.fogBrush)
   const addReveal = useStore((s) => s.addReveal)
@@ -94,22 +100,22 @@ export function MapCanvas() {
   const effectivePos = useCallback(
     (e: Entity): { x: number; y: number } => {
       if (timeEnabled && e.schedule.length > 0) {
-        const active = e.schedule.find((s) => inWindow(timeOfDay, s.timeStart, s.timeEnd))
+        const active = activeScheduleEntry(e.schedule, timeOfDay, currentDay)
         if (active) return { x: active.x, y: active.y }
       }
       return { x: e.placement!.x, y: e.placement!.y }
     },
-    [timeEnabled, timeOfDay],
+    [timeEnabled, timeOfDay, currentDay],
   )
 
   // Bewegt bei aktivem Zeitplan-Eintrag dessen Position, sonst die Basis-Platzierung.
   const moveEntityTimed = useCallback(
     (e: Entity, dxWorld: number, dyWorld: number) => {
-      const active = timeEnabled ? e.schedule.find((s) => inWindow(timeOfDay, s.timeStart, s.timeEnd)) : undefined
+      const active = timeEnabled ? activeScheduleEntry(e.schedule, timeOfDay, currentDay) : undefined
       if (active) moveScheduleEntry(e.id, active.id, dxWorld, dyWorld)
       else moveEntity(e.id, dxWorld, dyWorld)
     },
-    [timeEnabled, timeOfDay, moveScheduleEntry, moveEntity],
+    [timeEnabled, timeOfDay, currentDay, moveScheduleEntry, moveEntity],
   )
 
   const fitToView = useCallback(() => {
@@ -316,7 +322,7 @@ export function MapCanvas() {
       if (!el) return
       const ent = entities.find((x) => x.id === entityId)
       if (!ent?.placement) return
-      const active = timeEnabled ? ent.schedule.find((s) => inWindow(timeOfDay, s.timeStart, s.timeEnd)) : undefined
+      const active = timeEnabled ? activeScheduleEntry(ent.schedule, timeOfDay, currentDay) : undefined
       if (active) return
       const rect = el.getBoundingClientRect()
       const v = viewRef.current
@@ -326,7 +332,7 @@ export function MapCanvas() {
       if (result.layerId === ent.placement.layerId) return
       setPlacement(entityId, { layerId: result.layerId, x: result.x, y: result.y })
     },
-    [entities, campaign.layers, layer.id, setPlacement, timeEnabled, timeOfDay],
+    [entities, campaign.layers, layer.id, setPlacement, timeEnabled, timeOfDay, currentDay],
   )
 
   const onPointerDown = useCallback(
@@ -445,7 +451,24 @@ export function MapCanvas() {
       const wy = (e.clientY - rect.top - view.ty) / view.scale
       const inside = wx >= 0 && wy >= 0 && wx <= width && wy <= height
 
-      // Hoechste Prioritaet: eine Karte wird gerade als eingebettete Karte platziert.
+      // Hoechste Prioritaet: der Aufenthaltsort eines Zeitfensters wird gerade gesetzt.
+      // Zeitplan-Positionen liegen immer auf der Ebene der Basis-Platzierung des Objekts;
+      // ein Klick auf eine andere Ebene laesst den Setzmodus daher einfach weiterlaufen.
+      if (placingScheduleId) {
+        if (inside) {
+          const ent = entities.find((x) => x.id === placingScheduleId.entityId)
+          if (ent?.placement) {
+            const t = resolveDeepTarget(campaign.layers, layer.id, wx, wy, view.scale)
+            if (t.layerId === ent.placement.layerId) {
+              setSchedulePosition(placingScheduleId.entityId, placingScheduleId.scheduleId, t.x, t.y)
+              setPlacingSchedule(null)
+            }
+          }
+        }
+        return
+      }
+
+      // Eine Karte wird gerade als eingebettete Karte platziert.
       // Faellt der Klick in eine (beliebig tief) aufgedeckte eingebettete Karte,
       // wird dort eingebettet statt immer auf der Wurzelebene.
       if (placingLayerId) {
@@ -507,12 +530,16 @@ export function MapCanvas() {
       fogEditing,
       placingEntityId,
       placingLayerId,
+      placingScheduleId,
+      entities,
       campaign.layers,
       pins,
       effectivePos,
       addEntity,
       setPlacement,
       setPlacingEntity,
+      setPlacingSchedule,
+      setSchedulePosition,
       embedLayer,
       setPlacingLayer,
       selectEntity,
@@ -575,7 +602,8 @@ export function MapCanvas() {
     resize.current = null
   }, [])
 
-  const placingActive = placingEntityId !== null || placingLayerId !== null
+  const placingActive = placingEntityId !== null || placingLayerId !== null || placingScheduleId !== null
+  const selectedEntity = entities.find((e) => e.id === selectedEntityId && e.placement) ?? null
   // Nebel voll deckend fuer Spieler/Tisch, halbtransparent fuer den DM.
   const fogActive = layer.fogEnabled
   const fogOpacity = tableMode ? 1 : 0.45
@@ -733,6 +761,19 @@ export function MapCanvas() {
         })}
       </div>
 
+      {/* Beim Planen in der Zeitleiste: alle Stationen des ausgewaehlten Objekts als Route. */}
+      {bottomPanel === 'zeitleiste' && selectedEntity && (
+        <ScheduleOverlay
+          entity={selectedEntity}
+          layers={campaign.layers}
+          rootLayerId={layer.id}
+          view={view}
+          currentDay={currentDay}
+          timeOfDay={timeOfDay}
+          activeScheduleId={placingScheduleId?.scheduleId ?? null}
+        />
+      )}
+
       {embeddedLayers.map((el) => (
         <EmbeddedMap
           key={el.id}
@@ -840,6 +881,69 @@ export function MapCanvas() {
   )
 }
 
+/**
+ * Route eines Objekts ueber den Tag: alle heute geltenden Zeitfenster als nummerierte
+ * Stationen mit Verbindungslinie. Rein zur Orientierung beim Planen in der Zeitleiste -
+ * nimmt keine Klicks entgegen, damit Karte und Pins normal bedienbar bleiben.
+ */
+function ScheduleOverlay({
+  entity,
+  layers,
+  rootLayerId,
+  view,
+  currentDay,
+  timeOfDay,
+  activeScheduleId,
+}: {
+  entity: Entity
+  layers: MapLayer[]
+  rootLayerId: string
+  view: View
+  currentDay: number
+  timeOfDay: number
+  activeScheduleId: string | null
+}) {
+  if (!entity.placement) return null
+  const lv = layerScreenView(layers, rootLayerId, entity.placement.layerId, view)
+  if (!lv) return null
+
+  // Nur was heute wirklich gilt: Standardplan plus die Ausnahmen des aktuellen Tages.
+  const stops = entity.schedule
+    .filter((s) => s.day == null || s.day === currentDay)
+    .slice()
+    .sort((a, b) => a.timeStart - b.timeStart)
+  if (stops.length === 0) return null
+
+  const meta = entityDisplayMeta(entity)
+  const active = activeScheduleEntry(entity.schedule, timeOfDay, currentDay)
+  const points = stops.map((s) => ({ x: s.x * lv.scale + lv.tx, y: s.y * lv.scale + lv.ty }))
+
+  return (
+    <div className="schedule-overlay" style={{ ['--chip-color' as string]: meta.color }}>
+      {points.length > 1 && (
+        <svg className="schedule-overlay__lines">
+          <polyline points={points.map((p) => `${p.x},${p.y}`).join(' ')} />
+        </svg>
+      )}
+      {stops.map((s, i) => (
+        <div
+          key={s.id}
+          className={`schedule-stop${s.id === active?.id ? ' is-now' : ''}${
+            s.id === activeScheduleId ? ' is-target' : ''
+          }${s.day != null ? ' is-exception' : ''}`}
+          style={{ left: points[i].x, top: points[i].y }}
+        >
+          <span className="schedule-stop__dot">{i + 1}</span>
+          <span className="schedule-stop__label">
+            {formatTime(s.timeStart)}
+            {s.label ? ` · ${s.label}` : ''}
+          </span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function ZoomControls({ scale, onZoom, onFit }: { scale: number; onZoom: (dir: number) => void; onFit: () => void }) {
   // stopPropagation: sonst faengt das darunterliegende Karten-Pointerdown (Verschieben/
   // Rechteck-Markierung) den Klick ab, bevor er die Buttons erreicht. Ebenso wuerde ein
@@ -896,6 +1000,24 @@ function computeLayerScreenRect(
     v = { scale: w / l.width, tx: x, ty: y }
   }
   return rect
+}
+
+/**
+ * Transformation von den Weltkoordinaten einer (beliebig tief verschachtelten) Ebene auf
+ * den Bildschirm. Damit lassen sich Punkte einer Unterkarte einzeichnen, ohne die aktive
+ * Ebene zu wechseln. null, wenn die Ebene nicht unter rootLayerId haengt.
+ */
+function layerScreenView(
+  layers: MapLayer[],
+  rootLayerId: string,
+  targetLayerId: string,
+  rootView: View,
+): View | null {
+  if (targetLayerId === rootLayerId) return rootView
+  const target = layers.find((l) => l.id === targetLayerId)
+  const rect = computeLayerScreenRect(layers, rootLayerId, targetLayerId, rootView)
+  if (!target || !rect) return null
+  return { scale: rect.w / target.width, tx: rect.x, ty: rect.y }
 }
 
 /**
@@ -1024,6 +1146,8 @@ function EmbeddedMap({
   setEmbedRect: (id: string, x: number, y: number, width: number, height: number) => void
 }) {
   const image = useAsset(embLayer.imageUrl)
+  // Direkt aus dem Store, statt durch die (beliebig tiefe) Rekursion gereicht zu werden.
+  const currentDay = useStore((s) => s.currentDay)
   const embed = embLayer.embed!
   const selected = selectedEmbedId === embLayer.id
   const x = embed.x * parentView.scale + parentView.tx
@@ -1170,7 +1294,7 @@ function EmbeddedMap({
 
   function embEffectivePos(e: Entity): { x: number; y: number } {
     if (timeEnabled && e.schedule.length > 0) {
-      const active = e.schedule.find((s) => inWindow(timeOfDay, s.timeStart, s.timeEnd))
+      const active = activeScheduleEntry(e.schedule, timeOfDay, currentDay)
       if (active) return { x: active.x, y: active.y }
     }
     return { x: e.placement!.x, y: e.placement!.y }

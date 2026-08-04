@@ -1,5 +1,7 @@
 // Hilfsfunktionen fuer die Tageszeit (Minuten seit Mitternacht, 0..1439).
 
+import type { ScheduleEntry } from '../types'
+
 export const MINUTES_PER_DAY = 24 * 60
 
 /** 725 -> "12:05" */
@@ -29,6 +31,48 @@ export function inWindow(now: number, start: number | null, end: number | null):
   if (start === end) return true
   if (start < end) return now >= start && now < end
   return now >= start || now < end
+}
+
+/**
+ * Welcher Zeitplan-Eintrag gilt zur Uhrzeit "minutes" am Kalendertag "day"?
+ *
+ * Ausnahmen des konkreten Tages schlagen den Standard-Tagesablauf: Steht die Wirtin
+ * normalerweise ab 6 Uhr im Schankraum, an Tag 12 aber auf dem Fest, gewinnt der
+ * Eintrag mit day === 12. Gibt es fuer die Uhrzeit gar keinen Eintrag, liefert die
+ * Funktion undefined und es gilt die Basis-Platzierung des Objekts.
+ */
+export function activeScheduleEntry(
+  schedule: ScheduleEntry[],
+  minutes: number,
+  day: number,
+): ScheduleEntry | undefined {
+  const exception = schedule.find((s) => s.day === day && inWindow(minutes, s.timeStart, s.timeEnd))
+  if (exception) return exception
+  return schedule.find((s) => s.day == null && inWindow(minutes, s.timeStart, s.timeEnd))
+}
+
+/**
+ * Zerlegt ein Zeitfenster in die Abschnitte, die es auf einem 0-24-Uhr-Balken belegt.
+ * Fenster ueber Mitternacht (22:00-06:00) ergeben zwei Abschnitte, alle anderen einen.
+ */
+export function windowSegments(start: number, end: number): { from: number; to: number }[] {
+  if (start === end) return [{ from: 0, to: MINUTES_PER_DAY }]
+  if (start < end) return [{ from: start, to: end }]
+  return [
+    { from: start, to: MINUTES_PER_DAY },
+    { from: 0, to: end },
+  ]
+}
+
+/** Laenge eines Zeitfensters in Minuten (ueber Mitternacht mitgerechnet). */
+export function windowDuration(start: number, end: number): number {
+  if (start === end) return MINUTES_PER_DAY
+  return ((end - start) % MINUTES_PER_DAY + MINUTES_PER_DAY) % MINUTES_PER_DAY
+}
+
+/** Minuten auf 0..1439 normieren (auch fuer negative Werte). */
+export function wrapMinutes(minutes: number): number {
+  return ((Math.round(minutes) % MINUTES_PER_DAY) + MINUTES_PER_DAY) % MINUTES_PER_DAY
 }
 
 /**

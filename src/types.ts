@@ -76,6 +76,10 @@ export interface EntityLink {
  * Zeitfenster, in dem sich ein Objekt an einer anderen Stelle der Karte befindet
  * (gleiche Ebene wie die Basis-Platzierung). Ausserhalb aller Fenster gilt die
  * normale Platzierung. start>end laeuft ueber Mitternacht.
+ *
+ * Zwei Ebenen von Eintraegen (siehe activeScheduleEntry in utils/time.ts):
+ * - day === null: Standard-Tagesablauf, gilt an jedem Kampagnentag.
+ * - day === <Zahl>: Ausnahme, gilt nur an diesem Kalendertag und hat dann Vorrang.
  */
 export interface ScheduleEntry {
   id: string
@@ -83,6 +87,10 @@ export interface ScheduleEntry {
   timeEnd: number
   x: number
   y: number
+  /** Freie Beschriftung des Aufenthaltsorts fuer die Zeitleiste, z.B. "Marktplatz". */
+  label: string
+  /** null = gilt an jedem Tag; Zahl = Ausnahme nur an diesem Kalendertag. */
+  day: number | null
 }
 
 export interface Entity {

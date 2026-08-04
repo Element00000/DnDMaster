@@ -21,6 +21,7 @@ import type {
 } from '../types'
 import { emptyDecision, emptyEvent } from '../types'
 import { uid } from '../utils/id'
+import { MINUTES_PER_DAY } from '../utils/time'
 
 function makeLayer(name = 'Weltkarte'): MapLayer {
   return {
@@ -102,6 +103,14 @@ export type Tool = 'select' | 'add'
 /** Reiter im DM-Werkzeug-Panel. */
 export type ToolTab = 'wuerfel' | 'notizen' | 'ki' | 'musik'
 
+/** Ansicht in der unteren, hochfahrenden Leiste. */
+export type BottomPanel = 'zeitleiste' | 'handlungsbaum' | 'beziehungen'
+
+/** Standardhoehe der unteren Leiste in Prozent der Fensterhoehe. */
+export const BOTTOM_PANEL_DEFAULT = 45
+export const BOTTOM_PANEL_MIN = 18
+export const BOTTOM_PANEL_MAX = 92
+
 interface StoreState extends AppData {
   // UI-Zustand (nicht persistiert)
   tool: Tool
@@ -160,20 +169,27 @@ interface StoreState extends AppData {
   timeEnabled: boolean
   /** Aktuelle Tageszeit in Minuten (0..1439). */
   timeOfDay: number
+  /**
+   * Aktueller Kampagnentag. Bestimmt, welche Tagesplan-Ausnahmen greifen und auf welchen
+   * Tag sich neu angelegte Ausnahmen beziehen.
+   */
+  currentDay: number
   /** Tag/Nacht-Einfaerbung der Karte. */
   dayNight: boolean
-  /** Zeitleiste (Kalendertag) eingeblendet? */
-  timelineOpen: boolean
-  /** Handlungsbaum-Ansicht eingeblendet? */
-  storyTreeOpen: boolean
-  /** Beziehungsgraph eingeblendet? */
-  relationGraphOpen: boolean
   setTimeEnabled: (on: boolean) => void
   setTimeOfDay: (minutes: number) => void
+  setCurrentDay: (day: number) => void
   setDayNight: (on: boolean) => void
-  setTimelineOpen: (open: boolean) => void
-  setStoryTreeOpen: (open: boolean) => void
-  setRelationGraphOpen: (open: boolean) => void
+
+  // Untere, hochfahrende Leiste (Zeitleiste / Handlungsbaum / Beziehungen)
+  /** Geoeffnete Ansicht; null = Leiste zu. */
+  bottomPanel: BottomPanel | null
+  /** Hoehe der Leiste in Prozent der Fensterhoehe. */
+  bottomPanelHeight: number
+  /** Ansicht oeffnen; derselbe Wert erneut schliesst sie wieder. */
+  toggleBottomPanel: (panel: BottomPanel) => void
+  setBottomPanel: (panel: BottomPanel | null) => void
+  setBottomPanelHeight: (percent: number) => void
 
   // DM-Werkzeuge (Phase 5)
   toolsOpen: boolean
@@ -248,11 +264,23 @@ interface StoreState extends AppData {
   moveEntity: (id: string, dxWorld: number, dyWorld: number) => void
 
   // Zeitabhaengige Positionswechsel
-  /** Neues Zeitfenster anlegen; startet an der aktuellen Basis-Position. */
-  addScheduleEntry: (entityId: string) => void
+  /**
+   * Neues Zeitfenster anlegen; startet an der aktuellen Basis-Position. Ohne Angaben von
+   * der aktuellen Uhrzeit an zwei Stunden lang im Standard-Tagesablauf.
+   * Liefert die Id des neuen Eintrags (oder null, wenn das Objekt nicht platziert ist).
+   */
+  addScheduleEntry: (
+    entityId: string,
+    init?: { timeStart?: number; timeEnd?: number; day?: number | null; label?: string },
+  ) => string | null
   updateScheduleEntry: (entityId: string, scheduleId: string, patch: Partial<Omit<ScheduleEntry, 'id'>>) => void
   removeScheduleEntry: (entityId: string, scheduleId: string) => void
   moveScheduleEntry: (entityId: string, scheduleId: string, dxWorld: number, dyWorld: number) => void
+  /** Zeitfenster, dessen Position der naechste Kartenklick setzt; null = kein Setzmodus. */
+  placingScheduleId: { entityId: string; scheduleId: string } | null
+  setPlacingSchedule: (target: { entityId: string; scheduleId: string } | null) => void
+  /** Position eines Zeitfensters direkt setzen (Kartenklick im Setzmodus). */
+  setSchedulePosition: (entityId: string, scheduleId: string, x: number, y: number) => void
 
   // Entscheidungen (Phase 4)
   updateDecision: (entityId: string, patch: Partial<DecisionData>) => void
@@ -333,16 +361,20 @@ export const useStore = create<StoreState>()(
         lastUndoPushAt: 0,
         timeEnabled: false,
         timeOfDay: 12 * 60,
+        currentDay: 1,
         dayNight: false,
-        timelineOpen: false,
-        storyTreeOpen: false,
-        relationGraphOpen: false,
         setTimeEnabled: (on) => set({ timeEnabled: on }),
         setTimeOfDay: (minutes) => set({ timeOfDay: Math.max(0, Math.min(1439, Math.round(minutes))) }),
+        setCurrentDay: (day) => set({ currentDay: Math.max(0, Math.round(day)) }),
         setDayNight: (on) => set({ dayNight: on }),
-        setTimelineOpen: (open) => set({ timelineOpen: open }),
-        setStoryTreeOpen: (open) => set({ storyTreeOpen: open }),
-        setRelationGraphOpen: (open) => set({ relationGraphOpen: open }),
+
+        // ---------- Untere Leiste ----------
+        bottomPanel: null,
+        bottomPanelHeight: BOTTOM_PANEL_DEFAULT,
+        toggleBottomPanel: (panel) => set((s) => ({ bottomPanel: s.bottomPanel === panel ? null : panel })),
+        setBottomPanel: (panel) => set({ bottomPanel: panel }),
+        setBottomPanelHeight: (percent) =>
+          set({ bottomPanelHeight: Math.max(BOTTOM_PANEL_MIN, Math.min(BOTTOM_PANEL_MAX, percent)) }),
 
         // ---------- DM-Werkzeuge ----------
         toolsOpen: false,
@@ -361,9 +393,8 @@ export const useStore = create<StoreState>()(
             tool: 'select',
             placingEntityId: null,
             toolsOpen: on ? false : get().toolsOpen,
-            timelineOpen: on ? false : get().timelineOpen,
-            storyTreeOpen: on ? false : get().storyTreeOpen,
-            relationGraphOpen: on ? false : get().relationGraphOpen,
+            bottomPanel: on ? null : get().bottomPanel,
+            placingScheduleId: on ? null : get().placingScheduleId,
             fogEditing: false,
             selectedEntityId: on ? null : get().selectedEntityId,
             selectedIds: on ? [] : get().selectedIds,
@@ -733,21 +764,41 @@ export const useStore = create<StoreState>()(
           })),
 
         // ---------- Zeitabhaengige Positionswechsel ----------
-        addScheduleEntry: (entityId) =>
+        addScheduleEntry: (entityId, init) => {
+          const entity = get().activeCampaign().entities.find((e) => e.id === entityId)
+          if (!entity?.placement) return null
+          // Neue Station startet auf der zuletzt bekannten Position des Objekts, damit sie
+          // sofort sichtbar ist und nur noch verschoben werden muss.
+          const timeStart = init?.timeStart ?? get().timeOfDay
+          const entry: ScheduleEntry = {
+            id: uid('sched-'),
+            timeStart,
+            timeEnd: init?.timeEnd ?? (timeStart + 120) % MINUTES_PER_DAY,
+            x: entity.placement.x,
+            y: entity.placement.y,
+            label: init?.label ?? '',
+            day: init?.day ?? null,
+          }
           patchActive((c) => ({
             ...c,
-            entities: c.entities.map((e) => {
-              if (e.id !== entityId || !e.placement) return e
-              const timeOfDay = get().timeOfDay
-              const entry: ScheduleEntry = {
-                id: uid('sched-'),
-                timeStart: timeOfDay,
-                timeEnd: (timeOfDay + 120) % (24 * 60),
-                x: e.placement.x,
-                y: e.placement.y,
-              }
-              return { ...e, schedule: [...e.schedule, entry] }
-            }),
+            entities: c.entities.map((e) =>
+              e.id === entityId ? { ...e, schedule: [...e.schedule, entry] } : e,
+            ),
+          }))
+          return entry.id
+        },
+
+        placingScheduleId: null,
+        setPlacingSchedule: (target) => set({ placingScheduleId: target, tool: 'select' }),
+
+        setSchedulePosition: (entityId, scheduleId, x, y) =>
+          patchActive((c) => ({
+            ...c,
+            entities: c.entities.map((e) =>
+              e.id === entityId
+                ? { ...e, schedule: e.schedule.map((s) => (s.id === scheduleId ? { ...s, x, y } : s)) }
+                : e,
+            ),
           })),
 
         updateScheduleEntry: (entityId, scheduleId, patch) =>
@@ -1100,7 +1151,9 @@ function normalizeEntity(e: Partial<Entity> & { id: string; type: EntityType; na
     decision: e.decision ?? (e.type === 'entscheidung' ? emptyDecision() : null),
     event: e.event ?? (e.type === 'ereignis' ? emptyEvent() : null),
     day: e.day ?? null,
-    schedule: e.schedule ?? [],
+    // Aeltere Zeitfenster kannten weder Beschriftung noch Kalendertag: Sie gelten
+    // weiterhin an jedem Tag (day === null) und bleiben unbeschriftet.
+    schedule: (e.schedule ?? []).map((s) => ({ ...s, label: s.label ?? '', day: s.day ?? null })),
     createdAt: e.createdAt ?? Date.now(),
   }
 }

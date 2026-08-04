@@ -5,9 +5,11 @@ import { formatTime } from '../utils/time'
 export function TimeSlider() {
   const enabled = useStore((s) => s.timeEnabled)
   const timeOfDay = useStore((s) => s.timeOfDay)
+  const currentDay = useStore((s) => s.currentDay)
   const dayNight = useStore((s) => s.dayNight)
   const setEnabled = useStore((s) => s.setTimeEnabled)
   const setTime = useStore((s) => s.setTimeOfDay)
+  const setCurrentDay = useStore((s) => s.setCurrentDay)
   const setDayNight = useStore((s) => s.setDayNight)
 
   return (
@@ -16,6 +18,26 @@ export function TimeSlider() {
         <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
         <span>Tageszeit</span>
       </label>
+
+      {/* Kampagnentag: bestimmt, welche Tagesplan-Ausnahmen der Objekte greifen. */}
+      <div className="time-slider__day" title="Aktueller Kampagnentag">
+        <button
+          className="time-slider__daybtn"
+          onClick={() => setCurrentDay(currentDay - 1)}
+          disabled={currentDay <= 0}
+          title="Vorheriger Tag"
+        >
+          &minus;
+        </button>
+        <span className="time-slider__daylabel">Tag {currentDay}</span>
+        <button
+          className="time-slider__daybtn"
+          onClick={() => setCurrentDay(currentDay + 1)}
+          title="Naechster Tag"
+        >
+          +
+        </button>
+      </div>
 
       <div className="time-slider__body">
         <span className="time-slider__icon">{iconForTime(timeOfDay)}</span>

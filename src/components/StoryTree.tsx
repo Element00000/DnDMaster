@@ -6,7 +6,6 @@ import { useStore } from '../store/useStore'
 export function StoryTree() {
   const campaign = useStore((s) => s.campaigns.find((c) => c.id === s.activeCampaignId) ?? s.campaigns[0])
   const tableMode = useStore((s) => s.tableMode)
-  const setStoryTreeOpen = useStore((s) => s.setStoryTreeOpen)
   const selectEntity = useStore((s) => s.selectEntity)
 
   const decisions = campaign.entities.filter(
@@ -57,9 +56,6 @@ export function StoryTree() {
       <div className="storytree__header">
         <h2 className="storytree__title">Handlungsbaum</h2>
         <span className="storytree__meta">{decisions.length} Entscheidungen</span>
-        <button className="storytree__close" onClick={() => setStoryTreeOpen(false)} title="Schliessen">
-          &times;
-        </button>
       </div>
 
       {decisions.length === 0 ? (

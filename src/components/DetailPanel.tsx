@@ -11,7 +11,6 @@ import {
 } from '../types'
 import type { Campaign, Entity, EntityType, RelationType } from '../types'
 import { useStore } from '../store/useStore'
-import { formatTime, parseTime } from '../utils/time'
 import { fileToScaledDataUrl } from '../utils/image'
 import { deleteAsset, putAsset } from '../utils/assets'
 import { rollDie } from '../utils/tools'
@@ -447,9 +446,7 @@ function TimeFields({
   entity: Entity
   onUpdate: (patch: Partial<Entity>) => void
 }) {
-  const addScheduleEntry = useStore((s) => s.addScheduleEntry)
-  const updateScheduleEntry = useStore((s) => s.updateScheduleEntry)
-  const removeScheduleEntry = useStore((s) => s.removeScheduleEntry)
+  const setBottomPanel = useStore((s) => s.setBottomPanel)
 
   return (
     <div className="field">
@@ -471,59 +468,24 @@ function TimeFields({
           </label>
         </div>
 
+        {/* Der Tagesablauf selbst wird im Zeitstrahl unten bearbeitet - hier steht nur,
+            was hinterlegt ist, und der Weg dorthin. */}
         <div className="schedule">
-          <div className="schedule__head">
-            <span className="timefields__mini">Ortswechsel nach Uhrzeit</span>
-            {entity.placement && (
-              <button className="chipbtn" onClick={() => addScheduleEntry(entity.id)}>
-                + Zeitfenster
-              </button>
-            )}
-          </div>
-
+          <span className="timefields__mini">Tagesablauf</span>
           {!entity.placement ? (
             <p className="timefields__hint">
-              Objekt erst auf der Karte platzieren, um Zeitfenster mit wechselnder Position anzulegen.
-            </p>
-          ) : entity.schedule.length === 0 ? (
-            <p className="timefields__hint">
-              Ohne Zeitfenster bleibt das Objekt immer an derselben Stelle sichtbar.
+              Objekt erst auf der Karte platzieren, um Aufenthaltsorte nach Uhrzeit festzulegen.
             </p>
           ) : (
             <>
-              {entity.schedule.map((s) => (
-                <div key={s.id} className="schedule__row">
-                  <input
-                    className="field__control field__control--sm"
-                    type="time"
-                    value={formatTime(s.timeStart)}
-                    onChange={(e) => {
-                      const v = parseTime(e.target.value)
-                      if (v != null) updateScheduleEntry(entity.id, s.id, { timeStart: v })
-                    }}
-                  />
-                  <span className="schedule__sep">bis</span>
-                  <input
-                    className="field__control field__control--sm"
-                    type="time"
-                    value={formatTime(s.timeEnd)}
-                    onChange={(e) => {
-                      const v = parseTime(e.target.value)
-                      if (v != null) updateScheduleEntry(entity.id, s.id, { timeEnd: v })
-                    }}
-                  />
-                  <button
-                    className="schedule__remove"
-                    title="Zeitfenster entfernen"
-                    onClick={() => removeScheduleEntry(entity.id, s.id)}
-                  >
-                    &times;
-                  </button>
-                </div>
-              ))}
               <p className="timefields__hint">
-                Zeitregler auf ein Fenster stellen, dann den Pin auf der Karte an die gewuenschte Stelle ziehen.
+                {entity.schedule.length === 0
+                  ? 'Kein Zeitfenster hinterlegt — das Objekt bleibt immer an derselben Stelle.'
+                  : `${entity.schedule.length} Zeitfenster hinterlegt (${entity.schedule.filter((s) => s.day == null).length} taeglich).`}
               </p>
+              <button className="chipbtn" onClick={() => setBottomPanel('zeitleiste')}>
+                {'\u{1F551}'} In der Zeitleiste bearbeiten
+              </button>
             </>
           )}
         </div>
