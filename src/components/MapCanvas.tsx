@@ -29,6 +29,8 @@ const REVEAL_THRESHOLD = 160
 export const MIN_EMBED_SIZE = 20
 /** Dauer einer Kartenfahrt (Sprung zu einer Karte/einem Objekt, Einpassen) in ms. */
 const VIEW_ANIM_MS = 800
+/** Anteil des Sichtbereichs, den eine eingepasste Karte einnimmt (Rest bleibt als Rand). */
+const FIT_MARGIN = 0.92
 
 /** Sanft anfahren, in der Mitte am schnellsten, sanft abbremsen. */
 function easeInOutCubic(t: number): number {
@@ -204,7 +206,7 @@ export function MapCanvas() {
       const cw = el.clientWidth
       const ch = el.clientHeight
       if (cw === 0 || ch === 0) return
-      const scale = Math.min(cw / width, ch / height) * 0.92
+      const scale = Math.min(cw / width, ch / height) * FIT_MARGIN
       const target: View = { scale, tx: (cw - width * scale) / 2, ty: (ch - height * scale) / 2 }
       if (animate) {
         animateView(target)
@@ -333,13 +335,15 @@ export function MapCanvas() {
   // Bildschirm-Position/-Groesse (bereits rekursiv aus allen Eltern-Transformationen
   // berechnet), also unabhaengig davon, wie tief sie verschachtelt ist.
   const zoomToScreenRect = useCallback(
-    (sx: number, sy: number, sw: number, sh: number, targetScreen?: number) => {
+    (sx: number, sy: number, sw: number, sh: number) => {
       const cont = containerRef.current
       if (!cont) return
       const cw = cont.clientWidth
       const ch = cont.clientHeight
-      const target = targetScreen ?? Math.min(cw, ch) * 0.92
-      const neededFactor = target / Math.min(sw, sh)
+      // Beide Seiten einzeln pruefen und die knappere entscheiden lassen. Die kuerzere
+      // Kartenseite auf die kuerzere Containerseite zu beziehen genuegt nur, wenn beide
+      // dasselbe Seitenverhaeltnis haben - sonst ragt die laengere Seite hinaus.
+      const neededFactor = Math.min((cw * FIT_MARGIN) / sw, (ch * FIT_MARGIN) / sh)
       const cx = sx + sw / 2
       const cy = sy + sh / 2
       const v = viewRef.current
@@ -703,6 +707,25 @@ export function MapCanvas() {
     resize.current = null
   }, [])
 
+  /**
+   * Doppelklick auf die Wurzelkarte maximiert sie - dasselbe Verhalten wie bei einer
+   * eingebetteten Karte. Bewusst nur auf ihrer Flaeche: Ein Doppelklick daneben (auf den
+   * leeren Hintergrund) soll die Ansicht in Ruhe lassen. Eingebettete Karten fangen ihren
+   * eigenen Doppelklick ab, hier kommt er also gar nicht erst an.
+   */
+  const onDoubleClick = useCallback(
+    (e: React.MouseEvent) => {
+      const el = containerRef.current
+      if (!el || tableMode || fogEditing) return
+      const rect = el.getBoundingClientRect()
+      const wx = (e.clientX - rect.left - view.tx) / view.scale
+      const wy = (e.clientY - rect.top - view.ty) / view.scale
+      if (wx < 0 || wy < 0 || wx > width || wy > height) return
+      fitToView()
+    },
+    [view.tx, view.ty, view.scale, width, height, tableMode, fogEditing, fitToView],
+  )
+
   const placingActive = placingEntityId !== null || placingLayerId !== null || placingScheduleId !== null
   const selectedEntity = entities.find((e) => e.id === selectedEntityId && e.placement) ?? null
   // Nebel voll deckend fuer Spieler/Tisch, halbtransparent fuer den DM.
@@ -723,6 +746,7 @@ export function MapCanvas() {
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onContextMenu={(e) => e.preventDefault()}
+      onDoubleClick={onDoubleClick}
     >
       <div
         className="map-world"
