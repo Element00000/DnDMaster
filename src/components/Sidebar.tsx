@@ -58,10 +58,10 @@ export function Sidebar() {
   const swapImageFileRef = useRef<HTMLInputElement>(null)
   const newLayerFileRef = useRef<HTMLInputElement>(null)
 
-  // "Objekt anlegen"-Menue (Ohne Karte anlegen/Abbrechen) automatisch schliessen, sobald
-  // woanders hingeklickt wird - auf ein anderes Objekt (Liste oder Pin) oder allgemein
-  // irgendwohin ausserhalb der Anlege-Steuerung. Ein Klick auf die Karte selbst platziert
-  // das Objekt dort (bzw. verwirft den Klick daneben) und regelt das Beenden selbst.
+  // Den Anlege-Modus automatisch beenden, sobald woanders hingeklickt wird - auf ein
+  // anderes Objekt (Liste oder Pin) oder allgemein irgendwohin ausserhalb der
+  // Anlege-Steuerung. Ein Klick auf die Karte selbst platziert das Objekt dort (bzw.
+  // verwirft den Klick daneben) und regelt das Beenden selbst.
   useEffect(() => {
     if (tool !== 'add') return
     function onPointerDownCapture(e: PointerEvent) {
@@ -354,7 +354,7 @@ export function Sidebar() {
           <h2 className="sidebar__heading">Objekt anlegen</h2>
           <p className="sidebar__hint">
             {tool === 'add'
-              ? 'Klick auf die Karte platziert das Objekt. Ohne Karte: Button unten.'
+              ? 'Klick auf die Karte platziert das Objekt.'
               : 'Typ waehlen, dann auf die Karte klicken.'}
           </p>
           <div className="type-grid">
@@ -374,6 +374,10 @@ export function Sidebar() {
                       setPopup(null)
                       return
                     }
+                    // Ein zuvor gewaehlter Typ ist hinfaellig, sobald man hier ein anderes
+                    // Menue oeffnet - sonst bliebe er markiert, obwohl man gerade einen
+                    // anderen Typ waehlt. Markiert wird erst wieder nach der Auswahl.
+                    setTool('select')
                     const r = e.currentTarget.getBoundingClientRect()
                     setPopup({ type: t.type, top: r.top, left: r.right + 8 })
                   }}
