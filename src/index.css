@@ -191,6 +191,33 @@ button {
   color: var(--accent-soft);
 }
 
+/* ---------- Seitenleisten: nur vertikal scrollen ----------
+   Beide Leisten (links "sidebar", rechts "detail") haben eine feste Breite. Ihre Inhalte
+   duerfen darum nie horizontal ueberlaufen -- gescrollt wird ausschliesslich nach oben und
+   unten. Das Sicherheitsnetz unten faengt neue Inhalte ab; die eigentliche Ursache eines
+   Ueberlaufs (meist eine erzwungene Mindestbreite) gehoert trotzdem an der Stelle behoben. */
+.sidebar,
+.detail {
+  min-width: 0;
+  /* Lange Namen/URLs umbrechen, statt die Leiste zu verbreitern. */
+  overflow-wrap: anywhere;
+}
+
+.sidebar,
+.detail__body,
+.detail__objects,
+.detail__floating {
+  overflow-x: hidden;
+}
+
+.sidebar > *,
+.sidebar__section > *,
+.detail__body > *,
+.detail__objects > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
 /* ---------- Sidebar ---------- */
 .sidebar {
   background: var(--panel);
@@ -291,7 +318,7 @@ button {
 
 .toolbar-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -327,7 +354,7 @@ button {
 
 .type-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 8px;
 }
 
@@ -920,6 +947,7 @@ button {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  min-width: 0;
 }
 
 .field--row {
@@ -943,6 +971,10 @@ button {
   font-family: inherit;
   font-size: 13px;
   padding: 9px 11px;
+  /* Eingabefelder bringen eine Default-Mindestbreite (~20 Zeichen) mit. Ohne diese beiden
+     Zeilen sprengen sie in Grids/Flex-Zeilen die Seitenleiste. */
+  min-width: 0;
+  max-width: 100%;
   transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
 }
 
@@ -968,16 +1000,18 @@ button {
   margin-bottom: 6px;
 }
 
+/* minmax(0, 1fr) statt 1fr: Sonst erzwingt die Mindestbreite der <input>-Felder breitere
+   Spalten als die Seitenleiste und man muesste seitlich scrollen. */
 .statgrid--4 {
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .statgrid--6 {
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(6, minmax(0, 1fr));
 }
 
 .statgrid--1 {
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr);
   max-width: 33%;
 }
 
@@ -985,19 +1019,27 @@ button {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  min-width: 0;
 }
 
 .statfield span {
   font-size: 10px;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.3px;
+  line-height: 1.15;
   color: var(--ink-faint);
   text-align: center;
+  /* Lange Bezeichnungen (z. B. "Uebungsbonus") umbrechen zweizeilig, statt die Spalte
+     breiter zu machen als die Seitenleiste. */
+  overflow-wrap: break-word;
+  hyphens: auto;
 }
 
 .statfield .field__control {
   text-align: center;
   padding: 6px 4px;
+  width: 100%;
+  min-width: 0;
 }
 
 .statfield--text {
