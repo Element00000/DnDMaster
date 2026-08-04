@@ -719,7 +719,7 @@ button {
 .zoom-controls {
   position: absolute;
   right: 14px;
-  bottom: 14px;
+  /* "bottom" setzt ZoomControls inline: faehrt mit der unteren Leiste hoch (useBottomPanelOffset). */
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -729,10 +729,16 @@ button {
   border-radius: 8px;
   padding: 4px;
   backdrop-filter: blur(3px);
+  transition: bottom 0.14s ease-out;
   /* Muss ueber jeglichem Karteninhalt liegen (eingebettete Karten, Pins, Eck-Griffe
      haben positives z-index und wuerden sonst - unabhaengig von der DOM-Reihenfolge -
      darueber gemalt, sobald sie diese Ecke ueberdecken). */
   z-index: 20;
+}
+
+/* Auf- und Zuklappen: Position sofort uebernehmen, siehe .bottombar.is-snap. */
+.zoom-controls.is-snap {
+  transition: none;
 }
 
 .zoom-controls button {

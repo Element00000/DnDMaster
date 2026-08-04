@@ -4,6 +4,7 @@ import { entityDisplayMeta } from '../types'
 import type { Entity, MapLayer } from '../types'
 import { activeScheduleEntry, dayNightOverlay, formatTime } from '../utils/time'
 import { useAsset } from '../useAsset'
+import { useBottomPanelOffset } from '../useBottomPanelOffset'
 import { PlaceholderMap } from './PlaceholderMap'
 import { MapPin } from './MapPin'
 import { fileToScaledDataUrl } from '../utils/image'
@@ -945,6 +946,9 @@ function ScheduleOverlay({
 }
 
 function ZoomControls({ scale, onZoom, onFit }: { scale: number; onZoom: (dir: number) => void; onFit: () => void }) {
+  // Faehrt mit der unteren Leiste hoch, genau wie die schwebende Panel-Leiste.
+  const { bottom, snap } = useBottomPanelOffset(14)
+
   // stopPropagation: sonst faengt das darunterliegende Karten-Pointerdown (Verschieben/
   // Rechteck-Markierung) den Klick ab, bevor er die Buttons erreicht. Ebenso wuerde ein
   // schnelles Doppelklicken auf einen Button (z.B. zweimal "+" hintereinander) als
@@ -952,7 +956,8 @@ function ZoomControls({ scale, onZoom, onFit }: { scale: number; onZoom: (dir: n
   // die Ansicht ungewollt zurueck auf die Einpass-Groesse setzen.
   return (
     <div
-      className="zoom-controls"
+      className={`zoom-controls${snap ? ' is-snap' : ''}`}
+      style={{ bottom }}
       onPointerDown={(e) => e.stopPropagation()}
       onDoubleClick={(e) => e.stopPropagation()}
     >
