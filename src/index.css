@@ -763,12 +763,15 @@ button {
 }
 
 /* Der Ausschnitt steckt bereits in der Miniatur (siehe defaultThumbCrop bzw. die freie
-   Wahl per Pinnadel-Knopf im Detailpanel) - hier wird nur noch gefuellt. */
+   Wahl per Pinnadel-Knopf im Detailpanel) - hier wird nur noch gefuellt.
+   Aufgehellt, weil ein derart kleines Bild auf der dunklen Karte sonst zulaeuft; der
+   leichte Kontrast haelt es dabei davon ab, flau zu wirken. */
 .map-pin__image {
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
+  filter: brightness(1.28) contrast(1.06);
 }
 
 .map-pin__label {
