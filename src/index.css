@@ -1613,6 +1613,12 @@ button {
   max-width: calc(100% - 24px);
 }
 
+/* Auf- und Zuklappen: Position sofort uebernehmen, damit die Leiste nicht waehrend der
+   Animation ueber dem bereits vollstaendig ausgefahrenen Panel liegt. */
+.bottombar.is-snap {
+  transition: none;
+}
+
 .bottombar__btn {
   display: inline-flex;
   align-items: center;

@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef, useState } from 'react'
 import { useStore } from '../store/useStore'
 import type { BottomPanel } from '../store/useStore'
 
@@ -19,9 +20,34 @@ export function BottomBar() {
 
   // Bei offenem Panel sitzt die Leiste direkt auf dessen Oberkante statt am Kartenrand.
   const offset = bottomPanel ? bottomPanelHeight : 0
+  const open = bottomPanel !== null
+
+  /**
+   * Beim Auf- und Zuklappen ohne weichen Nachlauf umsetzen: Das Panel steht sofort auf
+   * voller Hoehe, die nachlaufende Leiste laege waehrend der Animation sonst darauf.
+   * Beim Ziehen an der Panelhoehe bleibt der Nachlauf erhalten.
+   */
+  const [snap, setSnap] = useState(false)
+  const wasOpen = useRef(open)
+
+  useLayoutEffect(() => {
+    if (wasOpen.current === open) return
+    wasOpen.current = open
+    setSnap(true)
+  }, [open])
+
+  // Ab dem naechsten Frame wieder mit Nachlauf - die Position steht dann bereits.
+  useLayoutEffect(() => {
+    if (!snap) return
+    const id = requestAnimationFrame(() => setSnap(false))
+    return () => cancelAnimationFrame(id)
+  }, [snap])
 
   return (
-    <div className="bottombar" style={{ bottom: `calc(${offset}% + 12px)` }}>
+    <div
+      className={`bottombar${snap ? ' is-snap' : ''}`}
+      style={{ bottom: `calc(${offset}% + 12px)` }}
+    >
       {PANELS.map((p) => (
         <button
           key={p.panel}
