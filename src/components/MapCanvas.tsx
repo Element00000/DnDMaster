@@ -892,15 +892,21 @@ export function MapCanvas() {
           entities={entities}
           selectedIds={selectedIds}
           selectedEmbedId={selectedEmbedId}
+          // Einfachklick waehlt die eingebettete Karte nur aus (Eck-Griffe, und das rechte
+          // Panel zeigt ihre Objekte) - ohne die Ansicht zu bewegen.
           onSelect={(id) => {
             setSelectedEmbedId(id)
             setMapSelected(false)
             selectEntity(null)
+            setViewLayerId(id, false)
+          }}
+          // Erst der Doppelklick faehrt hin. Zoomt per viewLayerId-Effekt (der berechnet den
+          // Ziel-Bildschirmbereich selbst aus der Hierarchie) statt hier zusaetzlich manuell -
+          // sonst wuerde doppelt gezoomt.
+          onMaximize={(id) => {
+            setSelectedEmbedId(id)
             setViewLayerId(id)
           }}
-          // Zoomt zur Karte per viewLayerId-Effekt (berechnet den Ziel-Bildschirmbereich selbst
-          // aus der Hierarchie) statt hier zusaetzlich manuell zu zoomen - sonst wuerde doppelt
-          // gezoomt.
           onZoomTo={(_sx, _sy, _sw, _sh, id) => setViewLayerId(id)}
           onReparent={onReparentEmbed}
           onEntityClick={(id, ev) => {
@@ -1215,6 +1221,7 @@ function EmbeddedMap({
   selectedIds,
   selectedEmbedId,
   onSelect,
+  onMaximize,
   onZoomTo,
   onReparent,
   onEntityClick,
@@ -1237,7 +1244,11 @@ function EmbeddedMap({
   entities: Entity[]
   selectedIds: string[]
   selectedEmbedId: string | null
+  /** Einfachklick auf die ausgeklappte Karte: nur auswaehlen, Ansicht bleibt stehen. */
   onSelect: (id: string) => void
+  /** Doppelklick auf die ausgeklappte Karte: hinfahren und formatfuellend zeigen. */
+  onMaximize: (id: string) => void
+  /** Klick auf die eingeklappte Kartenpinnadel: direkt hinfahren. */
   onZoomTo: (sx: number, sy: number, sw: number, sh: number, id: string) => void
   /** Nach dem Ziehen: prueft, ob die Karte auf eine andere (Vorfahren-)Karte umgehaengt werden soll. */
   onReparent: (draggedId: string, clientX: number, clientY: number) => void
@@ -1412,6 +1423,11 @@ function EmbeddedMap({
         onPointerUp={onBgPointerUp}
         onPointerCancel={onBgPointerUp}
         onLostPointerCapture={onBgPointerUp}
+        onDoubleClick={(e) => {
+          if (!interactive) return
+          e.stopPropagation()
+          onMaximize(embLayer.id)
+        }}
       >
         {embLayer.imageUrl && image ? (
           <img src={image} draggable={false} alt={embLayer.name} style={{ width: '100%', height: '100%', display: 'block', objectFit: 'fill' }} />
@@ -1463,6 +1479,7 @@ function EmbeddedMap({
           selectedIds={selectedIds}
           selectedEmbedId={selectedEmbedId}
           onSelect={onSelect}
+          onMaximize={onMaximize}
           onZoomTo={onZoomTo}
           onReparent={onReparent}
           onEntityClick={onEntityClick}
