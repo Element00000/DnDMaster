@@ -576,6 +576,15 @@ const MIN_CROP_SIDE = 32
 const CROP_VIEW_TARGET = 0.6
 /** Obergrenze der Vergroesserung, damit ein kleiner Ausschnitt nicht zu Matsch wird. */
 const CROP_MAX_ZOOM = 6
+/**
+ * Groesster Anteil des nutzbaren Bereichs, den der Ausschnitt einnehmen darf. Daraus ergibt
+ * sich bei Bedarf ein Zoom unter 1: Ein Ausschnitt, der fast das ganze Bild umfasst, wird
+ * also verkleinert dargestellt - sonst laege sein Ziehgriff ausserhalb des Rahmens und die
+ * Groesse waere nicht mehr aenderbar.
+ */
+const CROP_MAX_FRACTION = 0.82
+/** Hoehe der Knopfleiste am unteren Rand; ueber ihr wird der Ausschnitt zentriert. */
+const CROP_BAR_HEIGHT = 46
 
 /**
  * Auswahl des Bildausschnitts, der auf der Kartenpinnadel erscheint. Liegt als Ueberlagerung
@@ -634,17 +643,26 @@ function CropSelector({
   const layout =
     nat && box && sel
       ? (() => {
+          // Ueber der Knopfleiste bleibt der nutzbare Bereich; darin wird zentriert.
+          const usableH = Math.max(1, box.h - CROP_BAR_HEIGHT)
+          const centerY = usableH / 2
           const fit = Math.min(box.w / nat.w, box.h / nat.h)
-          const target = Math.min(box.w, box.h) * CROP_VIEW_TARGET
-          const zoom = clampNum(Math.sqrt(target / (sel.side * fit)), 1, CROP_MAX_ZOOM)
+          const base = sel.side * fit
+          const target = Math.min(box.w, usableH) * CROP_VIEW_TARGET
+          let zoom = clampNum(Math.sqrt(target / base), 1, CROP_MAX_ZOOM)
+          // Der Ausschnitt muss samt Ziehgriff in den Rahmen passen - notfalls wird eben
+          // herausgezoomt (zoom < 1), statt ihn ueber den Rand hinauslaufen zu lassen.
+          const maxSel = Math.min(box.w, usableH) * CROP_MAX_FRACTION
+          if (base * zoom > maxSel) zoom = maxSel / base
           const scale = fit * zoom
           return {
             scale,
+            centerY,
             imgW: nat.w * scale,
             imgH: nat.h * scale,
             // Der Ausschnitt sitzt fest in der Mitte, das Bild wandert darunter.
             imgLeft: box.w / 2 - sel.cx * scale,
-            imgTop: box.h / 2 - sel.cy * scale,
+            imgTop: centerY - sel.cy * scale,
             selPx: sel.side * scale,
           }
         })()
@@ -707,7 +725,7 @@ function CropSelector({
       {layout && (
         <div
           className="crop__sel"
-          style={{ width: layout.selPx, height: layout.selPx }}
+          style={{ width: layout.selPx, height: layout.selPx, top: layout.centerY }}
           onPointerDown={(e) => onDown(e, 'pan')}
           onPointerMove={onMove}
           onPointerUp={onUp}

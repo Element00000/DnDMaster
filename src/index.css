@@ -4665,10 +4665,10 @@ button {
 
 /* Der riesige Schattenring dunkelt alles ausserhalb der Auswahl ab; der Rahmen
    (.entity-image__frame) schneidet ihn auf seine Flaeche zu. */
+/* "top" setzt CropSelector inline: Mitte des Bereichs ueber der Knopfleiste. */
 .crop__sel {
   position: absolute;
   left: 50%;
-  top: 50%;
   transform: translate(-50%, -50%);
   border: 2px solid var(--accent);
   border-radius: 50%;
