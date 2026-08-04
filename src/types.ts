@@ -253,7 +253,7 @@ export interface CombatStatDef {
 
 export const COMBAT_STAT_FIELDS: CombatStatDef[] = [
   { key: 'speed', label: 'Speed' },
-  { key: 'proficiency', label: 'Übungsbonus' },
+  { key: 'proficiency', label: 'Übung' },
   { key: 'ac', label: 'RK (AC)' },
   { key: 'hp', label: 'HP' },
   { key: 'str', label: 'STR' },
@@ -267,6 +267,59 @@ export const COMBAT_STAT_FIELDS: CombatStatDef[] = [
   { key: 'besondereFaehigkeiten', label: 'Besondere Fähigkeiten', kind: 'textarea' },
   { key: 'kampfTaktik', label: 'Kampf-Taktik', kind: 'textarea' },
 ]
+
+/**
+ * Fertigkeiten eines Charakters (D&D 5e). "value" ist der gespeicherte Schluessel und
+ * bleibt stabil, auch wenn sich die Beschriftung einmal aendert.
+ */
+export interface SkillDef {
+  value: string
+  label: string
+  /** Englische Bezeichnung, zur Orientierung in Regelwerken. */
+  en: string
+}
+
+export const SKILLS: SkillDef[] = [
+  { value: 'akrobatik', label: 'Akrobatik', en: 'Acrobatics' },
+  { value: 'arkane_kunde', label: 'Arkane Kunde', en: 'Arcana' },
+  { value: 'athletik', label: 'Athletik', en: 'Athletics' },
+  { value: 'auftreten', label: 'Auftreten', en: 'Performance' },
+  { value: 'einschuechtern', label: 'Einschüchtern', en: 'Intimidation' },
+  { value: 'einsicht', label: 'Einsicht', en: 'Insight' },
+  { value: 'fingerfertigkeit', label: 'Fingerfertigkeit', en: 'Sleight of Hand' },
+  { value: 'geschichte', label: 'Geschichte', en: 'History' },
+  { value: 'heilkunde', label: 'Heilkunde', en: 'Medicine' },
+  { value: 'heimlichkeit', label: 'Heimlichkeit', en: 'Stealth' },
+  { value: 'mit_tieren_umgehen', label: 'Mit Tieren umgehen', en: 'Animal Handling' },
+  { value: 'nachforschungen', label: 'Nachforschungen', en: 'Investigation' },
+  { value: 'natur', label: 'Natur', en: 'Nature' },
+  { value: 'religion', label: 'Religion', en: 'Religion' },
+  { value: 'taeuschen', label: 'Täuschen', en: 'Deception' },
+  { value: 'ueberleben', label: 'Überleben', en: 'Survival' },
+  { value: 'ueberzeugen', label: 'Überzeugen', en: 'Persuasion' },
+  { value: 'wahrnehmung', label: 'Wahrnehmung', en: 'Perception' },
+]
+
+/** Schluessel, unter dem die gewaehlten Fertigkeiten in Entity.fields liegen. */
+export const SKILLS_FIELD = 'fertigkeiten'
+
+/** Gespeicherte Fertigkeiten eines Objekts (kommagetrennte Schluessel) einlesen. */
+export function parseSkills(value: string | undefined): string[] {
+  if (!value) return []
+  const known = new Set(SKILLS.map((s) => s.value))
+  return value
+    .split(',')
+    .map((v) => v.trim())
+    .filter((v) => known.has(v))
+}
+
+/** Fertigkeiten in der Reihenfolge der Liste ablegen, damit die Anzeige stabil bleibt. */
+export function serializeSkills(values: string[]): string {
+  const chosen = new Set(values)
+  return SKILLS.filter((s) => chosen.has(s.value))
+    .map((s) => s.value)
+    .join(',')
+}
 
 /** Art eines Gegenstands (Auswahl beim Anlegen und im Objekt-Feld "Art"). */
 export const ITEM_ART_OPTIONS: { value: string; label: string }[] = [

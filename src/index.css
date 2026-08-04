@@ -1129,6 +1129,152 @@ button {
   margin-top: 6px;
 }
 
+/* ---------- Fertigkeiten ---------- */
+/* Knopf, der wie ein Eingabefeld aussieht und die aktuelle Auswahl anzeigt. */
+.skills__open {
+  width: 100%;
+  min-width: 0;
+  text-align: left;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--ink-faint);
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1.45;
+  padding: 9px 11px;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.skills__open.has-skills {
+  color: var(--ink);
+}
+
+.skills__open:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.skills__open:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* Auswahlfenster: als Portal an document.body, damit es die schmale Seitenleiste
+   ueberragen darf, statt an deren Rand abgeschnitten zu werden. */
+.skills-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(6, 8, 12, 0.6);
+  backdrop-filter: blur(2px);
+}
+
+.skills-modal__box {
+  display: flex;
+  flex-direction: column;
+  width: min(560px, 100%);
+  max-height: 100%;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.skills-modal__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.skills-modal__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 16px;
+  color: var(--gold-soft);
+}
+
+.skills-modal__count {
+  font-size: 12px;
+  color: var(--ink-faint);
+}
+
+.skills-modal__close {
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  color: var(--ink-dim);
+  font-size: 22px;
+  line-height: 1;
+}
+
+.skills-modal__close:hover {
+  color: var(--ink);
+}
+
+.skills-modal__grid {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 8px;
+  padding: 14px 16px;
+}
+
+.skills-modal__skill {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: flex-start;
+  padding: 9px 11px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  color: var(--ink);
+  font-family: inherit;
+  text-align: left;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.skills-modal__skill:hover {
+  border-color: var(--border-strong);
+  background: var(--elevated);
+}
+
+.skills-modal__skill.is-active {
+  border-color: var(--accent);
+  background: var(--accent-tint);
+  color: var(--accent-soft);
+}
+
+.skills-modal__skill-de {
+  font-size: 13px;
+}
+
+.skills-modal__skill-en {
+  font-size: 10.5px;
+  color: var(--ink-faint);
+}
+
+.skills-modal__skill.is-active .skills-modal__skill-en {
+  color: color-mix(in srgb, var(--accent-soft) 65%, transparent);
+}
+
+.skills-modal__foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+}
+
 .detail__coords {
   font-size: 12px;
   color: var(--ink-dim);
@@ -4381,8 +4527,23 @@ button {
   color: var(--danger);
 }
 
+/* Umriss einer Kartenpinnadel - gleiche Geometrie wie .map-pin__head (Kreis mit einer
+   spitzen Ecke, um 45 Grad gedreht), nur als Linie, damit es zu den Nachbarzeichen
+   "Ersetzen" und "Entfernen" passt. */
+.pin-glyph {
+  width: 11px;
+  height: 11px;
+  border: 2px solid currentColor;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+}
+
 .entity-image__act--pin {
-  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Die Spitze zeigt nach unten, der optische Schwerpunkt liegt daher etwas hoeher. */
+  padding-bottom: 2px;
 }
 
 .entity-image__error {

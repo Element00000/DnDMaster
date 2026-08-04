@@ -1,13 +1,18 @@
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import {
   COMBAT_STAT_FIELDS,
   ENTITY_TYPES,
   FIELD_SCHEMA,
   FREUND_BERUFE,
   RELATIONS,
+  SKILLS,
+  SKILLS_FIELD,
   entityDisplayMeta,
   entityMeta,
+  parseSkills,
   relationMeta,
+  serializeSkills,
 } from '../types'
 import type { Campaign, Entity, EntityType, RelationType, ThumbCrop } from '../types'
 import { useStore } from '../store/useStore'
@@ -781,7 +786,8 @@ function EntityImageField({ entity, readOnly }: { entity: Entity; readOnly: bool
               disabled={busy != null}
               onClick={() => setCropping(true)}
             >
-              {'\u{1F4CD}'}
+              {/* Umriss der Kartenpinnadel, gleiche Geometrie wie .map-pin__head. */}
+              <span className="pin-glyph" aria-hidden="true" />
             </button>
             <button
               className="entity-image__act"
@@ -1044,7 +1050,109 @@ function CombatStatFields({
           />
         </label>
       ))}
+
+      <SkillsField entity={entity} readOnly={readOnly} onFieldChange={onFieldChange} />
     </div>
+  )
+}
+
+/**
+ * Fertigkeiten des Charakters. Der Knopf zeigt die aktuelle Auswahl und oeffnet ein
+ * Fenster, in dem jede Fertigkeit ein an- und abwaehlbarer Knopf ist. Uebernommen wird
+ * die Auswahl beim Schliessen des Fensters.
+ */
+function SkillsField({
+  entity,
+  readOnly,
+  onFieldChange,
+}: {
+  entity: Entity
+  readOnly: boolean
+  onFieldChange: (key: string, value: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const chosen = parseSkills(entity.fields[SKILLS_FIELD])
+  const labels = SKILLS.filter((s) => chosen.includes(s.value)).map((s) => s.label)
+
+  return (
+    <div className="field statfield--text">
+      <span className="field__label">Fertigkeiten</span>
+      <button
+        className={`skills__open${chosen.length > 0 ? ' has-skills' : ''}`}
+        disabled={readOnly}
+        onClick={() => setOpen(true)}
+        title="Fertigkeiten waehlen"
+      >
+        {labels.length > 0 ? labels.join(', ') : 'Fertigkeiten waehlen …'}
+      </button>
+
+      {open && (
+        <SkillPicker
+          initial={chosen}
+          onClose={(values) => {
+            onFieldChange(SKILLS_FIELD, serializeSkills(values))
+            setOpen(false)
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+/**
+ * Auswahlfenster fuer Fertigkeiten. Liegt als Portal an document.body, damit es nicht am
+ * Rand der schmalen Seitenleiste abgeschnitten wird. Die Auswahl wird bis zum Schliessen
+ * nur hier gehalten und dann in einem Rutsch uebergeben.
+ */
+function SkillPicker({
+  initial,
+  onClose,
+}: {
+  initial: string[]
+  onClose: (values: string[]) => void
+}) {
+  const [chosen, setChosen] = useState<string[]>(initial)
+
+  function toggle(value: string) {
+    setChosen((prev) => (prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value]))
+  }
+
+  return createPortal(
+    <div className="skills-modal" onClick={() => onClose(chosen)}>
+      {/* Klicks im Fenster sollen es nicht ueber den Hintergrund wieder schliessen. */}
+      <div className="skills-modal__box" onClick={(e) => e.stopPropagation()}>
+        <div className="skills-modal__head">
+          <h3 className="skills-modal__title">Fertigkeiten</h3>
+          <span className="skills-modal__count">{chosen.length} gewaehlt</span>
+          <button className="skills-modal__close" onClick={() => onClose(chosen)} title="Schliessen">
+            &times;
+          </button>
+        </div>
+
+        <div className="skills-modal__grid">
+          {SKILLS.map((s) => (
+            <button
+              key={s.value}
+              className={`skills-modal__skill${chosen.includes(s.value) ? ' is-active' : ''}`}
+              onClick={() => toggle(s.value)}
+            >
+              <span className="skills-modal__skill-de">{s.label}</span>
+              <span className="skills-modal__skill-en">{s.en}</span>
+            </button>
+          ))}
+        </div>
+
+        <div className="skills-modal__foot">
+          <button className="btn btn--sm" onClick={() => setChosen([])} disabled={chosen.length === 0}>
+            Auswahl leeren
+          </button>
+          <button className="btn btn--sm btn--primary" onClick={() => onClose(chosen)}>
+            Uebernehmen
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
   )
 }
 
