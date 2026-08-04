@@ -28,7 +28,7 @@ const REVEAL_THRESHOLD = 160
 /** Minimale Kantenlaenge einer Einbettung, in Weltkoordinaten der Eltern-Ebene. */
 export const MIN_EMBED_SIZE = 20
 /** Dauer einer Kartenfahrt (Sprung zu einer Karte/einem Objekt, Einpassen) in ms. */
-const VIEW_ANIM_MS = 500
+const VIEW_ANIM_MS = 800
 
 /** Sanft anfahren, in der Mitte am schnellsten, sanft abbremsen. */
 function easeInOutCubic(t: number): number {
