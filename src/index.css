@@ -659,7 +659,8 @@ button {
   border: 2px solid color-mix(in srgb, var(--gold) 55%, transparent);
   border-radius: 4px;
   box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
-  cursor: grab;
+  /* Klickbar und ziehbar - der Klick wiegt schwerer, also der Zeigefinger. */
+  cursor: pointer;
   z-index: 4;
   touch-action: none;
 }
@@ -1703,8 +1704,9 @@ button {
   border-color: var(--gold);
 }
 
+/* Klickbar und ziehbar - der Klick wiegt schwerer, also der Zeigefinger. */
 .map-pin.is-draggable {
-  cursor: grab;
+  cursor: pointer;
 }
 
 .map-pin.is-draggable:active {
@@ -2455,8 +2457,8 @@ button {
     var(--border) 0 1px,
     transparent 1px calc(100% / 24)
   );
-  /* Klick auf die Spur setzt den Zeitpunkt, wie ein Abspielkopf. */
-  cursor: ew-resize;
+  /* Klick auf die Spur setzt den Zeitpunkt. */
+  cursor: pointer;
   touch-action: none;
 }
 
@@ -2496,7 +2498,8 @@ button {
   padding: 0 4px;
   border: none;
   background: transparent;
-  cursor: grab;
+  /* Klickbar und ziehbar - der Klick wiegt schwerer, also der Zeigefinger. */
+  cursor: pointer;
   z-index: 2;
 }
 
@@ -2749,7 +2752,8 @@ button {
   /* Nur Nummern und Uhrzeiten nehmen Zeigerereignisse an, die Marke selbst nicht -
      sonst laege ein unsichtbarer Block ueber der Karte. */
   pointer-events: auto;
-  cursor: grab;
+  /* Klickbar und ziehbar - der Klick wiegt schwerer, also der Zeigefinger. */
+  cursor: pointer;
   touch-action: none;
 }
 
@@ -2792,7 +2796,8 @@ button {
   overflow: hidden;
   text-overflow: ellipsis;
   pointer-events: auto;
-  cursor: grab;
+  /* Klickbar und ziehbar - der Klick wiegt schwerer, also der Zeigefinger. */
+  cursor: pointer;
   touch-action: none;
 }
 

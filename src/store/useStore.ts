@@ -337,6 +337,12 @@ interface StoreState extends AppData {
   setPlacingEntity: (id: string | null) => void
 }
 
+/** Was ueber ein Neuladen hinweg erhalten bleibt. */
+interface PersistedState extends AppData {
+  timeOfDay: number
+  currentDay: number
+}
+
 function initialData(): AppData {
   const campaign = makeCampaign('Meine Kampagne')
   return { campaigns: [campaign], activeCampaignId: campaign.id }
@@ -1123,13 +1129,17 @@ export const useStore = create<StoreState>()(
     {
       name: 'dnd-weltkarte',
       version: 10,
-      // Nur Daten persistieren, keinen fluechtigen UI-Zustand.
-      partialize: (s): AppData => ({
+      // Nur Daten persistieren, keinen fluechtigen UI-Zustand. Uhrzeit und Kampagnentag
+      // gehoeren dazu: Sie sind der Spielstand der laufenden Sitzung, kein Fensterzustand -
+      // nach einem Neuladen soll die Runde dort weitergehen, wo sie stand.
+      partialize: (s): PersistedState => ({
         campaigns: s.campaigns,
         activeCampaignId: s.activeCampaignId,
+        timeOfDay: s.timeOfDay,
+        currentDay: s.currentDay,
       }),
       // Migration ueber alle Versionen und Normalisierung der Entitaeten.
-      migrate: (persisted: unknown): AppData => {
+      migrate: (persisted: unknown): PersistedState => {
         const state = persisted as Record<string, unknown> | undefined
         let data: AppData
         if (state && Array.isArray(state.campaigns)) {
@@ -1161,7 +1171,13 @@ export const useStore = create<StoreState>()(
           data = { campaigns: [campaign], activeCampaignId: campaign.id }
         }
         // Entitaeten (v3), Sitzungen (v4), Ebenen-Nebel (v5), Events (v6) sicherstellen.
-        return { ...data, campaigns: data.campaigns.map(normalizeCampaign) }
+        // Aeltere Staende kannten Uhrzeit und Tag noch nicht - dann gelten die Startwerte.
+        return {
+          ...data,
+          campaigns: data.campaigns.map(normalizeCampaign),
+          timeOfDay: typeof state?.timeOfDay === 'number' ? state.timeOfDay : 12 * 60,
+          currentDay: typeof state?.currentDay === 'number' ? state.currentDay : 1,
+        }
       },
     },
   ),
