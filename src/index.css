@@ -2743,25 +2743,22 @@ button {
    Overlay laesst Zeigerereignisse durch, nur die Station selbst faengt sie ab.
    Sitzt bewusst unterhalb des Punktes statt darauf: Ueber ihm steht die Pinnadel samt
    Namen. Die genaue Stelle markieren weiterhin die Pinnadel und der Knick der Route. */
+/* Marke fuer alles, was an einer Stelle liegt: Nummern nebeneinander, darunter die
+   Uhrzeiten. Untereinander statt nebeneinander, damit die Beschriftung auch bei vielen
+   Stationen nie ueber den Nummern liegt. */
 .schedule-stop {
   position: absolute;
   transform: translate(-50%, 12px);
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 6px;
-  padding: 0;
-  border: none;
-  background: transparent;
-  pointer-events: auto;
-  cursor: pointer;
+  gap: 3px;
+  pointer-events: none;
 }
 
-.schedule-stop:hover .schedule-stop__dot {
-  border-color: var(--accent);
-}
-
-.schedule-stop:hover .schedule-stop__label {
-  color: var(--ink);
+.schedule-stop__dots {
+  display: flex;
+  gap: 3px;
 }
 
 .schedule-stop__dot {
@@ -2771,42 +2768,55 @@ button {
   width: 20px;
   height: 20px;
   flex: none;
+  padding: 0;
   border-radius: 50%;
   border: 2px solid var(--chip-color, var(--gold));
   background: rgba(13, 15, 20, 0.85);
   color: var(--ink);
+  font-family: inherit;
   font-size: 10px;
   font-variant-numeric: tabular-nums;
+  /* Nur die Nummern nehmen Klicks an, die Marke selbst nicht - sonst laege ein
+     unsichtbarer Block ueber der Karte. */
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.schedule-stop__dot:hover {
+  border-color: var(--accent);
 }
 
 .schedule-stop__label {
+  max-width: 220px;
   padding: 2px 6px;
   border-radius: 5px;
   background: rgba(13, 15, 20, 0.82);
   color: var(--ink-dim);
   font-size: 10.5px;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Station, an der das Objekt zur eingestellten Uhrzeit gerade steht. */
-.schedule-stop.is-now .schedule-stop__dot {
+.schedule-stop__dot.is-now {
   background: var(--chip-color, var(--gold));
   box-shadow: 0 0 10px var(--chip-color, var(--gold));
 }
 
-.schedule-stop.is-exception .schedule-stop__dot {
+.schedule-stop__dot.is-exception {
   border-color: var(--gold);
   border-style: dashed;
 }
 
 /* Station 1 ist die Basis-Platzierung - zurueckgenommen, weil sie nicht eingestellt,
    sondern durch die Position des Objekts selbst gegeben ist. */
-.schedule-stop.is-base .schedule-stop__dot {
+.schedule-stop__dot.is-base {
   border-color: var(--ink-faint);
 }
 
 /* Station, deren Ort gerade per Kartenklick gesetzt wird. */
-.schedule-stop.is-target .schedule-stop__dot {
+.schedule-stop__dot.is-target {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-tint);
 }

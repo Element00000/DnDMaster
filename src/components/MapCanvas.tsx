@@ -1151,6 +1151,18 @@ function ScheduleOverlay({
   const active = activeScheduleKey(entity.schedule, timeOfDay, currentDay)
   const points = stops.map((s) => ({ x: s.x * lv.scale + lv.tx, y: s.y * lv.scale + lv.ty }))
 
+  // Mehrere Stationen koennen auf derselben Stelle liegen - etwa jedes Mal, wenn die Figur
+  // zur Startposition zurueckkehrt. Sie werden zu einer Marke zusammengefasst: Nummern
+  // nebeneinander in ihrer Reihenfolge, die Uhrzeiten gesammelt darunter. Einzeln
+  // gezeichnet laegen sie exakt uebereinander.
+  const marks = new Map<string, { left: number; top: number; items: { stop: (typeof stops)[number]; no: number }[] }>()
+  stops.forEach((s, i) => {
+    const key = `${Math.round(s.x)}:${Math.round(s.y)}`
+    const mark = marks.get(key) ?? { left: points[i].x, top: points[i].y, items: [] }
+    mark.items.push({ stop: s, no: i + 1 })
+    marks.set(key, mark)
+  })
+
   return (
     <div className="schedule-overlay" style={{ ['--chip-color' as string]: meta.color }}>
       {points.length > 1 && (
@@ -1158,24 +1170,34 @@ function ScheduleOverlay({
           <polyline points={points.map((p) => `${p.x},${p.y}`).join(' ')} />
         </svg>
       )}
-      {stops.map((s, i) => (
-        <button
-          key={s.id}
-          className={`schedule-stop${s.id === active?.id || (s.id === '__base__' && !active) ? ' is-now' : ''}${
-            s.id === activeScheduleId ? ' is-target' : ''
-          }${s.day != null ? ' is-exception' : ''}${s.id === '__base__' ? ' is-base' : ''}`}
-          style={{ left: points[i].x, top: points[i].y }}
-          title={`Zeitleiste auf ${formatTime(s.time)} stellen`}
-          // Sonst zieht der Kartenhintergrund darunter eine Rechteck-Markierung auf.
-          onPointerDown={(e) => e.stopPropagation()}
-          onClick={() => onPickTime(s.time)}
-        >
-          <span className="schedule-stop__dot">{i + 1}</span>
+      {[...marks.entries()].map(([key, mark]) => (
+        <div key={key} className="schedule-stop" style={{ left: mark.left, top: mark.top }}>
+          <div className="schedule-stop__dots">
+            {mark.items.map(({ stop: s, no }) => (
+              <button
+                key={s.id}
+                className={`schedule-stop__dot${
+                  s.id === active?.id || (s.id === '__base__' && !active) ? ' is-now' : ''
+                }${s.id === activeScheduleId ? ' is-target' : ''}${s.day != null ? ' is-exception' : ''}${
+                  s.id === '__base__' ? ' is-base' : ''
+                }`}
+                title={`Zeitleiste auf ${formatTime(s.time)} stellen`}
+                // Sonst zieht der Kartenhintergrund darunter eine Rechteck-Markierung auf.
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={() => onPickTime(s.time)}
+              >
+                {no}
+              </button>
+            ))}
+          </div>
           <span className="schedule-stop__label">
-            {s.id === '__base__' ? 'Start' : formatTime(s.time)}
-            {s.label ? ` · ${s.label}` : ''}
+            {mark.items
+              .map(({ stop: s }) =>
+                `${s.id === '__base__' ? 'Start' : formatTime(s.time)}${s.label ? ` · ${s.label}` : ''}`,
+              )
+              .join(' · ')}
           </span>
-        </button>
+        </div>
       ))}
     </div>
   )
