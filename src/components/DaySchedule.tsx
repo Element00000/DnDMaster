@@ -257,9 +257,9 @@ export function DaySchedule({ entities }: { entities: Entity[] }) {
           ))}
 
           {lane.keys.map((k) => {
-            // "Start" ist keine gespeicherte Beschriftung, sondern gilt genau solange der
-            // Timestone auf der Startposition liegt.
-            const caption = k.label || (isAtBase(lane.entity, k) ? 'Start' : '')
+            // Kein abgeleitetes "Start": Dass ein Timestone auf der Startposition liegt,
+            // zeigt schon seine graue, hohle Raute.
+            const caption = k.label
             return (
               <button
                 key={k.id}

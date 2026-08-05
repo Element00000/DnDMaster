@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from '../store/useStore'
-import { entityDisplayMeta, isAtBase } from '../types'
+import { entityDisplayMeta } from '../types'
 import type { Entity, MapLayer } from '../types'
 import { activeTimestone, dayNightOverlay, formatTime, scheduleForDay } from '../utils/time'
 import { useAsset } from '../useAsset'
@@ -1233,9 +1233,10 @@ function ScheduleOverlay({
               bei mehreren Stationen an einer Stelle bleiben sie auseinanderzuhalten. */}
           <div className="schedule-stop__labels">
             {mark.items.map(({ stop: s }) => {
-              // "Start" gilt genau solange der Timestone auf der Startposition liegt - es
-              // steht bewusst nicht in den Daten, sonst bliebe es beim Verschieben stehen.
-              const caption = s.id === '__base__' ? '' : s.label || (isAtBase(entity, s) ? 'Start' : '')
+              // "Start" steht nur an Station 1, der eigentlichen Startposition. Spaetere
+              // Timestones, die dorthin zurueckfuehren, zeigen ihre Uhrzeit - dass sie
+              // wieder am Start stehen, sagt schon ihre Lage auf derselben Marke.
+              const caption = s.id === '__base__' ? '' : s.label
               return (
                 <button
                   key={s.id}
