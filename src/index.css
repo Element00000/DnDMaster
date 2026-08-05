@@ -5108,16 +5108,17 @@ button {
   overflow: hidden;
 }
 
-/* Das iframe rechnet sich um den Kehrwert der Verkleinerung groesser und wird dann
-   zurueckgezoomt: So arbeitet der Player intern mit seiner gewohnten Breite - und packt
-   seine Bedienelemente nicht wegen zu wenig Platz um - erscheint aber kleiner.
-   Bewusst "zoom" statt "transform: scale": Ein Transform verkleinert das fertig
+/* Bewusst "zoom" statt "transform: scale": Ein Transform verkleinert das fertig
    gezeichnete Bild und macht Schrift und Cover unscharf, waehrend zoom den Inhalt in der
-   Zielgroesse neu zeichnet. */
+   Zielgroesse neu zeichnet.
+   Die 100 Prozent brauchen dabei keine Umrechnung: zoom loest Prozentangaben bereits im
+   eigenen, verkleinerten Koordinatensystem auf. Der Player sieht also von sich aus mehr
+   Breite, als der Rahmen hat, und schiebt seine Bedienelemente nicht zusammen - fuellt ihn
+   aber trotzdem genau aus. */
 .music__player iframe {
   display: block;
-  width: calc(100% / var(--player-scale, 1));
-  height: calc(100% / var(--player-scale, 1));
+  width: 100%;
+  height: 100%;
   zoom: var(--player-scale, 1);
   border: none;
   border-radius: 12px;
