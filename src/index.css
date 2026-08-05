@@ -4999,6 +4999,37 @@ button {
   gap: 12px;
 }
 
+.music__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.music__title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--ink-faint);
+}
+
+/* Die Erklaerung zur vollen Wiedergabe ist mehrzeilig und nennt Pfade - dafuer braucht
+   die Blase mehr Platz als am Zeitstrahl. */
+.music__head .infodot__bubble {
+  max-width: 300px;
+}
+
+.music__head .infodot__bubble code {
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: var(--panel);
+  color: var(--ink);
+  font-size: 10.5px;
+}
+
+.music__head .infodot__bubble strong {
+  color: var(--ink);
+}
+
 .music__add {
   display: flex;
   flex-direction: column;

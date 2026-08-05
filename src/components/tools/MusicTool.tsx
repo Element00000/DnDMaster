@@ -2,6 +2,14 @@ import { useState } from 'react'
 import { useStore } from '../../store/useStore'
 import { toSpotifyEmbed } from '../../utils/spotify'
 
+/** Fuer Screenreader; die Blase am Infopunkt zeigt denselben Inhalt gegliedert. */
+const FULL_TRACKS_HELP =
+  'Volle Songs statt 30-Sekunden-Vorschau: Spotify Premium noetig, und im selben Browser ' +
+  'bei Spotify angemeldet sein. Blockiert der Browser Drittanbieter-Cookies, braucht es zwei ' +
+  'Ausnahmen - in Chrome unter Einstellungen, Datenschutz und Sicherheit, ' +
+  'Drittanbieter-Cookies: erstens die Adresse dieser Seite, zweitens [*.]spotify.com. ' +
+  'Werbeblocker wie AdGuard fuer diese Seite abschalten.'
+
 export function MusicTool() {
   const campaign = useStore((s) => s.campaigns.find((c) => c.id === s.activeCampaignId) ?? s.campaigns[0])
   const addMusicEntry = useStore((s) => s.addMusicEntry)
@@ -31,6 +39,30 @@ export function MusicTool() {
 
   return (
     <div className="music">
+      <div className="music__head">
+        <span className="music__title">Spotify</span>
+        <span className="infodot" tabIndex={0} role="note" aria-label={FULL_TRACKS_HELP}>
+          i
+          <span className="infodot__bubble">
+            <strong>Volle Songs statt 30-Sekunden-Vorschau</strong>
+            <br />
+            Spotify Premium noetig, und im selben Browser bei Spotify angemeldet sein.
+            <br />
+            <br />
+            Blockiert der Browser Drittanbieter-Cookies, braucht es <em>zwei</em> Ausnahmen —
+            in Chrome unter Einstellungen › Datenschutz und Sicherheit › Drittanbieter-Cookies:
+            <br />
+            1. die Adresse dieser Seite (dort laeuft der Player)
+            <br />
+            2. <code>[*.]spotify.com</code> (dort liegt die Anmeldung)
+            <br />
+            <br />
+            Werbeblocker wie AdGuard fuer diese Seite abschalten - sie stoeren die
+            Anmeldepruefung des Players.
+          </span>
+        </span>
+      </div>
+
       <div className="music__add">
         <input
           className="field__control field__control--sm"
@@ -76,14 +108,17 @@ export function MusicTool() {
             width="100%"
             height={embed.height}
             frameBorder="0"
-            allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+            // storage-access: Blockiert der Browser Drittanbieter-Cookies, muss der Player
+            // den Zugriff auf seine Sitzung eigens anfordern - ohne diese Erlaubnis erkennt
+            // er das Spotify-Konto nicht und spielt nur 30-Sekunden-Vorschauen.
+            allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture; storage-access"
             loading="lazy"
           />
         </div>
       ) : (
         <p className="music__hint">
           Spotify-Playlist, -Track oder -Album verlinken und speichern — der Player erscheint hier.
-          Fuer volle Songs im selben Browser bei Spotify eingeloggt sein (sonst 30-Sek-Vorschau).
+          Spielt er nur Ausschnitte, hilft der Infopunkt oben.
         </p>
       )}
     </div>
