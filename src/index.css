@@ -1804,8 +1804,10 @@ button {
 }
 
 .time-slider__range {
-  width: 220px;
-  max-width: 26vw;
+  width: 360px;
+  /* Waechst mit dem Fenster, weicht aber schmaleren Fenstern aus - der Regler sitzt
+     absolut zentriert und wuerde sonst die Nachbarn in der Leiste ueberlagern. */
+  max-width: 32vw;
   accent-color: var(--gold);
 }
 
