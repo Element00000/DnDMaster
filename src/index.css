@@ -737,11 +737,11 @@ button {
   filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.5));
 }
 
-/* Was auf der Karte Gewicht hat, ist etwas groesser: eingebettete Karten sowie Spieler
+/* Was auf der Karte Gewicht hat, ist deutlich groesser: eingebettete Karten sowie Spieler
    und Bosse (siehe entityDisplayMeta). Alles andere bleibt schlanker. */
 .map-pin.is-map-link,
 .map-pin.is-emphasized {
-  --pin-size: 37px;
+  --pin-size: 39px;
 }
 
 .map-pin__head {
