@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from '../store/useStore'
 import { entityDisplayMeta } from '../types'
 import type { Entity, MapLayer } from '../types'
@@ -752,6 +752,27 @@ export function MapCanvas() {
 
   const placingActive = placingEntityId !== null || placingLayerId !== null || placingScheduleId !== null
   const selectedEntity = entities.find((e) => e.id === selectedEntityId && e.placement) ?? null
+
+  /**
+   * Karten, die aufgeklappt bleiben, obwohl sie zu klein dafuer geworden sind: die der
+   * gerade in der Zeitleiste bearbeiteten Objekte samt aller Karten darueber. Sonst
+   * verschwaende beim Herauszoomen genau die Figur, deren Weg man plant - mitsamt ihrem
+   * Pin. Schliesst man die Zeitleiste oder waehlt etwas anderes, gilt wieder die
+   * normale Aufdeck-Schwelle.
+   */
+  const keepOpenLayers = useMemo(() => {
+    const ids = new Set<string>()
+    if (bottomPanel !== 'zeitleiste') return ids
+    for (const id of selectedIds) {
+      let layerId = entities.find((e) => e.id === id)?.placement?.layerId
+      // Eine innere Karte hilft nichts, wenn die Karte darueber eingeklappt ist.
+      while (layerId && !ids.has(layerId)) {
+        ids.add(layerId)
+        layerId = campaign.layers.find((l) => l.id === layerId)?.embed?.parentLayerId
+      }
+    }
+    return ids
+  }, [bottomPanel, selectedIds, entities, campaign.layers])
   // Nebel voll deckend fuer Spieler/Tisch, halbtransparent fuer den DM.
   const fogActive = layer.fogEnabled
   const fogOpacity = tableMode ? 1 : 0.45
@@ -941,6 +962,7 @@ export function MapCanvas() {
           containerRef={containerRef}
           layers={campaign.layers}
           visited={[]}
+          keepOpen={keepOpenLayers}
           tool={tool}
           tableMode={tableMode}
           fogEditing={fogEditing}
@@ -1363,6 +1385,7 @@ function EmbeddedMap({
   containerRef,
   layers,
   visited,
+  keepOpen,
   tool,
   tableMode,
   fogEditing,
@@ -1386,6 +1409,8 @@ function EmbeddedMap({
   layers: MapLayer[]
   /** IDs aller Eltern-Ebenen auf dem Weg von der Wurzel hierher (Zyklenschutz). */
   visited: string[]
+  /** Karten, die trotz geringer Groesse aufgeklappt bleiben (siehe keepOpenLayers). */
+  keepOpen: Set<string>
   tool: string
   tableMode: boolean
   fogEditing: boolean
@@ -1422,7 +1447,7 @@ function EmbeddedMap({
   // Zeigererfassung ginge stillschweigend verloren (kein pointerup mehr) und der naechste
   // Hover ueber eine neu gemountete Ecke wuerde faelschlich mit dem alten resizeRef weiterziehen.
   const [isResizing, setIsResizing] = useState(false)
-  const revealed = isResizing || Math.min(w, h) >= REVEAL_THRESHOLD
+  const revealed = isResizing || keepOpen.has(embLayer.id) || Math.min(w, h) >= REVEAL_THRESHOLD
   const interactive = !tableMode && !fogEditing
 
   // Bildschirm- zu Weltkoordinaten der Eltern-Ebene, zum Ziehen der Eck-Griffe.
@@ -1620,6 +1645,7 @@ function EmbeddedMap({
           containerRef={containerRef}
           layers={layers}
           visited={[...visited, embLayer.id]}
+          keepOpen={keepOpen}
           tool={tool}
           tableMode={tableMode}
           fogEditing={fogEditing}
