@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from '../store/useStore'
+import type { DraftPos } from '../store/useStore'
 import { entityDisplayMeta } from '../types'
 import type { Entity, MapLayer } from '../types'
 import { activeTimestone, dayNightOverlay, formatTime, scheduleForDay } from '../utils/time'
@@ -74,6 +75,7 @@ export function MapCanvas() {
   const setTimeOfDay = useStore((s) => s.setTimeOfDay)
   const draftPos = useStore((s) => s.draftPos)
   const setDraftPos = useStore((s) => s.setDraftPos)
+  const clearDraftPos = useStore((s) => s.clearDraftPos)
   const selectedEntityId = useStore((s) => s.selectedEntityId)
   const bottomPanel = useStore((s) => s.bottomPanel)
   const setBottomPanel = useStore((s) => s.setBottomPanel)
@@ -733,6 +735,35 @@ export function MapCanvas() {
   const placingActive = placingEntityId !== null || placingLayerId !== null
   const selectedEntity = entities.find((e) => e.id === selectedEntityId && e.placement) ?? null
 
+  /**
+   * Nach dem Ziehen einer vorgemerkten Stelle an einer bestehenden Station einrasten -
+   * genauso wie beim Ziehen der Stationen selbst. Von Hand liesse sich eine Stelle nie
+   * genau treffen, und schon ein Pixel Abstand ergaebe spaeter zwei getrennte Marken.
+   */
+  const snapDraft = useCallback(
+    (entityId: string) => {
+      const e = entities.find((x) => x.id === entityId)
+      const draft = draftPos[entityId]
+      if (!e?.placement || !draft) return
+      const lv = layerScreenView(campaign.layers, layer.id, e.placement.layerId, view)
+      if (!lv) return
+      const targets = [
+        { x: e.placement.x, y: e.placement.y },
+        ...scheduleForDay(e.schedule, currentDay),
+      ]
+      for (const t of targets) {
+        const dx = t.x - draft.x
+        const dy = t.y - draft.y
+        if (dx === 0 && dy === 0) return
+        if (Math.hypot(dx * lv.scale, dy * lv.scale) <= STOP_SNAP_PX) {
+          setDraftPos(entityId, t.x, t.y)
+          return
+        }
+      }
+    },
+    [entities, draftPos, campaign.layers, layer.id, view, currentDay, setDraftPos],
+  )
+
   /** Doppelklick auf ein Objekt: seinen Tagesablauf in der unteren Leiste aufschlagen. */
   const openSchedule = useCallback(
     (entityId: string) => {
@@ -912,7 +943,12 @@ export function MapCanvas() {
               onDragEnd={
                 selectedIds.length > 1 && selectedIds.includes(e.id)
                   ? undefined
-                  : (clientX, clientY) => onReparentEntity(e.id, clientX, clientY)
+                  : (clientX, clientY) => {
+                      // Eine vorgemerkte Stelle rastet an bestehenden Stationen ein, statt
+                      // das Objekt auf eine andere Karte umzuhaengen.
+                      if (draftPos[e.id]) snapDraft(e.id)
+                      else onReparentEntity(e.id, clientX, clientY)
+                    }
               }
             />
           )
@@ -928,6 +964,7 @@ export function MapCanvas() {
         view={view}
         timeOfDay={timeOfDay}
         effectivePos={effectivePos}
+        onCancel={clearDraftPos}
       />
 
       {/* Beim Planen in der Zeitleiste: alle Stationen des ausgewaehlten Objekts als Route. */}
@@ -1076,14 +1113,17 @@ function DraftOverlay({
   view,
   timeOfDay,
   effectivePos,
+  onCancel,
 }: {
   entities: Entity[]
-  drafts: Record<string, { x: number; y: number }>
+  drafts: Record<string, DraftPos>
   layers: MapLayer[]
   rootLayerId: string
   view: View
   timeOfDay: number
   effectivePos: (e: Entity) => { x: number; y: number }
+  /** Vormerkung dieses Objekts verwerfen. */
+  onCancel: (entityId: string) => void
 }) {
   const items = entities.filter((e) => e.placement && drafts[e.id])
   if (items.length === 0) return null
@@ -1120,6 +1160,17 @@ function DraftOverlay({
               onClick={() => {}}
               onMove={() => {}}
             />
+            {/* Sitzt neben dem Doppel, damit die Vormerkung verworfen werden kann, ohne
+                die Figur erst zurueckschieben zu muessen. */}
+            <button
+              className="draft-overlay__cancel"
+              style={{ left: to.x, top: to.y }}
+              title="Vorgemerkte Stelle verwerfen"
+              onPointerDown={(ev) => ev.stopPropagation()}
+              onClick={() => onCancel(e.id)}
+            >
+              Abbrechen
+            </button>
           </div>
         )
       })}

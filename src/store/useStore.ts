@@ -21,7 +21,7 @@ import type {
 } from '../types'
 import { emptyDecision, emptyEvent } from '../types'
 import { uid } from '../utils/id'
-import { activeTimestone } from '../utils/time'
+import { MINUTES_PER_DAY, activeTimestone } from '../utils/time'
 
 function makeLayer(name = 'Weltkarte'): MapLayer {
   return {
@@ -296,9 +296,10 @@ interface StoreState extends AppData {
    * gueltigen Punkt (oder die Basis-Platzierung) veraendern, statt einen neuen Zeitpunkt
    * vorzubereiten. Fluechtig; wird bei Zeit- oder Tagwechsel verworfen.
    */
-  draftPos: Record<string, { x: number; y: number }>
+  draftPos: Record<string, DraftPos>
   setDraftPos: (entityId: string, x: number, y: number) => void
-  clearDraftPos: () => void
+  /** Ohne Id alle Vormerkungen verwerfen, mit Id nur die des Objekts. */
+  clearDraftPos: (entityId?: string) => void
 
   // Entscheidungen (Phase 4)
   updateDecision: (entityId: string, patch: Partial<DecisionData>) => void
@@ -335,6 +336,17 @@ interface StoreState extends AppData {
   setPendingEntityType: (t: EntityType) => void
   setPendingEntityFields: (fields: Record<string, string>) => void
   setPlacingEntity: (id: string | null) => void
+}
+
+/**
+ * Eine vorgemerkte Position samt dem Timestone, der beim Vormerken gerade galt (null =
+ * Basis-Platzierung). Daran haengt ihre Lebensdauer: Sie beschreibt, wo das Objekt in
+ * diesem Zeitabschnitt stehen soll, und bleibt gueltig, solange man sich darin bewegt.
+ */
+export interface DraftPos {
+  x: number
+  y: number
+  keyId: string | null
 }
 
 /** Was ueber ein Neuladen hinweg erhalten bleibt. */
@@ -385,10 +397,26 @@ export const useStore = create<StoreState>()(
         lastUndoPushAt: 0,
         timeOfDay: 12 * 60,
         currentDay: 1,
-        // Vorgemerkte Positionen gehoeren immer zu genau einem Zeitpunkt an einem Tag -
-        // wechselt einer davon, sind sie hinfaellig.
+        /**
+         * Eine Vormerkung gilt fuer den Zeitabschnitt, in dem sie entstanden ist. Sie
+         * ueberlebt daher das Verschieben der Uhrzeit innerhalb dieses Abschnitts und
+         * faellt erst weg, sobald ein anderer Timestone gilt - sonst waere sie schon beim
+         * kleinsten Nachjustieren der Uhrzeit verloren.
+         */
         setTimeOfDay: (minutes) =>
-          set({ timeOfDay: Math.max(0, Math.min(1439, Math.round(minutes))), draftPos: {} }),
+          set((s) => {
+            const timeOfDay = Math.max(0, Math.min(MINUTES_PER_DAY - 1, Math.round(minutes)))
+            const entities = s.activeCampaign().entities
+            const draftPos: Record<string, DraftPos> = {}
+            for (const [id, d] of Object.entries(s.draftPos)) {
+              const entity = entities.find((e) => e.id === id)
+              if (!entity) continue
+              const nowId = activeTimestone(entity.schedule, timeOfDay, s.currentDay)?.id ?? null
+              if (nowId === d.keyId) draftPos[id] = d
+            }
+            return { timeOfDay, draftPos }
+          }),
+        // Der Kalendertag wechselt den ganzen Ablauf - Vormerkungen sind dann hinfaellig.
         setCurrentDay: (day) => set({ currentDay: Math.max(0, Math.round(day)), draftPos: {} }),
 
         // ---------- Untere Leiste ----------
@@ -843,8 +871,21 @@ export const useStore = create<StoreState>()(
         },
 
         draftPos: {},
-        setDraftPos: (entityId, x, y) => set((s) => ({ draftPos: { ...s.draftPos, [entityId]: { x, y } } })),
-        clearDraftPos: () => set({ draftPos: {} }),
+        setDraftPos: (entityId, x, y) =>
+          set((s) => {
+            const entity = s.activeCampaign().entities.find((e) => e.id === entityId)
+            const keyId = entity
+              ? activeTimestone(entity.schedule, s.timeOfDay, s.currentDay)?.id ?? null
+              : null
+            return { draftPos: { ...s.draftPos, [entityId]: { x, y, keyId } } }
+          }),
+        clearDraftPos: (entityId) =>
+          set((s) => {
+            if (!entityId) return { draftPos: {} }
+            const rest = { ...s.draftPos }
+            delete rest[entityId]
+            return { draftPos: rest }
+          }),
 
         updateTimestone: (entityId, scheduleId, patch) =>
           patchActive((c) => ({
