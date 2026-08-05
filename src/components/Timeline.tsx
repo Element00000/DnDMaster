@@ -47,13 +47,9 @@ export function Timeline() {
           </button>
           {/* Die Anleitung steckt hier statt unter dem Zeitstrahl - dort nahm sie
               dauerhaft Hoehe weg, obwohl man sie nur einmal braucht. */}
-          <span
-            className="infodot"
-            tabIndex={0}
-            role="note"
-            aria-label={SCHEDULE_HELP}
-            title={SCHEDULE_HELP}
-          >
+          {/* Bewusst ohne title: Der Browser wuerde denselben Text ein zweites Mal als
+              eigenen Tooltip einblenden, nur traeger als die Blase daneben. */}
+          <span className="infodot" tabIndex={0} role="note" aria-label={SCHEDULE_HELP}>
             i<span className="infodot__bubble">{SCHEDULE_HELP}</span>
           </span>
           <button
