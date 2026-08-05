@@ -15,13 +15,13 @@ import type {
   MapLayer,
   Placement,
   RelationType,
-  ScheduleKey,
+  Timestone,
   Session,
   UndoEntry,
 } from '../types'
 import { emptyDecision, emptyEvent } from '../types'
 import { uid } from '../utils/id'
-import { activeScheduleKey } from '../utils/time'
+import { activeTimestone } from '../utils/time'
 
 function makeLayer(name = 'Weltkarte'): MapLayer {
   return {
@@ -275,35 +275,30 @@ interface StoreState extends AppData {
   /** Platzierte Entitaet um ein Weltkoordinaten-Delta verschieben. */
   moveEntity: (id: string, dxWorld: number, dyWorld: number) => void
 
-  // Tagesablauf als Schluesselpunkte
+  // Tagesablauf als Timestones
   /**
-   * Schluesselpunkt setzen: Ab dieser Uhrzeit steht das Objekt an der Position, an der es
+   * Timestone setzen: Ab dieser Uhrzeit steht das Objekt an der Position, an der es
    * gerade steht. Ohne Angaben zur aktuellen Uhrzeit im Standard-Tagesablauf. Liegt dort
    * schon einer, wird dessen Position aktualisiert statt ein zweiter angelegt.
    * Liefert die Id (oder null, wenn das Objekt nicht platziert ist).
    */
-  addScheduleKey: (
+  addTimestone: (
     entityId: string,
     init?: { time?: number; day?: number | null; label?: string; x?: number; y?: number },
   ) => string | null
-  updateScheduleKey: (entityId: string, keyId: string, patch: Partial<Omit<ScheduleKey, 'id'>>) => void
-  removeScheduleKey: (entityId: string, keyId: string) => void
-  moveScheduleKey: (entityId: string, keyId: string, dxWorld: number, dyWorld: number) => void
+  updateTimestone: (entityId: string, keyId: string, patch: Partial<Omit<Timestone, 'id'>>) => void
+  removeTimestone: (entityId: string, keyId: string) => void
+  moveTimestone: (entityId: string, keyId: string, dxWorld: number, dyWorld: number) => void
   /**
    * Vorgemerkte Positionen beim Planen eines Tagesablaufs, je Objekt-Id: Waehrend die
    * Zeitleiste offen ist, schiebt man die Objekte auf der Karte erst einmal nur probeweise -
-   * festgehalten werden sie durch "Punkt setzen". Ohne das wuerde das Ziehen den zuletzt
+   * festgehalten werden sie durch "Timestone setzen". Ohne das wuerde das Ziehen den zuletzt
    * gueltigen Punkt (oder die Basis-Platzierung) veraendern, statt einen neuen Zeitpunkt
    * vorzubereiten. Fluechtig; wird bei Zeit- oder Tagwechsel verworfen.
    */
   draftPos: Record<string, { x: number; y: number }>
   setDraftPos: (entityId: string, x: number, y: number) => void
   clearDraftPos: () => void
-  /** Schluesselpunkt, dessen Position der naechste Kartenklick setzt; null = kein Setzmodus. */
-  placingScheduleId: { entityId: string; scheduleId: string } | null
-  setPlacingSchedule: (target: { entityId: string; scheduleId: string } | null) => void
-  /** Position eines Schluesselpunkts direkt setzen (Kartenklick im Setzmodus). */
-  setSchedulePosition: (entityId: string, scheduleId: string, x: number, y: number) => void
 
   // Entscheidungen (Phase 4)
   updateDecision: (entityId: string, patch: Partial<DecisionData>) => void
@@ -425,7 +420,6 @@ export const useStore = create<StoreState>()(
             placingEntityId: null,
             toolsOpen: on ? false : get().toolsOpen,
             bottomPanel: on ? null : get().bottomPanel,
-            placingScheduleId: on ? null : get().placingScheduleId,
             fogEditing: false,
             selectedEntityId: on ? null : get().selectedEntityId,
             selectedIds: on ? [] : get().selectedIds,
@@ -798,8 +792,8 @@ export const useStore = create<StoreState>()(
             ),
           })),
 
-        // ---------- Tagesablauf als Schluesselpunkte ----------
-        addScheduleKey: (entityId, init) => {
+        // ---------- Tagesablauf als Timestones ----------
+        addTimestone: (entityId, init) => {
           const s = get()
           const entity = s.activeCampaign().entities.find((e) => e.id === entityId)
           if (!entity?.placement) return null
@@ -811,8 +805,8 @@ export const useStore = create<StoreState>()(
           // Der Punkt haelt fest, wo das Objekt gerade zu sehen ist: die vorgemerkte
           // Position, wenn man es eben verschoben hat, sonst die zu dieser Zeit geltende.
           const draft = s.draftPos[entityId]
-          const current = activeScheduleKey(entity.schedule, time, s.currentDay)
-          const key: ScheduleKey = {
+          const current = activeTimestone(entity.schedule, time, s.currentDay)
+          const key: Timestone = {
             id: existing?.id ?? uid('key-'),
             time,
             x: init?.x ?? draft?.x ?? current?.x ?? entity.placement.x,
@@ -846,20 +840,7 @@ export const useStore = create<StoreState>()(
         setDraftPos: (entityId, x, y) => set((s) => ({ draftPos: { ...s.draftPos, [entityId]: { x, y } } })),
         clearDraftPos: () => set({ draftPos: {} }),
 
-        placingScheduleId: null,
-        setPlacingSchedule: (target) => set({ placingScheduleId: target, tool: 'select' }),
-
-        setSchedulePosition: (entityId, scheduleId, x, y) =>
-          patchActive((c) => ({
-            ...c,
-            entities: c.entities.map((e) =>
-              e.id === entityId
-                ? { ...e, schedule: e.schedule.map((s) => (s.id === scheduleId ? { ...s, x, y } : s)) }
-                : e,
-            ),
-          })),
-
-        updateScheduleKey: (entityId, scheduleId, patch) =>
+        updateTimestone: (entityId, scheduleId, patch) =>
           patchActive((c) => ({
             ...c,
             entities: c.entities.map((e) =>
@@ -869,7 +850,7 @@ export const useStore = create<StoreState>()(
             ),
           })),
 
-        removeScheduleKey: (entityId, scheduleId) =>
+        removeTimestone: (entityId, scheduleId) =>
           patchActive((c) => ({
             ...c,
             entities: c.entities.map((e) =>
@@ -877,7 +858,7 @@ export const useStore = create<StoreState>()(
             ),
           })),
 
-        moveScheduleKey: (entityId, scheduleId, dxWorld, dyWorld) =>
+        moveTimestone: (entityId, scheduleId, dxWorld, dyWorld) =>
           patchActive((c) => ({
             ...c,
             entities: c.entities.map((e) =>
@@ -1198,11 +1179,11 @@ interface OldMarker {
 }
 
 /**
- * Schluesselpunkt eines Tagesablaufs auffuellen. Frueher waren das Zeitfenster mit
+ * Timestone eines Tagesablaufs auffuellen. Frueher waren das Zeitfenster mit
  * timeStart/timeEnd; deren Beginn wird zum Zeitpunkt des Punktes, das Ende ergibt sich
  * nun aus dem jeweils naechsten Punkt.
  */
-function normalizeScheduleKey(s: Partial<ScheduleKey> & { timeStart?: number }): ScheduleKey {
+function normalizeTimestone(s: Partial<Timestone> & { timeStart?: number }): Timestone {
   return {
     id: s.id ?? uid('key-'),
     time: s.time ?? s.timeStart ?? 0,
@@ -1236,7 +1217,7 @@ function normalizeEntity(e: Partial<Entity> & { id: string; type: EntityType; na
     decision: e.decision ?? (e.type === 'entscheidung' ? emptyDecision() : null),
     event: e.event ?? (e.type === 'ereignis' ? emptyEvent() : null),
     day: e.day ?? null,
-    schedule: (e.schedule ?? []).map(normalizeScheduleKey),
+    schedule: (e.schedule ?? []).map(normalizeTimestone),
     createdAt: e.createdAt ?? Date.now(),
   }
 }

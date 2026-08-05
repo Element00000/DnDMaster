@@ -11,7 +11,7 @@ type Tab = 'objekt' | 'kampagne'
 /** Kurzanleitung zum Tagesablauf; haengt am Infopunkt neben dem Reiter. */
 const SCHEDULE_HELP =
   'Zuerst die Uhrzeit am Zeiger ziehen, dann die Figur auf der Karte an ihren Platz ' +
-  'schieben, dann mit ◆ den Punkt setzen. Vor dem ersten Punkt gilt die normale Position. ' +
+  'schieben, dann mit ◆ den Timestone setzen. Vor dem ersten Timestone gilt die normale Position. ' +
   'Mit ◇ kehrt die Figur ab dieser Uhrzeit wieder dorthin zurueck.'
 
 /**

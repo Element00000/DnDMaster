@@ -1,6 +1,6 @@
 // Hilfsfunktionen fuer die Tageszeit (Minuten seit Mitternacht, 0..1439).
 
-import type { ScheduleKey } from '../types'
+import type { Timestone } from '../types'
 
 export const MINUTES_PER_DAY = 24 * 60
 
@@ -34,11 +34,11 @@ export function inWindow(now: number, start: number | null, end: number | null):
 }
 
 /**
- * Alle Schluesselpunkte, die am Kalendertag "day" gelten, chronologisch sortiert:
+ * Alle Timestones, die am Kalendertag "day" gelten, chronologisch sortiert:
  * der Standard-Tagesablauf plus die Ausnahmen dieses Tages. Fallen beide auf dieselbe
- * Uhrzeit, steht die Ausnahme hinten und gewinnt damit in activeScheduleKey.
+ * Uhrzeit, steht die Ausnahme hinten und gewinnt damit in activeTimestone.
  */
-export function scheduleForDay(schedule: ScheduleKey[], day: number): ScheduleKey[] {
+export function scheduleForDay(schedule: Timestone[], day: number): Timestone[] {
   return schedule
     .filter((s) => s.day == null || s.day === day)
     .slice()
@@ -46,18 +46,18 @@ export function scheduleForDay(schedule: ScheduleKey[], day: number): ScheduleKe
 }
 
 /**
- * Welcher Schluesselpunkt gilt zur Uhrzeit "minutes" am Kalendertag "day"? Das ist der
- * zuletzt vergangene - ein Objekt bleibt also stehen, bis der naechste Punkt es
+ * Welcher Timestone gilt zur Uhrzeit "minutes" am Kalendertag "day"? Das ist der
+ * zuletzt vergangene - ein Objekt bleibt also stehen, bis der naechste Timestone es
  * weiterschickt. Liegt vor der Uhrzeit keiner, liefert die Funktion undefined: Dann gilt
- * die Basis-Platzierung, die als fester Punkt um 0 Uhr zu verstehen ist.
+ * die Basis-Platzierung, die als fester Timestone um 0 Uhr zu verstehen ist.
  */
-export function activeScheduleKey(
-  schedule: ScheduleKey[],
+export function activeTimestone(
+  schedule: Timestone[],
   minutes: number,
   day: number,
-): ScheduleKey | undefined {
+): Timestone | undefined {
   const keys = scheduleForDay(schedule, day)
-  let active: ScheduleKey | undefined
+  let active: Timestone | undefined
   for (const k of keys) {
     if (k.time > minutes) break
     active = k
@@ -66,10 +66,10 @@ export function activeScheduleKey(
 }
 
 /**
- * Bis wann ein Schluesselpunkt gilt: bis zum naechsten, sonst bis Mitternacht. Nur fuer
+ * Bis wann ein Timestone gilt: bis zum naechsten, sonst bis Mitternacht. Nur fuer
  * die Darstellung des Zeitstrahls gedacht.
  */
-export function keyEndsAt(keys: ScheduleKey[], index: number): number {
+export function timestoneEndsAt(keys: Timestone[], index: number): number {
   return keys[index + 1]?.time ?? MINUTES_PER_DAY
 }
 

@@ -1,8 +1,8 @@
 import { useCallback, useRef, useState } from 'react'
 import { entityDisplayMeta, isAtBase } from '../types'
-import type { Entity, ScheduleKey } from '../types'
+import type { Entity, Timestone } from '../types'
 import { useStore } from '../store/useStore'
-import { MINUTES_PER_DAY, formatTime, keyEndsAt, parseTime, scheduleForDay } from '../utils/time'
+import { MINUTES_PER_DAY, formatTime, timestoneEndsAt, scheduleForDay } from '../utils/time'
 
 /** Raster, auf das Ziehen und Klicken im Zeitstrahl einrastet (Minuten). */
 const SNAP = 15
@@ -21,38 +21,36 @@ function clampTime(minutes: number): number {
   return Math.max(0, Math.min(MINUTES_PER_DAY - 1, snapped))
 }
 
-/** Welche Punkte gehoeren in eine Spur? */
+/** Welche Timestones gehoeren in eine Spur? */
 interface Lane {
   /** Objekt, dessen Tagesablauf die Spur zeigt. */
   entity: Entity
   label: string
   /** null = Standardplan, Zahl = Ausnahme dieses Kalendertags. */
   day: number | null
-  keys: ScheduleKey[]
+  keys: Timestone[]
 }
 
 /**
- * Tagesablauf als 24-Stunden-Zeitstrahl mit Schluesselpunkten: Ein Punkt haelt fest, wo ein
- * Objekt ab dieser Uhrzeit steht - bis der naechste Punkt es weiterschickt. Die
- * Basis-Platzierung ist der feste Punkt um 0 Uhr.
+ * Tagesablauf als 24-Stunden-Zeitstrahl mit Timestones: Ein Timestone haelt fest, wo ein
+ * Objekt ab dieser Uhrzeit steht - bis der naechste Timestone es weiterschickt. Die
+ * Basis-Platzierung ist der feste Timestone um 0 Uhr.
  *
  * Der Ablauf ist dreiteilig: Uhrzeit am Zeiger einstellen, Objekte auf der Karte an ihren
- * Platz schieben, Punkt setzen. Das Verschieben wird bis dahin nur vorgemerkt (siehe
- * draftPos im Store), damit es nicht den zuletzt gueltigen Punkt mitverschiebt.
+ * Platz schieben, Timestone setzen. Das Verschieben wird bis dahin nur vorgemerkt (siehe
+ * draftPos im Store), damit es nicht den zuletzt gueltigen Timestone mitverschiebt.
  *
  * Sind mehrere Objekte ausgewaehlt, bekommt jedes eine eigene Spur und ein Klick auf ◆
- * setzt fuer alle gemeinsam einen Punkt.
+ * setzt fuer alle gemeinsam einen Timestone.
  */
 export function DaySchedule({ entities }: { entities: Entity[] }) {
   const timeOfDay = useStore((s) => s.timeOfDay)
   const currentDay = useStore((s) => s.currentDay)
   const tableMode = useStore((s) => s.tableMode)
   const setTimeOfDay = useStore((s) => s.setTimeOfDay)
-  const addScheduleKey = useStore((s) => s.addScheduleKey)
-  const updateScheduleKey = useStore((s) => s.updateScheduleKey)
-  const removeScheduleKey = useStore((s) => s.removeScheduleKey)
-  const placingScheduleId = useStore((s) => s.placingScheduleId)
-  const setPlacingSchedule = useStore((s) => s.setPlacingSchedule)
+  const addTimestone = useStore((s) => s.addTimestone)
+  const updateTimestone = useStore((s) => s.updateTimestone)
+  const removeTimestone = useStore((s) => s.removeTimestone)
   const draftPos = useStore((s) => s.draftPos)
 
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -70,7 +68,7 @@ export function DaySchedule({ entities }: { entities: Entity[] }) {
   const showException = single && (exceptionOpen || hasExceptions)
 
   // Bei einem Objekt trennen die Spuren Standardplan und Ausnahme, bei mehreren steht
-  // eine Spur je Objekt - sonst laegen die Punkte verschiedener Figuren uebereinander.
+  // eine Spur je Objekt - sonst laegen die Timestones verschiedener Figuren uebereinander.
   const lanes: Lane[] = single
     ? [
         {
@@ -107,19 +105,19 @@ export function DaySchedule({ entities }: { entities: Entity[] }) {
     return clampTime(ratio * MINUTES_PER_DAY)
   }, [])
 
-  /** Punkt setzen - fuer alle ausgewaehlten Objekte auf einmal. */
+  /** Timestone setzen - fuer alle ausgewaehlten Objekte auf einmal. */
   function setKeys(day: number | null) {
     if (readOnly) return
     let firstId: string | null = null
     for (const e of entities) {
-      const id = addScheduleKey(e.id, { time: timeOfDay, day })
+      const id = addTimestone(e.id, { time: timeOfDay, day })
       if (id && !firstId) firstId = id
     }
     if (firstId) setSelectedId(firstId)
   }
 
   /**
-   * Punkt setzen, der zurueck an die Startposition fuehrt. Ohne ihn gilt der letzte Punkt
+   * Timestone setzen, der zurueck an die Startposition fuehrt. Ohne ihn gilt der letzte Timestone
    * bis Mitternacht - die Figur bliebe also fuer den Rest des Tages dort stehen, wo sie
    * zuletzt hingeschickt wurde.
    */
@@ -130,7 +128,7 @@ export function DaySchedule({ entities }: { entities: Entity[] }) {
       if (!e.placement) continue
       // Ohne Beschriftung: Dass es die Startposition ist, ergibt sich aus der Position
       // selbst (isAtBase). Ein gespeichertes "Start" wuerde beim Verschieben luegen.
-      const id = addScheduleKey(e.id, { time: timeOfDay, day, x: e.placement.x, y: e.placement.y })
+      const id = addTimestone(e.id, { time: timeOfDay, day, x: e.placement.x, y: e.placement.y })
       if (id && !firstId) firstId = id
     }
     if (firstId) setSelectedId(firstId)
@@ -157,9 +155,9 @@ export function DaySchedule({ entities }: { entities: Entity[] }) {
     if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId)
   }, [])
 
-  // ---------- Schluesselpunkt verschieben ----------
+  // ---------- Timestone verschieben ----------
   const onKeyPointerDown = useCallback(
-    (e: React.PointerEvent, entityId: string, key: ScheduleKey) => {
+    (e: React.PointerEvent, entityId: string, key: Timestone) => {
       if (readOnly || e.button !== 0) return
       e.stopPropagation()
       const lane = e.currentTarget.closest('.daytrack__lane') as HTMLElement | null
@@ -181,10 +179,10 @@ export function DaySchedule({ entities }: { entities: Entity[] }) {
       const delta = minutesFromPointer(e.clientX) - d.grabbedAt
       if (delta === 0) return
       const time = clampTime(d.origTime + delta)
-      updateScheduleKey(d.entityId, d.keyId, { time })
+      updateTimestone(d.entityId, d.keyId, { time })
       setTimeOfDay(time)
     },
-    [updateScheduleKey, minutesFromPointer, setTimeOfDay],
+    [updateTimestone, minutesFromPointer, setTimeOfDay],
   )
 
   const onLaneUp = useCallback((e: React.PointerEvent) => {
@@ -194,7 +192,7 @@ export function DaySchedule({ entities }: { entities: Entity[] }) {
     keyDrag.current = null
   }, [])
 
-  // Klick auf freie Spurflaeche setzt nur die Uhrzeit - Punkte entstehen ueber den Knopf,
+  // Klick auf freie Spurflaeche setzt nur die Uhrzeit - Timestones entstehen ueber den Knopf,
   // damit nicht jeder Klick auf der Suche nach dem richtigen Moment einen hinterlaesst.
   const onLaneClick = useCallback(
     (e: React.MouseEvent) => {
@@ -224,9 +222,9 @@ export function DaySchedule({ entities }: { entities: Entity[] }) {
           onPointerCancel={onLaneUp}
           onLostPointerCapture={onLaneUp}
         >
-          {/* Die Basis-Platzierung ist der feste Punkt um 0 Uhr. Sie steht nicht in den
+          {/* Die Basis-Platzierung ist der feste Timestone um 0 Uhr. Sie steht nicht in den
               Daten, wird aber gezeigt - gedaempft, weil sie nicht zu bearbeiten ist und
-              zurueckweicht, sobald man dort einen echten Punkt setzt. */}
+              zurueckweicht, sobald man dort einen echten Timestone setzt. */}
           {showBase && (
             <>
               <div
@@ -236,14 +234,14 @@ export function DaySchedule({ entities }: { entities: Entity[] }) {
               <span
                 className="daykey daykey--base is-athome"
                 style={{ left: 0 }}
-                title="Basisposition — gilt, bis der erste Punkt kommt"
+                title="Basisposition — gilt, bis der erste Timestone kommt"
               >
                 <span className="daykey__diamond" />
               </span>
             </>
           )}
 
-          {/* Der Abschnitt, den ein Punkt abdeckt: von ihm bis zum naechsten. */}
+          {/* Der Abschnitt, den ein Timestone abdeckt: von ihm bis zum naechsten. */}
           {lane.keys.map((k, i) => (
             <div
               key={`span-${k.id}`}
@@ -252,7 +250,7 @@ export function DaySchedule({ entities }: { entities: Entity[] }) {
               }`}
               style={{
                 left: pct(k.time),
-                width: pct(keyEndsAt(lane.keys, i) - k.time),
+                width: pct(timestoneEndsAt(lane.keys, i) - k.time),
                 ['--chip-color' as string]: meta.color,
               }}
             />
@@ -260,7 +258,7 @@ export function DaySchedule({ entities }: { entities: Entity[] }) {
 
           {lane.keys.map((k) => {
             // "Start" ist keine gespeicherte Beschriftung, sondern gilt genau solange der
-            // Punkt auf der Startposition liegt.
+            // Timestone auf der Startposition liegt.
             const caption = k.label || (isAtBase(lane.entity, k) ? 'Start' : '')
             return (
               <button
@@ -283,8 +281,8 @@ export function DaySchedule({ entities }: { entities: Entity[] }) {
           <button
             className={`daytrack__add${draftPos[lane.entity.id] && isBaseLane ? ' is-pending' : ''}`}
             disabled={readOnly}
-            onClick={() => (single ? setKeys(lane.day) : addScheduleKey(lane.entity.id, { time: timeOfDay }))}
-            title={`Punkt bei ${formatTime(timeOfDay)} setzen`}
+            onClick={() => (single ? setKeys(lane.day) : addTimestone(lane.entity.id, { time: timeOfDay }))}
+            title={`Timestone bei ${formatTime(timeOfDay)} setzen`}
           >
             ◆
           </button>
@@ -336,7 +334,7 @@ export function DaySchedule({ entities }: { entities: Entity[] }) {
         {!single && !readOnly && (
           <>
             <button className="btn btn--sm btn--primary" onClick={() => setKeys(null)}>
-              ◆ Punkt fuer alle {entities.length} setzen
+              ◆ Timestone fuer alle {entities.length} setzen
             </button>
             <button
               className="btn btn--sm"
@@ -352,85 +350,21 @@ export function DaySchedule({ entities }: { entities: Entity[] }) {
             + Ausnahme fuer Tag {currentDay}
           </button>
         )}
-      </div>
-
-      {/* Die Anleitung steht am Infopunkt neben dem Reiter, nicht mehr hier - sie haette
-          dauerhaft Hoehe gekostet. Dass eine Stelle vorgemerkt ist, zeigen das Doppel auf
-          der Karte und der hervorgehobene Knopf an der Spur. */}
-      {selected && selectedOwner ? (
-        <div className="dayedit">
-          <label className="dayedit__field">
-            <span>Ab</span>
-            <input
-              className="field__control field__control--sm"
-              type="time"
-              value={formatTime(selected.time)}
-              disabled={readOnly}
-              onChange={(e) => {
-                const v = parseTime(e.target.value)
-                if (v != null) updateScheduleKey(selectedOwner.id, selected.id, { time: v })
-              }}
-            />
-          </label>
-          <label className="dayedit__field dayedit__field--grow">
-            <span>Beschriftung</span>
-            <input
-              className="field__control field__control--sm"
-              value={selected.label}
-              placeholder="z.B. Marktplatz"
-              disabled={readOnly}
-              onChange={(e) => updateScheduleKey(selectedOwner.id, selected.id, { label: e.target.value })}
-            />
-          </label>
-          <label className="dayedit__field">
-            <span>Gilt</span>
-            <select
-              className="field__control field__control--sm"
-              value={selected.day == null ? 'standard' : 'exception'}
-              disabled={readOnly}
-              onChange={(e) => {
-                const day = e.target.value === 'standard' ? null : currentDay
-                if (day != null) setExceptionOpen(true)
-                updateScheduleKey(selectedOwner.id, selected.id, { day })
-              }}
-            >
-              <option value="standard">Jeden Tag</option>
-              <option value="exception">Nur Tag {currentDay}</option>
-            </select>
-          </label>
-
-          <button
-            className={`btn btn--sm${placingScheduleId?.scheduleId === selected.id ? ' btn--active' : ''}`}
-            disabled={readOnly}
-            title="Danach auf die Karte klicken, um den Aufenthaltsort zu setzen"
-            onClick={() =>
-              setPlacingSchedule(
-                placingScheduleId?.scheduleId === selected.id
-                  ? null
-                  : { entityId: selectedOwner.id, scheduleId: selected.id },
-              )
-            }
-          >
-            {placingScheduleId?.scheduleId === selected.id
-              ? 'Auf die Karte klicken …'
-              : '\u{1F4CD} Ort auf Karte setzen'}
-          </button>
+        {/* Der angeklickte Timestone laesst sich nur noch loeschen - Uhrzeit stellt man am
+            Zeitstrahl ein, den Ort auf der Karte. Eine Eingabeleiste braucht es dafuer nicht. */}
+        {selected && selectedOwner && !readOnly && (
           <button
             className="btn btn--sm btn--danger"
-            disabled={readOnly}
             onClick={() => {
-              removeScheduleKey(selectedOwner.id, selected.id)
+              removeTimestone(selectedOwner.id, selected.id)
               setSelectedId(null)
             }}
           >
-            Entfernen
+            Timestone entfernen
           </button>
-        </div>
-      ) : (
-        // Nichts ausgewaehlt: Die Bearbeitungszeile bleibt einfach weg, statt Platz fuer
-        // einen Hinweis zu belegen.
-        null
-      )}
+        )}
+      </div>
+
     </div>
   )
 }

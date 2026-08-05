@@ -79,16 +79,16 @@ export interface EntityLink {
 }
 
 /**
- * Schluesselpunkt im Tagesablauf eines Objekts: Ab dieser Uhrzeit steht es an dieser
+ * Timestone im Tagesablauf eines Objekts: Ab dieser Uhrzeit steht es an dieser
  * Stelle der Karte (gleiche Ebene wie die Basis-Platzierung), bis der naechste
- * Schluesselpunkt kommt. Vor dem ersten gilt die Basis-Platzierung - sie ist damit der
- * feste Schluesselpunkt um 0 Uhr.
+ * Timestone kommt. Vor dem ersten gilt die Basis-Platzierung - sie ist damit der
+ * feste Timestone um 0 Uhr.
  *
- * Zwei Ebenen von Punkten (siehe activeScheduleKey in utils/time.ts):
+ * Zwei Ebenen von Timestones (siehe activeTimestone in utils/time.ts):
  * - day === null: Standard-Tagesablauf, gilt an jedem Kampagnentag.
  * - day === <Zahl>: Ausnahme, gilt nur an diesem Kalendertag und hat dann Vorrang.
  */
-export interface ScheduleKey {
+export interface Timestone {
   id: string
   /** Uhrzeit in Minuten seit Mitternacht, ab der diese Position gilt. */
   time: number
@@ -134,8 +134,8 @@ export interface Entity {
   event: EventData | null
   /** Kampagnen-Kalendertag fuer die Zeitleiste; null = ohne Datum. */
   day: number | null
-  /** Tagesablauf als Schluesselpunkte (z.B. ab 8 Uhr Marktplatz, ab 14 Uhr Gaststaette). */
-  schedule: ScheduleKey[]
+  /** Tagesablauf als Timestones (z.B. ab 8 Uhr Marktplatz, ab 14 Uhr Gaststaette). */
+  schedule: Timestone[]
   createdAt: number
 }
 
@@ -167,9 +167,9 @@ export function isHostile(entity: Entity): boolean {
 }
 
 /**
- * Steht das Objekt an diesem Schluesselpunkt wieder an seiner Startposition? Wird bei
+ * Steht das Objekt an diesem Timestone wieder an seiner Startposition? Wird bei
  * jeder Anzeige neu aus der Position bestimmt, nie gespeichert - sonst behielte ein
- * verschobener Punkt die Kennzeichnung "Start", obwohl er laengst woanders liegt.
+ * verschobener Timestone die Kennzeichnung "Start", obwohl er laengst woanders liegt.
  */
 export function isAtBase(entity: Entity, key: { x: number; y: number }): boolean {
   const p = entity.placement

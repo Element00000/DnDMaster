@@ -2438,7 +2438,7 @@ button {
   color: var(--gold-soft);
 }
 
-/* Die Spur selbst: Stundenraster als Hintergrund, Schluesselpunkte absolut darin.
+/* Die Spur selbst: Stundenraster als Hintergrund, Timestones absolut darin.
    Der Rahmen liegt bewusst als innerer Schatten auf statt als border: Ein border wuerde
    den Innenbereich um 1 px verkleinern, sodass Punkte und Raster gegenueber dem
    Abspielkopf verrutschen, der ueber der vollen Breite liegt. */
@@ -2460,7 +2460,7 @@ button {
   touch-action: none;
 }
 
-/* Abschnitt, den ein Schluesselpunkt abdeckt: von ihm bis zum naechsten. Nur zur
+/* Abschnitt, den ein Timestone abdeckt: von ihm bis zum naechsten. Nur zur
    Orientierung - angefasst wird die Raute. */
 .daykey__span {
   position: absolute;
@@ -2482,7 +2482,7 @@ button {
   background: rgba(255, 255, 255, 0.05);
 }
 
-/* Der Schluesselpunkt selbst - eine Raute auf der Zeitachse, wie in Animationswerkzeugen. */
+/* Der Timestone selbst - eine Raute auf der Zeitachse, wie in Animationswerkzeugen. */
 .daykey {
   position: absolute;
   top: 0;
@@ -2685,37 +2685,6 @@ button {
 }
 
 
-/* Bearbeitungszeile des ausgewaehlten Zeitfensters. */
-.dayedit {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: 8px;
-  padding: 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--panel-2);
-}
-
-.dayedit__field {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-}
-
-.dayedit__field > span {
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-  color: var(--ink-faint);
-}
-
-.dayedit__field--grow {
-  flex: 1;
-  min-width: 140px;
-}
-
 /* ---------- Stationen-Route auf der Karte ---------- */
 .schedule-overlay {
   position: absolute;
@@ -2813,12 +2782,6 @@ button {
    sondern durch die Position des Objekts selbst gegeben ist. */
 .schedule-stop__dot.is-base {
   border-color: var(--ink-faint);
-}
-
-/* Station, deren Ort gerade per Kartenklick gesetzt wird. */
-.schedule-stop__dot.is-target {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-tint);
 }
 
 /* ---------- Entscheidungs-Editor ---------- */

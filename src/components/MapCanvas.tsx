@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from '../store/useStore'
 import { entityDisplayMeta, isAtBase } from '../types'
 import type { Entity, MapLayer } from '../types'
-import { activeScheduleKey, dayNightOverlay, formatTime, scheduleForDay } from '../utils/time'
+import { activeTimestone, dayNightOverlay, formatTime, scheduleForDay } from '../utils/time'
 import { useAsset } from '../useAsset'
 import { useBottomPanelOffset } from '../useBottomPanelOffset'
 import { PlaceholderMap } from './PlaceholderMap'
@@ -60,7 +60,7 @@ export function MapCanvas() {
   const setPlacement = useStore((s) => s.setPlacement)
   const setPlacingEntity = useStore((s) => s.setPlacingEntity)
   const moveEntity = useStore((s) => s.moveEntity)
-  const moveScheduleKey = useStore((s) => s.moveScheduleKey)
+  const moveTimestone = useStore((s) => s.moveTimestone)
   const selectEntity = useStore((s) => s.selectEntity)
   const selectedIds = useStore((s) => s.selectedIds)
   const setSelectedIds = useStore((s) => s.setSelectedIds)
@@ -72,9 +72,6 @@ export function MapCanvas() {
   const setTimeOfDay = useStore((s) => s.setTimeOfDay)
   const draftPos = useStore((s) => s.draftPos)
   const setDraftPos = useStore((s) => s.setDraftPos)
-  const placingScheduleId = useStore((s) => s.placingScheduleId)
-  const setPlacingSchedule = useStore((s) => s.setPlacingSchedule)
-  const setSchedulePosition = useStore((s) => s.setSchedulePosition)
   const selectedEntityId = useStore((s) => s.selectedEntityId)
   const bottomPanel = useStore((s) => s.bottomPanel)
   const fogEditing = useStore((s) => s.fogEditing)
@@ -115,14 +112,14 @@ export function MapCanvas() {
 
   /**
    * Wo ein Objekt gerade zu sehen ist: die eben vorgemerkte Position, sonst der zur
-   * Uhrzeit geltende Schluesselpunkt, sonst die Basis-Platzierung.
+   * Uhrzeit geltende Timestone, sonst die Basis-Platzierung.
    */
   // Eine vorgemerkte Position bewegt den Pin bewusst NICHT: Sie erscheint als eigenes
   // Doppel daneben (siehe DraftOverlay), damit man sieht, dass noch nichts gespeichert ist.
   const effectivePos = useCallback(
     (e: Entity): { x: number; y: number } => {
       if (e.schedule.length > 0) {
-        const active = activeScheduleKey(e.schedule, timeOfDay, currentDay)
+        const active = activeTimestone(e.schedule, timeOfDay, currentDay)
         if (active) return { x: active.x, y: active.y }
       }
       return { x: e.placement!.x, y: e.placement!.y }
@@ -133,18 +130,18 @@ export function MapCanvas() {
   /**
    * Ziehen eines Pins - was dabei verschoben wird, haengt davon ab, was man gerade tut:
    *
-   * - Liegt die Uhrzeit genau auf einem Schluesselpunkt, wird dieser bearbeitet.
+   * - Liegt die Uhrzeit genau auf einem Timestone, wird dieser bearbeitet.
    * - Plant man gerade den Tagesablauf dieses Objekts (Zeitleiste offen, Objekt gewaehlt,
    *   Uhrzeit nach 0 Uhr), wird die neue Stelle nur vorgemerkt und erst durch "Punkt
-   *   setzen" festgehalten. Sonst wuerde das Ziehen den zuletzt gueltigen Punkt
+   *   setzen" festgehalten. Sonst wuerde das Ziehen den zuletzt gueltigen Timestone
    *   mitverschieben, statt einen neuen Zeitpunkt vorzubereiten.
    * - Sonst gilt die Basis-Platzierung des Objekts (auch um 0 Uhr, denn das ist sie).
    */
   const moveEntityTimed = useCallback(
     (e: Entity, dxWorld: number, dyWorld: number) => {
-      const active = activeScheduleKey(e.schedule, timeOfDay, currentDay)
+      const active = activeTimestone(e.schedule, timeOfDay, currentDay)
       if (active && active.time === timeOfDay) {
-        moveScheduleKey(e.id, active.id, dxWorld, dyWorld)
+        moveTimestone(e.id, active.id, dxWorld, dyWorld)
         return
       }
       const planning = bottomPanel === 'zeitleiste' && selectedIds.includes(e.id) && timeOfDay > 0
@@ -155,7 +152,7 @@ export function MapCanvas() {
       }
       moveEntity(e.id, dxWorld, dyWorld)
     },
-    [timeOfDay, currentDay, moveScheduleKey, moveEntity, bottomPanel, selectedIds, draftPos, setDraftPos],
+    [timeOfDay, currentDay, moveTimestone, moveEntity, bottomPanel, selectedIds, draftPos, setDraftPos],
   )
 
   /**
@@ -447,7 +444,7 @@ export function MapCanvas() {
       if (!el) return
       const ent = entities.find((x) => x.id === entityId)
       if (!ent?.placement) return
-      const active = activeScheduleKey(ent.schedule, timeOfDay, currentDay)
+      const active = activeTimestone(ent.schedule, timeOfDay, currentDay)
       if (active) return
       const rect = el.getBoundingClientRect()
       const v = viewRef.current
@@ -578,23 +575,6 @@ export function MapCanvas() {
       const wy = (e.clientY - rect.top - view.ty) / view.scale
       const inside = wx >= 0 && wy >= 0 && wx <= width && wy <= height
 
-      // Hoechste Prioritaet: der Aufenthaltsort eines Zeitfensters wird gerade gesetzt.
-      // Zeitplan-Positionen liegen immer auf der Ebene der Basis-Platzierung des Objekts;
-      // ein Klick auf eine andere Ebene laesst den Setzmodus daher einfach weiterlaufen.
-      if (placingScheduleId) {
-        if (inside) {
-          const ent = entities.find((x) => x.id === placingScheduleId.entityId)
-          if (ent?.placement) {
-            const t = resolveDeepTarget(campaign.layers, layer.id, wx, wy, view.scale)
-            if (t.layerId === ent.placement.layerId) {
-              setSchedulePosition(placingScheduleId.entityId, placingScheduleId.scheduleId, t.x, t.y)
-              setPlacingSchedule(null)
-            }
-          }
-        }
-        return
-      }
-
       // Eine Karte wird gerade als eingebettete Karte platziert.
       // Faellt der Klick in eine (beliebig tief) aufgedeckte eingebettete Karte,
       // wird dort eingebettet statt immer auf der Wurzelebene.
@@ -659,7 +639,6 @@ export function MapCanvas() {
       fogEditing,
       placingEntityId,
       placingLayerId,
-      placingScheduleId,
       entities,
       campaign.layers,
       pins,
@@ -667,8 +646,6 @@ export function MapCanvas() {
       addEntity,
       setPlacement,
       setPlacingEntity,
-      setPlacingSchedule,
-      setSchedulePosition,
       embedLayer,
       setPlacingLayer,
       selectEntity,
@@ -750,7 +727,7 @@ export function MapCanvas() {
     [view.tx, view.ty, view.scale, width, height, tableMode, fogEditing, fitToView],
   )
 
-  const placingActive = placingEntityId !== null || placingLayerId !== null || placingScheduleId !== null
+  const placingActive = placingEntityId !== null || placingLayerId !== null
   const selectedEntity = entities.find((e) => e.id === selectedEntityId && e.placement) ?? null
 
   /**
@@ -949,7 +926,6 @@ export function MapCanvas() {
           view={view}
           currentDay={currentDay}
           timeOfDay={timeOfDay}
-          activeScheduleId={placingScheduleId?.scheduleId ?? null}
           onPickTime={setTimeOfDay}
         />
       )}
@@ -1143,7 +1119,6 @@ function ScheduleOverlay({
   view,
   currentDay,
   timeOfDay,
-  activeScheduleId,
   onPickTime,
 }: {
   entity: Entity
@@ -1152,7 +1127,6 @@ function ScheduleOverlay({
   view: View
   currentDay: number
   timeOfDay: number
-  activeScheduleId: string | null
   /** Klick auf eine Station stellt die Zeitleiste auf deren Uhrzeit. */
   onPickTime: (minutes: number) => void
 }) {
@@ -1170,7 +1144,7 @@ function ScheduleOverlay({
   const stops = keys.some((k) => k.time === 0) ? keys : [base, ...keys]
 
   const meta = entityDisplayMeta(entity)
-  const active = activeScheduleKey(entity.schedule, timeOfDay, currentDay)
+  const active = activeTimestone(entity.schedule, timeOfDay, currentDay)
   const points = stops.map((s) => ({ x: s.x * lv.scale + lv.tx, y: s.y * lv.scale + lv.ty }))
 
   // Mehrere Stationen koennen auf derselben Stelle liegen - etwa jedes Mal, wenn die Figur
@@ -1200,7 +1174,7 @@ function ScheduleOverlay({
                 key={s.id}
                 className={`schedule-stop__dot${
                   s.id === active?.id || (s.id === '__base__' && !active) ? ' is-now' : ''
-                }${s.id === activeScheduleId ? ' is-target' : ''}${s.day != null ? ' is-exception' : ''}${
+                }${s.day != null ? ' is-exception' : ''}${
                   s.id === '__base__' ? ' is-base' : ''
                 }`}
                 title={`Zeitleiste auf ${formatTime(s.time)} stellen`}
@@ -1216,7 +1190,7 @@ function ScheduleOverlay({
             {mark.items
               .map(({ stop: s }) => {
                 if (s.id === '__base__') return 'Start'
-                // "Start" gilt genau solange der Punkt auf der Startposition liegt - es
+                // "Start" gilt genau solange der Timestone auf der Startposition liegt - es
                 // steht bewusst nicht in den Daten, sonst bliebe es beim Verschieben stehen.
                 const caption = s.label || (isAtBase(entity, s) ? 'Start' : '')
                 return `${formatTime(s.time)}${caption ? ` · ${caption}` : ''}`
@@ -1585,7 +1559,7 @@ function EmbeddedMap({
 
   function embEffectivePos(e: Entity): { x: number; y: number } {
     if (e.schedule.length > 0) {
-      const active = activeScheduleKey(e.schedule, timeOfDay, currentDay)
+      const active = activeTimestone(e.schedule, timeOfDay, currentDay)
       if (active) return { x: active.x, y: active.y }
     }
     return { x: e.placement!.x, y: e.placement!.y }
