@@ -2278,8 +2278,8 @@ button {
   /* Was links und rechts neben der eigentlichen Spur liegt: die Beschriftung und der
      Knopf zum Punktsetzen, jeweils samt Abstand. Stundenleiste, Spuren und Abspielkopf
      richten sich daran aus, damit sie exakt dieselbe Zeitachse teilen. */
-  --lane-offset: 130px;
-  --lane-tail: 38px;
+  --lane-offset: 92px;
+  --lane-tail: 74px;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -2325,6 +2325,10 @@ button {
   font-size: 11px;
   color: var(--ink-dim);
   line-height: 1.2;
+  /* Objektnamen koennen beliebig lang sein - sie duerfen die Spur nicht wegdruecken. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .daytrack__lanelabel--exception {
@@ -2505,12 +2509,19 @@ button {
   background: var(--gold-soft);
 }
 
-/* Punkt in dieser Spur setzen - steht am Ende jeder Spur. */
-.daytrack__add {
+/* Knoepfe am Ende jeder Spur: Punkt setzen und zurueck zur Startposition. */
+.daytrack__laneactions {
   /* 8px gehen an den Abstand zur Spur, der Rest ergibt --lane-tail. */
   width: calc(var(--lane-tail) - 8px);
   flex: none;
   align-self: center;
+  display: flex;
+  gap: 6px;
+}
+
+.daytrack__add {
+  flex: 1;
+  min-width: 0;
   padding: 6px 0;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);

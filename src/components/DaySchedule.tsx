@@ -137,14 +137,14 @@ export function DaySchedule({ entities }: { entities: Entity[] }) {
    * bis Mitternacht - die Figur bliebe also fuer den Rest des Tages dort stehen, wo sie
    * zuletzt hingeschickt wurde.
    */
-  function setHomeKeys() {
+  function setHomeKeys(list: Entity[], day: number | null) {
     if (readOnly) return
     let firstId: string | null = null
-    for (const e of entities) {
+    for (const e of list) {
       if (!e.placement) continue
       const id = addScheduleKey(e.id, {
         time: timeOfDay,
-        day: null,
+        day,
         x: e.placement.x,
         y: e.placement.y,
         label: 'Start',
@@ -292,14 +292,24 @@ export function DaySchedule({ entities }: { entities: Entity[] }) {
             </button>
           ))}
         </div>
-        <button
-          className={`daytrack__add${draftPos[lane.entity.id] && isBaseLane ? ' is-pending' : ''}`}
-          disabled={readOnly}
-          onClick={() => (single ? setKeys(lane.day) : addScheduleKey(lane.entity.id, { time: timeOfDay }))}
-          title={`Punkt bei ${formatTime(timeOfDay)} setzen`}
-        >
-          ◆
-        </button>
+        <div className="daytrack__laneactions">
+          <button
+            className={`daytrack__add${draftPos[lane.entity.id] && isBaseLane ? ' is-pending' : ''}`}
+            disabled={readOnly}
+            onClick={() => (single ? setKeys(lane.day) : addScheduleKey(lane.entity.id, { time: timeOfDay }))}
+            title={`Punkt bei ${formatTime(timeOfDay)} setzen`}
+          >
+            ◆
+          </button>
+          <button
+            className="daytrack__add"
+            disabled={readOnly}
+            onClick={() => setHomeKeys(single ? entities : [lane.entity], lane.day)}
+            title={`Ab ${formatTime(timeOfDay)} wieder an der Startposition`}
+          >
+            ◇
+          </button>
+        </div>
       </div>
     )
   }
@@ -337,18 +347,18 @@ export function DaySchedule({ entities }: { entities: Entity[] }) {
 
       <div className="dayschedule__actions">
         {!single && !readOnly && (
-          <button className="btn btn--sm btn--primary" onClick={() => setKeys(null)}>
-            ◆ Punkt fuer alle {entities.length} setzen
-          </button>
-        )}
-        {!readOnly && (
-          <button
-            className="btn btn--sm"
-            onClick={setHomeKeys}
-            title="Punkt setzen, ab dem wieder die Startposition gilt"
-          >
-            ↩ Zurueck zum Start
-          </button>
+          <>
+            <button className="btn btn--sm btn--primary" onClick={() => setKeys(null)}>
+              ◆ Punkt fuer alle {entities.length} setzen
+            </button>
+            <button
+              className="btn btn--sm"
+              onClick={() => setHomeKeys(entities, null)}
+              title="Alle ab hier wieder an ihrer Startposition"
+            >
+              ◇ Alle zum Start
+            </button>
+          </>
         )}
         {single && !showException && !readOnly && (
           <button className="dayschedule__addlane" onClick={() => setExceptionOpen(true)}>
