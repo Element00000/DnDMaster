@@ -31,6 +31,8 @@ export const MIN_EMBED_SIZE = 20
 const VIEW_ANIM_MS = 800
 /** Anteil des Sichtbereichs, den eine eingepasste Karte einnimmt (Rest bleibt als Rand). */
 const FIT_MARGIN = 0.92
+/** Abstand in Bildschirmpunkten, ab dem eine gezogene Station an einer anderen einrastet. */
+const STOP_SNAP_PX = 22
 
 /** Sanft anfahren, in der Mitte am schnellsten, sanft abbremsen. */
 function easeInOutCubic(t: number): number {
@@ -1139,8 +1141,60 @@ function ScheduleOverlay({
   /** Ziehen an einer Station verschiebt sie auf der Karte (Delta in Weltkoordinaten). */
   onMoveStop: (stopId: string, dxWorld: number, dyWorld: number) => void
 }) {
-  // Ziehen wird vom Klicken per Schwelle getrennt, wie bei den Pinnadeln auch.
-  const drag = useRef<{ id: string; lastX: number; lastY: number; moved: boolean } | null>(null)
+  // Ziehen wird vom Klicken per Schwelle getrennt, wie bei den Pinnadeln auch. Die
+  // Umrechnung in Weltkoordinaten haengt an der Ebene, deren Massstab beim Griff
+  // festgehalten wird.
+  const drag = useRef<{
+    id: string
+    time: number
+    lastX: number
+    lastY: number
+    moved: boolean
+    scale: number
+  } | null>(null)
+
+  // Immer die aktuellen Rueckrufe, ohne die Fenster-Listener neu anzulegen.
+  const moveRef = useRef(onMoveStop)
+  moveRef.current = onMoveStop
+  const pickRef = useRef(onPickTime)
+  pickRef.current = onPickTime
+  const snapRef = useRef<(stopId: string) => void>(() => {})
+
+  /**
+   * Bewegung und Loslassen haengen am Fenster, nicht am angeklickten Knopf: Beim
+   * Verschieben aendert sich die Position und damit die Gruppierung der Stationen, sodass
+   * React den Knopf ersetzen kann. Eine Zeigererfassung auf ihm ginge dabei verloren - das
+   * Ziehen bricht dann mitten in der Bewegung ab.
+   */
+  useEffect(() => {
+    function onMove(e: PointerEvent) {
+      const d = drag.current
+      if (!d) return
+      const dx = e.clientX - d.lastX
+      const dy = e.clientY - d.lastY
+      if (!d.moved && Math.hypot(dx, dy) > 3) d.moved = true
+      if (!d.moved) return
+      d.lastX = e.clientX
+      d.lastY = e.clientY
+      moveRef.current(d.id, dx / d.scale, dy / d.scale)
+    }
+    function onUp() {
+      const d = drag.current
+      drag.current = null
+      if (!d) return
+      // Ohne Bewegung war es ein Klick.
+      if (d.moved) snapRef.current(d.id)
+      else pickRef.current(d.time)
+    }
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+    window.addEventListener('pointercancel', onUp)
+    return () => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointercancel', onUp)
+    }
+  }, [])
 
   if (!entity.placement) return null
   const lv = layerScreenView(layers, rootLayerId, entity.placement.layerId, view)
@@ -1171,34 +1225,35 @@ function ScheduleOverlay({
     marks.set(key, mark)
   })
 
+  const scale = lv.scale
+
   /** Ziehen an Nummer oder Uhrzeit verschiebt den Timestone; ein Klick stellt die Zeit. */
-  function onStopDown(e: React.PointerEvent, stopId: string) {
+  function onStopDown(e: React.PointerEvent, stopId: string, time: number) {
     if (e.button !== 0) return
     // Sonst zieht der Kartenhintergrund darunter eine Rechteck-Markierung auf.
     e.stopPropagation()
     e.preventDefault()
-    ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
-    drag.current = { id: stopId, lastX: e.clientX, lastY: e.clientY, moved: false }
+    drag.current = { id: stopId, time, lastX: e.clientX, lastY: e.clientY, moved: false, scale }
   }
 
-  function onStopMove(e: React.PointerEvent) {
-    const d = drag.current
-    if (!d || !lv) return
-    const dx = e.clientX - d.lastX
-    const dy = e.clientY - d.lastY
-    if (!d.moved && Math.hypot(dx, dy) > 3) d.moved = true
-    if (!d.moved) return
-    d.lastX = e.clientX
-    d.lastY = e.clientY
-    onMoveStop(d.id, dx / lv.scale, dy / lv.scale)
-  }
-
-  function onStopUp(e: React.PointerEvent, time: number) {
-    const d = drag.current
-    drag.current = null
-    const el = e.currentTarget as HTMLElement
-    if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId)
-    if (!d?.moved) onPickTime(time)
+  /**
+   * Nach dem Loslassen an einer nahen Station einrasten: Die gezogene uebernimmt deren
+   * Position exakt, sodass beide zu einer Marke zusammenfallen - Nummern nebeneinander,
+   * Uhrzeiten untereinander. Von Hand liesse sich die Stelle sonst nie genau genug
+   * treffen, und schon ein Pixel Abstand ergaebe zwei ueberlappende Marken.
+   */
+  snapRef.current = (stopId: string) => {
+    const dragged = stops.find((s) => s.id === stopId)
+    if (!dragged) return
+    for (const s of stops) {
+      if (s.id === stopId) continue
+      const dx = s.x - dragged.x
+      const dy = s.y - dragged.y
+      if (Math.hypot(dx * scale, dy * scale) <= STOP_SNAP_PX) {
+        onMoveStop(stopId, dx, dy)
+        return
+      }
+    }
   }
 
   return (
@@ -1220,9 +1275,7 @@ function ScheduleOverlay({
                   s.id === '__base__' ? ' is-base' : ''
                 }`}
                 title={`Ziehen verschiebt · Klick stellt die Zeitleiste auf ${formatTime(s.time)}`}
-                onPointerDown={(e) => onStopDown(e, s.id)}
-                onPointerMove={onStopMove}
-                onPointerUp={(e) => onStopUp(e, s.time)}
+                onPointerDown={(e) => onStopDown(e, s.id, s.time)}
               >
                 {no}
               </button>
@@ -1242,9 +1295,7 @@ function ScheduleOverlay({
                   key={s.id}
                   className="schedule-stop__label"
                   title={`Ziehen verschiebt · Klick stellt die Zeitleiste auf ${formatTime(s.time)}`}
-                  onPointerDown={(e) => onStopDown(e, s.id)}
-                  onPointerMove={onStopMove}
-                  onPointerUp={(e) => onStopUp(e, s.time)}
+                  onPointerDown={(e) => onStopDown(e, s.id, s.time)}
                 >
                   {s.id === '__base__' ? 'Start' : formatTime(s.time)}
                   {caption ? ` · ${caption}` : ''}
