@@ -1,6 +1,7 @@
 // Hilfsfunktionen fuer die Tageszeit (Minuten seit Mitternacht, 0..1439).
 
-import type { Timestone } from '../types'
+import type { Entity, Timestone } from '../types'
+import { effectivePlacement } from '../types'
 
 export const MINUTES_PER_DAY = 24 * 60
 
@@ -63,6 +64,18 @@ export function activeTimestone(
     active = k
   }
   return active
+}
+
+/**
+ * Wo ein Objekt zur Uhrzeit "minutes" am Kalendertag "day" steht: Karte und Koordinaten
+ * darauf. Kurzform fuer activeTimestone + effectivePlacement.
+ */
+export function placementAt(
+  entity: Entity,
+  minutes: number,
+  day: number,
+): { layerId: string; x: number; y: number } | null {
+  return effectivePlacement(entity, activeTimestone(entity.schedule, minutes, day))
 }
 
 /**

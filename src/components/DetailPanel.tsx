@@ -14,6 +14,7 @@ import {
 } from '../types'
 import type { Entity, ThumbCrop } from '../types'
 import { useStore } from '../store/useStore'
+import { placementAt } from '../utils/time'
 import { defaultThumbCrop, fileToScaledDataUrl } from '../utils/image'
 import { deleteAsset } from '../utils/assets'
 import { discardEntityImage, restoreEntityThumb, storeEntityImage } from '../utils/entityImage'
@@ -27,6 +28,8 @@ export function DetailPanel() {
   const campaign = useStore((s) => s.campaigns.find((c) => c.id === s.activeCampaignId) ?? s.campaigns[0])
   const activeLayer = campaign.layers.find((l) => l.id === campaign.activeLayerId) ?? campaign.layers[0]
   const viewLayerId = useStore((s) => s.viewLayerId)
+  const timeOfDay = useStore((s) => s.timeOfDay)
+  const currentDay = useStore((s) => s.currentDay)
   const selectedId = useStore((s) => s.selectedEntityId)
   const tableMode = useStore((s) => s.tableMode)
   const updateEntity = useStore((s) => s.updateEntity)
@@ -50,7 +53,12 @@ export function DetailPanel() {
   // aktuell einbetten wuerde.
   const mapLayerId = viewLayerId ?? activeLayer.id
   const mapLayer = campaign.layers.find((l) => l.id === mapLayerId) ?? activeLayer
-  const mapEntities = campaign.entities.filter((e) => e.placement?.layerId === mapLayerId)
+  // Nach der Karte, auf der das Objekt gerade steht: Schickt ein Timestone es zu dieser
+  // Uhrzeit auf eine andere Karte, gehoert es auch in deren Uebersicht - und nicht mehr in
+  // die der Karte, auf der sein Tag beginnt.
+  const mapEntities = campaign.entities.filter(
+    (e) => placementAt(e, timeOfDay, currentDay)?.layerId === mapLayerId,
+  )
   const enemies = mapEntities.filter(isHostile)
   const sortedEnemies = [...enemies].sort(
     (a, b) => (initiatives[b.id] ?? -Infinity) - (initiatives[a.id] ?? -Infinity),

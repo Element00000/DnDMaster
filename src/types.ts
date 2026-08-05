@@ -92,6 +92,12 @@ export interface Timestone {
   id: string
   /** Uhrzeit in Minuten seit Mitternacht, ab der diese Position gilt. */
   time: number
+  /**
+   * Karte, auf der diese Stelle liegt - x und y gelten in deren Koordinaten. Fehlt die
+   * Angabe (aeltere Daten), gilt die Karte der Basis-Platzierung; so lagen alle
+   * Timestones frueher.
+   */
+  layerId?: string
   x: number
   y: number
   /** Freie Beschriftung des Aufenthaltsorts fuer die Zeitleiste, z.B. "Marktplatz". */
@@ -171,10 +177,31 @@ export function isHostile(entity: Entity): boolean {
  * jeder Anzeige neu aus der Position bestimmt, nie gespeichert - sonst behielte ein
  * verschobener Timestone die Kennzeichnung "Start", obwohl er laengst woanders liegt.
  */
-export function isAtBase(entity: Entity, key: { x: number; y: number }): boolean {
+export function isAtBase(entity: Entity, key: { x: number; y: number; layerId?: string }): boolean {
   const p = entity.placement
   if (!p) return false
+  // Dieselbe Stelle auf einer anderen Karte ist eine andere Stelle.
+  if ((key.layerId ?? p.layerId) !== p.layerId) return false
   return Math.abs(key.x - p.x) < 1 && Math.abs(key.y - p.y) < 1
+}
+
+/**
+ * Wo das Objekt zu dieser Uhrzeit steht - Karte samt Koordinaten darauf. Der geltende
+ * Timestone bestimmt beides; erst wenn keiner gilt, zaehlt die Basis-Platzierung.
+ *
+ * Alles, was ein Objekt auf einer Karte einsortiert (welche Pinnadel-Liste, welche
+ * Kartenuebersicht, wohin die Ansicht springt), muss diese Funktion benutzen statt der
+ * Basis-Platzierung - sonst haengt das Objekt an der Karte, auf der sein Tag beginnt,
+ * obwohl es laengst auf einer anderen unterwegs ist.
+ */
+export function effectivePlacement(
+  entity: Entity,
+  active: Timestone | undefined,
+): { layerId: string; x: number; y: number } | null {
+  const p = entity.placement
+  if (!p) return null
+  if (!active) return { layerId: p.layerId, x: p.x, y: p.y }
+  return { layerId: active.layerId ?? p.layerId, x: active.x, y: active.y }
 }
 
 /** Aufgedeckter Kreis fuer den Nebel des Krieges (Weltkoordinaten). */

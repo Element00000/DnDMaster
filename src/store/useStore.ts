@@ -21,7 +21,7 @@ import type {
 } from '../types'
 import { emptyDecision, emptyEvent } from '../types'
 import { uid } from '../utils/id'
-import { MINUTES_PER_DAY, activeTimestone } from '../utils/time'
+import { MINUTES_PER_DAY, activeTimestone, placementAt } from '../utils/time'
 
 function makeLayer(name = 'Weltkarte'): MapLayer {
   return {
@@ -81,12 +81,21 @@ function rescaleLayerContent(c: Campaign, layerId: string, sx: number, sy: numbe
       }
       return l
     }),
+    // Platzierung und Timestones werden einzeln geprueft: Beide koennen inzwischen auf
+    // verschiedenen Karten liegen, und mitskaliert werden darf nur, was auf der
+    // veraenderten liegt.
     entities: c.entities.map((e) => {
-      if (!e.placement || e.placement.layerId !== layerId) return e
+      if (!e.placement) return e
+      const onLayer = (id: string | undefined) => (id ?? e.placement!.layerId) === layerId
       return {
         ...e,
-        placement: { ...e.placement, x: e.placement.x * sx, y: e.placement.y * sy },
-        schedule: e.schedule.map((s) => ({ ...s, x: s.x * sx, y: s.y * sy })),
+        placement:
+          e.placement.layerId === layerId
+            ? { ...e.placement, x: e.placement.x * sx, y: e.placement.y * sy }
+            : e.placement,
+        schedule: e.schedule.map((s) =>
+          onLayer(s.layerId) ? { ...s, x: s.x * sx, y: s.y * sy } : s,
+        ),
       }
     }),
   }
@@ -154,6 +163,12 @@ interface StoreState extends AppData {
    * eine Karte isoliert zu sehen, statt wieder die gesamte Hierarchie.
    */
   goToLayer: (layerId: string) => void
+  /**
+   * Zu der Karte springen, auf der ein Objekt gerade steht. Das muss nicht die Karte seiner
+   * Basis-Platzierung sein: Ein Timestone kann es zur eingestellten Uhrzeit auf eine andere
+   * geschickt haben.
+   */
+  goToEntity: (entityId: string) => void
   /**
    * Zaehler als einmaliger Befehl an MapCanvas, die aktive Karte komplett einzupassen
    * (herauszuzoomen, bis sie vollstaendig sichtbar ist). Wird bei jedem Aufruf erhoeht,
@@ -285,7 +300,7 @@ interface StoreState extends AppData {
    */
   addTimestone: (
     entityId: string,
-    init?: { time?: number; day?: number | null; label?: string; x?: number; y?: number },
+    init?: { time?: number; day?: number | null; label?: string; x?: number; y?: number; layerId?: string },
   ) => string | null
   updateTimestone: (entityId: string, keyId: string, patch: Partial<Omit<Timestone, 'id'>>) => void
   removeTimestone: (entityId: string, keyId: string) => void
@@ -298,7 +313,7 @@ interface StoreState extends AppData {
    * vorzubereiten. Fluechtig; wird bei Zeit- oder Tagwechsel verworfen.
    */
   draftPos: Record<string, DraftPos>
-  setDraftPos: (entityId: string, x: number, y: number) => void
+  setDraftPos: (entityId: string, x: number, y: number, layerId: string) => void
   /** Ohne Id alle Vormerkungen verwerfen, mit Id nur die des Objekts. */
   clearDraftPos: (entityId?: string) => void
 
@@ -359,6 +374,8 @@ function deselectPatch(s: StoreState, stillSelected: boolean): Pick<StoreState, 
 export interface DraftPos {
   x: number
   y: number
+  /** Karte, auf der die vorgemerkte Stelle liegt - x und y gelten in deren Koordinaten. */
+  layerId: string
   keyId: string | null
 }
 
@@ -610,6 +627,14 @@ export const useStore = create<StoreState>()(
           set((s) => ({ viewLayerId: layerId === root ? null : layerId, viewLayerNonce: s.viewLayerNonce + 1 }))
         },
 
+        goToEntity: (entityId) => {
+          const s = get()
+          const entity = s.activeCampaign().entities.find((e) => e.id === entityId)
+          if (!entity) return
+          const at = placementAt(entity, s.timeOfDay, s.currentDay)
+          if (at) s.goToLayer(at.layerId)
+        },
+
         /**
          * Kartenbild (aus)tauschen. Hat das neue Bild andere Abmessungen als das alte, werden
          * Nebel, Objekte darauf und darin eingebettete Karten proportional mitskaliert, damit
@@ -676,11 +701,14 @@ export const useStore = create<StoreState>()(
               // Eingebettete Karten, deren Eltern-Ebene geloescht wird, werden zu eigenstaendigen Ebenen.
               .map((l) => (l.embed?.parentLayerId === id ? { ...l, embed: null } : l))
             const activeLayerId = c.activeLayerId === id ? layers[0].id : c.activeLayerId
-            // Platzierungen und Unterkarten-Verweise auf die geloeschte Ebene bereinigen.
+            // Platzierungen und Unterkarten-Verweise auf die geloeschte Ebene bereinigen -
+            // auch Timestones, die auf diese Karte zeigten. Sie blieben sonst als Punkte
+            // ohne Ort im Tagesablauf stehen.
             const entities = c.entities.map((e) => ({
               ...e,
               placement: e.placement?.layerId === id ? null : e.placement,
               subMapId: e.subMapId === id ? null : e.subMapId,
+              schedule: e.schedule.filter((s) => (s.layerId ?? e.placement?.layerId) !== id),
             }))
             return { ...c, layers, activeLayerId, entities }
           }),
@@ -872,11 +900,21 @@ export const useStore = create<StoreState>()(
           // Position, wenn man es eben verschoben hat, sonst die zu dieser Zeit geltende.
           const draft = s.draftPos[entityId]
           const current = activeTimestone(entity.schedule, time, s.currentDay)
+          // Karte und Koordinaten stammen immer aus derselben Quelle - sonst laege der Punkt
+          // bei den Koordinaten der einen auf der anderen Karte.
+          const from =
+            init?.x != null && init?.y != null
+              ? { layerId: init.layerId ?? entity.placement.layerId, x: init.x, y: init.y }
+              : (draft ??
+                (current
+                  ? { layerId: current.layerId ?? entity.placement.layerId, x: current.x, y: current.y }
+                  : entity.placement))
           const key: Timestone = {
             id: existing?.id ?? uid('key-'),
             time,
-            x: init?.x ?? draft?.x ?? current?.x ?? entity.placement.x,
-            y: init?.y ?? draft?.y ?? current?.y ?? entity.placement.y,
+            layerId: from.layerId,
+            x: from.x,
+            y: from.y,
             label: init?.label ?? existing?.label ?? '',
             day,
           }
@@ -903,13 +941,13 @@ export const useStore = create<StoreState>()(
         },
 
         draftPos: {},
-        setDraftPos: (entityId, x, y) =>
+        setDraftPos: (entityId, x, y, layerId) =>
           set((s) => {
             const entity = s.activeCampaign().entities.find((e) => e.id === entityId)
             const keyId = entity
               ? activeTimestone(entity.schedule, s.timeOfDay, s.currentDay)?.id ?? null
               : null
-            return { draftPos: { ...s.draftPos, [entityId]: { x, y, keyId } } }
+            return { draftPos: { ...s.draftPos, [entityId]: { x, y, layerId, keyId } } }
           }),
         clearDraftPos: (entityId) =>
           set((s) => {
@@ -1276,6 +1314,9 @@ function normalizeTimestone(s: Partial<Timestone> & { timeStart?: number }): Tim
   return {
     id: s.id ?? uid('key-'),
     time: s.time ?? s.timeStart ?? 0,
+    // Aeltere Punkte lagen immer auf der Karte der Basis-Platzierung und haben darum keine
+    // eigene Angabe; sie bleibt offen und wird bei der Anzeige von dort ergaenzt.
+    layerId: s.layerId,
     x: s.x ?? 0,
     y: s.y ?? 0,
     // "Start" wurde eine Zeit lang mitgespeichert und blieb dadurch auch stehen, wenn der

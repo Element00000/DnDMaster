@@ -143,7 +143,7 @@ function CampaignDays() {
   const currentDay = useStore((s) => s.currentDay)
   const selectEntity = useStore((s) => s.selectEntity)
   const setCurrentDay = useStore((s) => s.setCurrentDay)
-  const goToLayer = useStore((s) => s.goToLayer)
+  const goToEntity = useStore((s) => s.goToEntity)
   const [filterId, setFilterId] = useState('')
 
   const all = campaign.entities
@@ -172,7 +172,7 @@ function CampaignDays() {
   }
 
   function openEntity(e: Entity) {
-    if (e.placement) goToLayer(e.placement.layerId)
+    goToEntity(e.id)
     selectEntity(e.id)
   }
 

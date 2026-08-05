@@ -3,7 +3,7 @@ import { useStore } from '../store/useStore'
 import type { DraftPos } from '../store/useStore'
 import { entityDisplayMeta } from '../types'
 import type { Entity, MapLayer } from '../types'
-import { activeTimestone, dayNightOverlay, formatTime, scheduleForDay } from '../utils/time'
+import { activeTimestone, dayNightOverlay, formatTime, placementAt, scheduleForDay } from '../utils/time'
 import { useAsset } from '../useAsset'
 import { useBottomPanelOffset } from '../useBottomPanelOffset'
 import { PlaceholderMap } from './PlaceholderMap'
@@ -64,6 +64,7 @@ export function MapCanvas() {
   const setPlacingEntity = useStore((s) => s.setPlacingEntity)
   const moveEntity = useStore((s) => s.moveEntity)
   const moveTimestone = useStore((s) => s.moveTimestone)
+  const updateTimestone = useStore((s) => s.updateTimestone)
   const selectEntity = useStore((s) => s.selectEntity)
   const selectedIds = useStore((s) => s.selectedIds)
   const setSelectedIds = useStore((s) => s.setSelectedIds)
@@ -120,23 +121,25 @@ export function MapCanvas() {
   // Auf der aktiven Ebene platzierte Objekte (im Spieltischmodus nur entdeckte).
   // Objekte sind immer sichtbar; bei aktivem Tageszeit-Filter kann sich ihre
   // Position aber gemaess eines passenden Zeitplan-Eintrags verschieben.
+  // Nach der Karte, auf der das Objekt gerade steht - nicht nach der, auf der sein Tag
+  // beginnt. Schickt ein Timestone es auf eine andere Karte, zeichnet ab dann diese es.
   const pins = entities.filter(
-    (e) => e.placement && e.placement.layerId === layer.id && (!tableMode || e.visibility === 'spieler'),
+    (e) =>
+      placementAt(e, timeOfDay, currentDay)?.layerId === layer.id &&
+      (!tableMode || e.visibility === 'spieler'),
   )
 
   /**
-   * Wo ein Objekt gerade zu sehen ist: die eben vorgemerkte Position, sonst der zur
-   * Uhrzeit geltende Timestone, sonst die Basis-Platzierung.
+   * Wo ein Objekt gerade zu sehen ist: der zur Uhrzeit geltende Timestone, sonst die
+   * Basis-Platzierung. Die Koordinaten gelten auf der Karte, die placementAt nennt - beides
+   * gehoert zusammen und darf nicht getrennt werden.
    */
   // Eine vorgemerkte Position bewegt den Pin bewusst NICHT: Sie erscheint als eigenes
   // Doppel daneben (siehe DraftOverlay), damit man sieht, dass noch nichts gespeichert ist.
   const effectivePos = useCallback(
     (e: Entity): { x: number; y: number } => {
-      if (e.schedule.length > 0) {
-        const active = activeTimestone(e.schedule, timeOfDay, currentDay)
-        if (active) return { x: active.x, y: active.y }
-      }
-      return { x: e.placement!.x, y: e.placement!.y }
+      const p = placementAt(e, timeOfDay, currentDay)
+      return p ? { x: p.x, y: p.y } : { x: e.placement!.x, y: e.placement!.y }
     },
     [timeOfDay, currentDay],
   )
@@ -160,13 +163,38 @@ export function MapCanvas() {
       }
       const planning = bottomPanel === 'zeitleiste' && selectedIds.includes(e.id) && timeOfDay > 0
       if (planning) {
-        const from = draftPos[e.id] ?? { x: active?.x ?? e.placement!.x, y: active?.y ?? e.placement!.y }
-        setDraftPos(e.id, from.x + dxWorld, from.y + dyWorld)
+        // Waehrend des Ziehens bleibt die Karte dieselbe; auf eine andere umgesetzt wird die
+        // Vormerkung erst beim Loslassen (siehe onReparentEntity), wo die Bildschirmstelle
+        // bekannt ist.
+        const here = placementAt(e, timeOfDay, currentDay)!
+        const from = draftPos[e.id] ?? here
+        // Gezogen wird die Nadel auf der Karte, auf der das Objekt gerade steht - die
+        // Vormerkung kann laengst auf einer anderen liegen. Deren Massstab ist ein anderer,
+        // und dieselbe Handbewegung bedeutet dort eine andere Strecke.
+        let factor = 1
+        if (from.layerId !== here.layerId) {
+          const a = layerScreenView(campaign.layers, layer.id, here.layerId, view)
+          const b = layerScreenView(campaign.layers, layer.id, from.layerId, view)
+          if (a && b && b.scale !== 0) factor = a.scale / b.scale
+        }
+        setDraftPos(e.id, from.x + dxWorld * factor, from.y + dyWorld * factor, from.layerId)
         return
       }
       moveEntity(e.id, dxWorld, dyWorld)
     },
-    [timeOfDay, currentDay, moveTimestone, moveEntity, bottomPanel, selectedIds, draftPos, setDraftPos],
+    [
+      timeOfDay,
+      currentDay,
+      moveTimestone,
+      moveEntity,
+      bottomPanel,
+      selectedIds,
+      draftPos,
+      setDraftPos,
+      campaign.layers,
+      layer.id,
+      view,
+    ],
   )
 
   /**
@@ -448,27 +476,54 @@ export function MapCanvas() {
     [campaign.layers, layer.id, embedLayer],
   )
 
-  // Objekt-Pinnadel per Ziehen auf eine andere Karte fallen lassen: das Objekt gehoert dann
-  // zu dieser Karte, statt weiterhin unsichtbar an die alte Karte gebunden zu bleiben (nur
-  // sichtbar, wenn diese wieder nah genug aufgedeckt ist). Zeitplan-Positionen (kein eigenes
-  // layerId) werden dabei nicht umgehaengt.
+  /**
+   * Loslassen nach dem Ziehen einer Pinnadel. Erst hier ist bekannt, ueber welcher Karte der
+   * Zeiger steht - waehrend des Ziehens bewegt sich alles noch in den Koordinaten der
+   * bisherigen Karte. Landet die Nadel auf einer anderen, wird genau das umgehaengt, was
+   * gerade gezogen wurde: der bearbeitete Timestone, die Vormerkung oder die
+   * Basis-Platzierung. Sonst behielte ein Punkt auf einer anderen Karte die Koordinaten der
+   * alten - er laege dann rechnerisch ausserhalb und verschwaende, sobald sie einklappt.
+   */
   const onReparentEntity = useCallback(
     (entityId: string, clientX: number, clientY: number) => {
       const el = containerRef.current
       if (!el) return
       const ent = entities.find((x) => x.id === entityId)
       if (!ent?.placement) return
-      const active = activeTimestone(ent.schedule, timeOfDay, currentDay)
-      if (active) return
       const rect = el.getBoundingClientRect()
       const v = viewRef.current
       const wx = (clientX - rect.left - v.tx) / v.scale
       const wy = (clientY - rect.top - v.ty) / v.scale
       const result = resolveDeepTarget(campaign.layers, layer.id, wx, wy, v.scale)
+
+      const draft = draftPos[entityId]
+      if (draft) {
+        if (result.layerId === draft.layerId) return
+        setDraftPos(entityId, result.x, result.y, result.layerId)
+        return
+      }
+      const active = activeTimestone(ent.schedule, timeOfDay, currentDay)
+      if (active) {
+        // Nur der Punkt, der gerade genau gilt, wurde auch gezogen (siehe moveEntityTimed).
+        if (active.time !== timeOfDay) return
+        if (result.layerId === (active.layerId ?? ent.placement.layerId)) return
+        updateTimestone(entityId, active.id, { layerId: result.layerId, x: result.x, y: result.y })
+        return
+      }
       if (result.layerId === ent.placement.layerId) return
       setPlacement(entityId, { layerId: result.layerId, x: result.x, y: result.y })
     },
-    [entities, campaign.layers, layer.id, setPlacement, timeOfDay, currentDay],
+    [
+      entities,
+      campaign.layers,
+      layer.id,
+      setPlacement,
+      timeOfDay,
+      currentDay,
+      draftPos,
+      setDraftPos,
+      updateTimestone,
+    ],
   )
 
   const onPointerDown = useCallback(
@@ -754,18 +809,24 @@ export function MapCanvas() {
       const e = entities.find((x) => x.id === entityId)
       const draft = draftPos[entityId]
       if (!e?.placement || !draft) return
-      const lv = layerScreenView(campaign.layers, layer.id, e.placement.layerId, view)
+      const lv = layerScreenView(campaign.layers, layer.id, draft.layerId, view)
       if (!lv) return
+      // Nur an Stellen auf derselben Karte einrasten - Koordinaten anderer Karten haben
+      // hier keine Bedeutung und laegen sonst zufaellig in Reichweite.
       const targets = [
-        { x: e.placement.x, y: e.placement.y },
-        ...scheduleForDay(e.schedule, currentDay),
-      ]
+        { layerId: e.placement.layerId, x: e.placement.x, y: e.placement.y },
+        ...scheduleForDay(e.schedule, currentDay).map((s) => ({
+          layerId: s.layerId ?? e.placement!.layerId,
+          x: s.x,
+          y: s.y,
+        })),
+      ].filter((t) => t.layerId === draft.layerId)
       for (const t of targets) {
         const dx = t.x - draft.x
         const dy = t.y - draft.y
         if (dx === 0 && dy === 0) return
         if (Math.hypot(dx * lv.scale, dy * lv.scale) <= STOP_SNAP_PX) {
-          setDraftPos(entityId, t.x, t.y)
+          setDraftPos(entityId, t.x, t.y, draft.layerId)
           return
         }
       }
@@ -792,13 +853,21 @@ export function MapCanvas() {
   const keepOpenLayers = useMemo(() => {
     const ids = new Set<string>()
     if (bottomPanel !== 'zeitleiste') return ids
-    for (const id of selectedIds) {
-      let layerId = entities.find((e) => e.id === id)?.placement?.layerId
+    const add = (start: string | undefined) => {
+      let layerId = start
       // Eine innere Karte hilft nichts, wenn die Karte darueber eingeklappt ist.
       while (layerId && !ids.has(layerId)) {
         ids.add(layerId)
         layerId = campaign.layers.find((l) => l.id === layerId)?.embed?.parentLayerId
       }
+    }
+    for (const id of selectedIds) {
+      const e = entities.find((x) => x.id === id)
+      if (!e?.placement) continue
+      // Alle Karten des Tagesablaufs, nicht nur die Startkarte: Fuehrt der Weg auf eine
+      // andere Karte, muss auch die offen bleiben, sonst plant man auf einer Pinnadel.
+      add(e.placement.layerId)
+      for (const stone of e.schedule) add(stone.layerId ?? e.placement.layerId)
     }
     return ids
   }, [bottomPanel, selectedIds, entities, campaign.layers])
@@ -972,7 +1041,7 @@ export function MapCanvas() {
         rootLayerId={layer.id}
         view={view}
         timeOfDay={timeOfDay}
-        effectivePos={effectivePos}
+        placementOf={(e) => placementAt(e, timeOfDay, currentDay)}
         onCancel={clearDraftPos}
       />
 
@@ -1121,7 +1190,7 @@ function DraftOverlay({
   rootLayerId,
   view,
   timeOfDay,
-  effectivePos,
+  placementOf,
   onCancel,
 }: {
   entities: Entity[]
@@ -1130,7 +1199,7 @@ function DraftOverlay({
   rootLayerId: string
   view: View
   timeOfDay: number
-  effectivePos: (e: Entity) => { x: number; y: number }
+  placementOf: (e: Entity) => { layerId: string; x: number; y: number } | null
   /** Vormerkung dieses Objekts verwerfen. */
   onCancel: (entityId: string) => void
 }) {
@@ -1140,13 +1209,17 @@ function DraftOverlay({
   return (
     <div className="draft-overlay">
       {items.map((e) => {
-        const lv = layerScreenView(layers, rootLayerId, e.placement!.layerId, view)
-        if (!lv) return null
         const meta = entityDisplayMeta(e)
-        const origin = effectivePos(e)
+        const origin = placementOf(e)
         const draft = drafts[e.id]
-        const from = { x: origin.x * lv.scale + lv.tx, y: origin.y * lv.scale + lv.ty }
-        const to = { x: draft.x * lv.scale + lv.tx, y: draft.y * lv.scale + lv.ty }
+        if (!origin) return null
+        // Beide Enden der Linie koennen auf verschiedenen Karten liegen - merkt man eine
+        // Stelle auf einer anderen Karte vor, hat jedes Ende seine eigene Umrechnung.
+        const ov = layerScreenView(layers, rootLayerId, origin.layerId, view)
+        const dv = layerScreenView(layers, rootLayerId, draft.layerId, view)
+        if (!ov || !dv) return null
+        const from = { x: origin.x * ov.scale + ov.tx, y: origin.y * ov.scale + ov.ty }
+        const to = { x: draft.x * dv.scale + dv.tx, y: draft.y * dv.scale + dv.ty }
         return (
           <div key={e.id} style={{ ['--chip-color' as string]: meta.color }}>
             <svg className="draft-overlay__link">
@@ -1279,8 +1352,6 @@ function ScheduleOverlay({
   }, [])
 
   if (!entity.placement) return null
-  const lv = layerScreenView(layers, rootLayerId, entity.placement.layerId, view)
-  if (!lv) return null
 
   // Nur was heute wirklich gilt: Standardplan plus die Ausnahmen des aktuellen Tages.
   const keys = scheduleForDay(entity.schedule, currentDay)
@@ -1288,29 +1359,55 @@ function ScheduleOverlay({
 
   // Der Tag beginnt an der Basis-Platzierung - sie ist Station 1, auch wenn sie nicht in
   // den Daten steht. Nur wenn dort schon ein echter Punkt liegt, gilt dieser als erster.
-  const base = { id: '__base__', time: 0, x: entity.placement.x, y: entity.placement.y, label: '', day: null }
-  const stops = keys.some((k) => k.time === 0) ? keys : [base, ...keys]
+  const base = {
+    id: '__base__',
+    time: 0,
+    layerId: entity.placement.layerId,
+    x: entity.placement.x,
+    y: entity.placement.y,
+    label: '',
+    day: null,
+  }
+  // Jede Station kennt ihre eigene Karte: Ein Weg darf ueber mehrere Karten fuehren, und
+  // die Koordinaten einer Station gelten nur auf ihrer.
+  const stops = (keys.some((k) => k.time === 0) ? keys : [base, ...keys]).map((s) => ({
+    ...s,
+    layerId: s.layerId ?? entity.placement!.layerId,
+  }))
 
   const meta = entityDisplayMeta(entity)
   const active = activeTimestone(entity.schedule, timeOfDay, currentDay)
-  const points = stops.map((s) => ({ x: s.x * lv.scale + lv.tx, y: s.y * lv.scale + lv.ty }))
+
+  // Jede Station mit der Umrechnung ihrer eigenen Karte auf den Bildschirm. Die Nummer
+  // stammt aus der vollen Reihenfolge, damit sie stimmt, auch wenn eine Karte gerade nicht
+  // gezeichnet wird und ihre Station wegfaellt.
+  const placed = stops
+    .map((s, i) => {
+      const sv = layerScreenView(layers, rootLayerId, s.layerId, view)
+      return sv
+        ? { stop: s, no: i + 1, x: s.x * sv.scale + sv.tx, y: s.y * sv.scale + sv.ty, scale: sv.scale }
+        : null
+    })
+    .filter((p): p is NonNullable<typeof p> => p !== null)
 
   // Mehrere Stationen koennen auf derselben Stelle liegen - etwa jedes Mal, wenn die Figur
   // zur Startposition zurueckkehrt. Sie werden zu einer Marke zusammengefasst: Nummern
   // nebeneinander in ihrer Reihenfolge, die Uhrzeiten gesammelt darunter. Einzeln
-  // gezeichnet laegen sie exakt uebereinander.
-  const marks = new Map<string, { left: number; top: number; items: { stop: (typeof stops)[number]; no: number }[] }>()
-  stops.forEach((s, i) => {
-    const key = `${Math.round(s.x)}:${Math.round(s.y)}`
-    const mark = marks.get(key) ?? { left: points[i].x, top: points[i].y, items: [] }
-    mark.items.push({ stop: s, no: i + 1 })
+  // gezeichnet laegen sie exakt uebereinander. Dieselbe Stelle auf verschiedenen Karten
+  // gehoert dabei nicht zusammen, daher steht die Karte mit im Schluessel.
+  const marks = new Map<
+    string,
+    { left: number; top: number; items: { stop: (typeof stops)[number]; no: number; scale: number }[] }
+  >()
+  for (const p of placed) {
+    const key = `${p.stop.layerId}:${Math.round(p.stop.x)}:${Math.round(p.stop.y)}`
+    const mark = marks.get(key) ?? { left: p.x, top: p.y, items: [] }
+    mark.items.push({ stop: p.stop, no: p.no, scale: p.scale })
     marks.set(key, mark)
-  })
-
-  const scale = lv.scale
+  }
 
   /** Ziehen an Nummer oder Uhrzeit verschiebt den Timestone; ein Klick stellt die Zeit. */
-  function onStopDown(e: React.PointerEvent, stopId: string, time: number) {
+  function onStopDown(e: React.PointerEvent, stopId: string, time: number, scale: number) {
     if (e.button !== 0) return
     // Sonst zieht der Kartenhintergrund darunter eine Rechteck-Markierung auf.
     e.stopPropagation()
@@ -1323,19 +1420,23 @@ function ScheduleOverlay({
    * Position exakt, sodass beide zu einer Marke zusammenfallen - Nummern nebeneinander,
    * Uhrzeiten untereinander. Von Hand liesse sich die Stelle sonst nie genau genug
    * treffen, und schon ein Pixel Abstand ergaebe zwei ueberlappende Marken.
+   *
+   * Nur Stationen auf derselben Karte kommen infrage: Ein Versatz zwischen zwei Karten
+   * waere keine Verschiebung, sondern ein Kartenwechsel - der laeuft ueber das Ziehen der
+   * Pinnadel selbst.
    */
   snapRef.current = (stopId: string, apply = false) => {
-    const dragged = stops.find((s) => s.id === stopId)
+    const dragged = placed.find((p) => p.stop.id === stopId)
     if (!dragged) return null
-    for (const s of stops) {
-      if (s.id === stopId) continue
-      const dx = s.x - dragged.x
-      const dy = s.y - dragged.y
+    for (const p of placed) {
+      if (p.stop.id === stopId || p.stop.layerId !== dragged.stop.layerId) continue
+      const dx = p.stop.x - dragged.stop.x
+      const dy = p.stop.y - dragged.stop.y
       // Bereits deckungsgleich? Dann gehoeren sie schon zusammen, nichts zu melden.
       if (dx === 0 && dy === 0) continue
-      if (Math.hypot(dx * scale, dy * scale) <= STOP_SNAP_PX) {
+      if (Math.hypot(dx * dragged.scale, dy * dragged.scale) <= STOP_SNAP_PX) {
         if (apply) onMoveStop(stopId, dx, dy)
-        return s.id
+        return p.stop.id
       }
     }
     return null
@@ -1343,15 +1444,15 @@ function ScheduleOverlay({
 
   return (
     <div className="schedule-overlay" style={{ ['--chip-color' as string]: meta.color }}>
-      {points.length > 1 && (
+      {placed.length > 1 && (
         <svg className="schedule-overlay__lines">
-          <polyline points={points.map((p) => `${p.x},${p.y}`).join(' ')} />
+          <polyline points={placed.map((p) => `${p.x},${p.y}`).join(' ')} />
         </svg>
       )}
       {[...marks.entries()].map(([key, mark]) => (
         <div key={key} className="schedule-stop" style={{ left: mark.left, top: mark.top }}>
           <div className="schedule-stop__dots">
-            {mark.items.map(({ stop: s, no }) => (
+            {mark.items.map(({ stop: s, no, scale }) => (
               <button
                 key={s.id}
                 className={`schedule-stop__dot${
@@ -1362,7 +1463,7 @@ function ScheduleOverlay({
                   s.id === '__base__' ? ' is-base' : ''
                 }`}
                 title={`Ziehen verschiebt · Klick stellt die Zeitleiste auf ${formatTime(s.time)}`}
-                onPointerDown={(e) => onStopDown(e, s.id, s.time)}
+                onPointerDown={(e) => onStopDown(e, s.id, s.time, scale)}
               >
                 {no}
               </button>
@@ -1372,7 +1473,7 @@ function ScheduleOverlay({
           {/* Je Station eine eigene Zeile: So laesst sich auch die Uhrzeit anfassen, und
               bei mehreren Stationen an einer Stelle bleiben sie auseinanderzuhalten. */}
           <div className="schedule-stop__labels">
-            {mark.items.map(({ stop: s }) => {
+            {mark.items.map(({ stop: s, scale }) => {
               // "Start" steht nur an Station 1, der eigentlichen Startposition. Spaetere
               // Timestones, die dorthin zurueckfuehren, zeigen ihre Uhrzeit - dass sie
               // wieder am Start stehen, sagt schon ihre Lage auf derselben Marke.
@@ -1382,7 +1483,7 @@ function ScheduleOverlay({
                   key={s.id}
                   className="schedule-stop__label"
                   title={`Ziehen verschiebt · Klick stellt die Zeitleiste auf ${formatTime(s.time)}`}
-                  onPointerDown={(e) => onStopDown(e, s.id, s.time)}
+                  onPointerDown={(e) => onStopDown(e, s.id, s.time, scale)}
                 >
                   {s.id === '__base__' ? 'Start' : formatTime(s.time)}
                   {caption ? ` · ${caption}` : ''}
@@ -1746,19 +1847,19 @@ function EmbeddedMap({
   // der Wurzelebene - rekursiv, beliebig tief, ohne die aktive Ebene zu wechseln.
   const childView: View = { scale: w / embLayer.width, tx: x, ty: y }
 
+  // Wie auf der Wurzelebene: Es zaehlt die Karte, auf der das Objekt gerade steht.
   const embPins = entities.filter(
-    (e) => e.placement && e.placement.layerId === embLayer.id && (!tableMode || e.visibility === 'spieler'),
+    (e) =>
+      placementAt(e, timeOfDay, currentDay)?.layerId === embLayer.id &&
+      (!tableMode || e.visibility === 'spieler'),
   )
   const nestedEmbeds = layers.filter(
     (l) => l.embed && l.embed.parentLayerId === embLayer.id && !visited.includes(l.id),
   )
 
   function embEffectivePos(e: Entity): { x: number; y: number } {
-    if (e.schedule.length > 0) {
-      const active = activeTimestone(e.schedule, timeOfDay, currentDay)
-      if (active) return { x: active.x, y: active.y }
-    }
-    return { x: e.placement!.x, y: e.placement!.y }
+    const p = placementAt(e, timeOfDay, currentDay)
+    return p ? { x: p.x, y: p.y } : { x: e.placement!.x, y: e.placement!.y }
   }
 
   return (

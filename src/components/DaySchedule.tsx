@@ -128,7 +128,15 @@ export function DaySchedule({ entities }: { entities: Entity[] }) {
       if (!e.placement) continue
       // Ohne Beschriftung: Dass es die Startposition ist, ergibt sich aus der Position
       // selbst (isAtBase). Ein gespeichertes "Start" wuerde beim Verschieben luegen.
-      const id = addTimestone(e.id, { time: timeOfDay, day, x: e.placement.x, y: e.placement.y })
+      // Karte der Startposition mitgeben: Sie muss nicht die sein, auf der die Figur
+      // gerade steht - der Weg kann laengst auf einer anderen Karte weitergegangen sein.
+      const id = addTimestone(e.id, {
+        time: timeOfDay,
+        day,
+        layerId: e.placement.layerId,
+        x: e.placement.x,
+        y: e.placement.y,
+      })
       if (id && !firstId) firstId = id
     }
     if (firstId) setSelectedId(firstId)

@@ -20,7 +20,7 @@ export function SearchBar() {
   const campaign = useStore((s) => s.campaigns.find((c) => c.id === s.activeCampaignId) ?? s.campaigns[0])
   const tableMode = useStore((s) => s.tableMode)
   const selectEntity = useStore((s) => s.selectEntity)
-  const goToLayer = useStore((s) => s.goToLayer)
+  const goToEntity = useStore((s) => s.goToEntity)
   const setToolsOpen = useStore((s) => s.setToolsOpen)
   const setToolsTab = useStore((s) => s.setToolsTab)
 
@@ -61,7 +61,7 @@ export function SearchBar() {
 
   function choose(hit: Hit) {
     if (hit.kind === 'entity') {
-      if (hit.layerId) goToLayer(hit.layerId)
+      goToEntity(hit.id)
       selectEntity(hit.id)
     } else {
       setToolsTab('notizen')

@@ -16,7 +16,7 @@ export function EntityRelations({ entity }: { entity: Entity }) {
   const addLink = useStore((s) => s.addLink)
   const removeLink = useStore((s) => s.removeLink)
   const selectEntity = useStore((s) => s.selectEntity)
-  const goToLayer = useStore((s) => s.goToLayer)
+  const goToEntity = useStore((s) => s.goToEntity)
 
   const readOnly = tableMode
   const meta = entityDisplayMeta(entity)
@@ -28,8 +28,7 @@ export function EntityRelations({ entity }: { entity: Entity }) {
 
   /** Zu einem verknuepften Objekt springen: Karte nachziehen und es auswaehlen. */
   function navigate(id: string) {
-    const target = campaign.entities.find((e) => e.id === id)
-    if (target?.placement) goToLayer(target.placement.layerId)
+    goToEntity(id)
     selectEntity(id)
   }
 

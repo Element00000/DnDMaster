@@ -23,7 +23,7 @@ export function RelationGraph() {
   const campaign = useStore((s) => s.campaigns.find((c) => c.id === s.activeCampaignId) ?? s.campaigns[0])
   const tableMode = useStore((s) => s.tableMode)
   const selectEntity = useStore((s) => s.selectEntity)
-  const goToLayer = useStore((s) => s.goToLayer)
+  const goToEntity = useStore((s) => s.goToEntity)
   const [onlyChars, setOnlyChars] = useState(false)
 
   const containerRef = useRef<HTMLDivElement>(null)
@@ -147,8 +147,7 @@ export function RelationGraph() {
   }
 
   function openEntity(id: string) {
-    const e = campaign.entities.find((x) => x.id === id)
-    if (e?.placement) goToLayer(e.placement.layerId)
+    goToEntity(id)
     selectEntity(id)
   }
 
