@@ -810,7 +810,9 @@ button {
   /* "bottom" setzt ZoomControls inline: faehrt mit der unteren Leiste hoch (useBottomPanelOffset). */
   display: flex;
   flex-direction: column;
-  align-items: stretch;
+  /* Mittig statt gestreckt: Bei dreistelligen Prozentwerten wird die Box breiter, die
+     Knoepfe haben aber eine feste Breite und rutschten sonst an den linken Rand. */
+  align-items: center;
   gap: 2px;
   background: rgba(20, 24, 33, 0.82);
   border: 1px solid var(--border);
@@ -844,10 +846,13 @@ button {
 }
 
 .zoom-level {
+  /* Volle Breite, damit die Zahl in der Box zentriert bleibt statt sie zu verschieben. */
+  width: 100%;
   text-align: center;
   font-size: 11px;
   color: var(--ink-dim);
   padding: 2px 0;
+  font-variant-numeric: tabular-nums;
 }
 
 /* ---------- Detailpanel ---------- */
@@ -1630,42 +1635,17 @@ button {
 }
 
 /* ---------- Uhrzeit-Regler ---------- */
+/* Sitzt in der oberen Leiste. Absolut zentriert statt im Fluss, damit er wirklich mittig
+   steht und nicht von der Breite seiner Nachbarn abhaengt. */
 .time-slider {
   position: absolute;
-  top: 12px;
   left: 50%;
-  transform: translateX(-50%);
-  z-index: 15;
+  top: 50%;
+  transform: translate(-50%, -50%);
   display: flex;
   align-items: center;
   gap: 14px;
-  background: rgba(20, 24, 33, 0.9);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 8px 14px;
-  backdrop-filter: blur(4px);
-  box-shadow: var(--shadow);
   max-width: calc(100% - 24px);
-}
-
-.time-slider.is-enabled {
-  border-color: color-mix(in srgb, var(--gold) 45%, var(--border));
-}
-
-.time-slider__toggle,
-.time-slider__daynight {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--ink-dim);
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.time-slider__toggle input,
-.time-slider__daynight input {
-  accent-color: var(--gold);
 }
 
 .time-slider__body {
@@ -1723,13 +1703,9 @@ button {
 }
 
 .time-slider__range {
-  width: 260px;
-  max-width: 40vw;
+  width: 220px;
+  max-width: 26vw;
   accent-color: var(--gold);
-}
-
-.time-slider__range:disabled {
-  opacity: 0.4;
 }
 
 .time-slider__clock {
@@ -3581,20 +3557,11 @@ button {
 }
 
 /* ---------- Kartenebenen-Leiste + Nebel ---------- */
+/* Sitzt in der oberen Leiste, nicht mehr schwebend ueber der Karte. */
 .layerbar {
-  position: absolute;
-  top: 12px;
-  left: 12px;
-  z-index: 16;
   display: flex;
-  flex-direction: column;
-  gap: 6px;
-  background: rgba(20, 24, 33, 0.9);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  padding: 7px 9px;
-  backdrop-filter: blur(6px);
-  box-shadow: var(--shadow-sm);
+  align-items: center;
+  flex: none;
 }
 
 .layerbar__row,
@@ -3602,11 +3569,6 @@ button {
   display: flex;
   align-items: center;
   gap: 6px;
-}
-
-.layerbar__fog {
-  border-top: 1px solid var(--border);
-  padding-top: 6px;
 }
 
 .layerbar__icon {
@@ -3666,9 +3628,23 @@ button {
   accent-color: var(--accent);
 }
 
+.layerbar__brushfield {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .layerbar__brush {
   width: 90px;
   accent-color: var(--accent);
+}
+
+.layerbar__brushsize {
+  min-width: 24px;
+  font-size: 11px;
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
 }
 
 .map-fog {

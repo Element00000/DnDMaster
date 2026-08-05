@@ -1,6 +1,8 @@
 import { useRef, useState } from 'react'
 import { useStore } from '../store/useStore'
 import { SearchBar } from './SearchBar'
+import { TimeSlider } from './TimeSlider'
+import { LayerBar } from './LayerBar'
 import { downloadJson, readJsonFile, slugify, todayStamp } from '../utils/backup'
 import { backupHint, markBackup } from '../utils/backupReminder'
 import { inlineAsset, internAsset, mapCampaignAssets } from '../utils/assets'
@@ -122,6 +124,8 @@ export function TopBar() {
             <img className="topbar__logo" src={logo} alt="DnD Master" />
           </button>
         </div>
+        {/* Tageszeit bleibt auch am Spieltisch sichtbar und steuerbar. */}
+        <TimeSlider />
         <button className="btn btn--primary" onClick={() => setTableMode(false)}>
           Spieltisch verlassen
         </button>
@@ -191,7 +195,13 @@ export function TopBar() {
 
       <SearchBar />
 
+      {/* Absolut zentriert statt im Flussvom: So sitzt der Zeitregler mittig in der Leiste,
+          unabhaengig davon, wie breit seine Nachbarn gerade sind. */}
+      <TimeSlider />
+
       <div className="topbar__meta">{entityCount} Objekte</div>
+
+      <LayerBar />
 
       {/* Zeitleiste, Handlungsbaum und Beziehungen sitzen in der schwebenden Leiste am
           unteren Kartenrand (BottomBar), nicht mehr hier oben. */}

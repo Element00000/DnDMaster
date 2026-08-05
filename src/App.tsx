@@ -3,10 +3,8 @@ import { TopBar } from './components/TopBar'
 import { Sidebar } from './components/Sidebar'
 import { MapCanvas } from './components/MapCanvas'
 import { DetailPanel } from './components/DetailPanel'
-import { TimeSlider } from './components/TimeSlider'
 import { BottomBar } from './components/BottomBar'
 import { BottomPanel } from './components/BottomPanel'
-import { LayerBar } from './components/LayerBar'
 import { FightMode } from './components/FightMode'
 import { useStore } from './store/useStore'
 
@@ -37,9 +35,9 @@ export default function App() {
       <TopBar />
       <div className="app__body">
         {!tableMode && <Sidebar />}
+        {/* Zeitregler und Nebel-Steuerung sitzen in der oberen Leiste, nicht mehr
+            schwebend ueber der Karte. */}
         <main className="app__map">
-          <LayerBar />
-          <TimeSlider />
           <MapCanvas />
           <BottomPanel />
           {!tableMode && <BottomBar />}

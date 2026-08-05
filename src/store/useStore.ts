@@ -409,7 +409,9 @@ export const useStore = create<StoreState>()(
             selectedIds: on ? [] : get().selectedIds,
           }),
         setFogEditing: (on) => set({ fogEditing: on, tool: 'select' }),
-        setFogBrush: (r) => set({ fogBrush: Math.max(30, Math.min(500, r)) }),
+        // Untergrenze bewusst klein: Auf einer eingebetteten Kampfkarte muessen auch
+        // einzelne Raeume aufdeckbar sein, nicht nur grobe Flaechen.
+        setFogBrush: (r) => set({ fogBrush: Math.max(4, Math.min(500, r)) }),
 
         // Sitzungsnotizen
         addSession: () => {

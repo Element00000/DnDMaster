@@ -36,16 +36,21 @@ export function LayerBar() {
               Pinsel
             </button>
             {fogEditing && (
-              <input
-                className="layerbar__brush"
-                type="range"
-                min={40}
-                max={400}
-                step={10}
-                value={fogBrush}
-                onChange={(e) => setFogBrush(Number(e.target.value))}
-                title="Pinselgroesse"
-              />
+              <label className="layerbar__brushfield" title="Pinselgroesse">
+                <input
+                  className="layerbar__brush"
+                  type="range"
+                  // Fein genug fuer einzelne Raeume auf einer kleinen Kampfkarte. Die
+                  // Schrittweite waechst mit der Groesse, damit der Regler unten
+                  // feinfuehlig bleibt und oben trotzdem den ganzen Bereich abdeckt.
+                  min={4}
+                  max={400}
+                  step={fogBrush < 40 ? 2 : 10}
+                  value={fogBrush}
+                  onChange={(e) => setFogBrush(Number(e.target.value))}
+                />
+                <span className="layerbar__brushsize">{Math.round(fogBrush)}</span>
+              </label>
             )}
             <button className="layerbar__btn" title="Alles wieder verdecken" onClick={() => clearReveals(layer.id)}>
               Reset

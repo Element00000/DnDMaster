@@ -12,7 +12,7 @@ export function TimeSlider() {
   const setCurrentDay = useStore((s) => s.setCurrentDay)
 
   return (
-    <div className="time-slider is-enabled">
+    <div className="time-slider">
       {/* Kampagnentag: bestimmt, welche Tagesplan-Ausnahmen der Objekte greifen. */}
       <div className="time-slider__day" title="Aktueller Kampagnentag">
         <button
