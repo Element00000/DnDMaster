@@ -30,6 +30,8 @@ export interface EntityTypeMeta {
   color: string
   /** Icon soll weiss statt in der Standardfarbe dargestellt werden (z.B. Spieler-Charaktere). */
   iconInvert?: boolean
+  /** Hervorgehoben: bekommt auf der Karte eine groessere Pinnadel (Spieler, Bosse). */
+  emphasized?: boolean
 }
 
 export const ENTITY_TYPES: EntityTypeMeta[] = [
@@ -139,18 +141,29 @@ export interface Entity {
 
 /**
  * Farbe fuer die Anzeige (Karte etc.), inkl. Ueberschreibung fuer Charaktere:
- * Freund gruen, Feind rot, neutral grau, Spieler dunkelgruen mit weissem Icon.
- * Das Icon selbst bleibt sonst immer das Charakter-Icon.
+ * Freund gruen, Feind rot, Boss dunkelrot, neutral grau, Spieler dunkelgruen mit weissem
+ * Icon. Das Icon selbst bleibt sonst immer das Charakter-Icon.
  */
 export function entityDisplayMeta(entity: Entity): EntityTypeMeta {
   const meta = entityMeta(entity.type)
   if (entity.type === 'nsc') {
     if (entity.fields.gesinnung === 'freund') return { ...meta, color: '#3fa34d' }
     if (entity.fields.gesinnung === 'feind') return { ...meta, color: '#c0392b' }
+    if (entity.fields.gesinnung === 'boss') return { ...meta, color: '#9b1b30', emphasized: true }
     if (entity.fields.gesinnung === 'neutral') return { ...meta, color: '#8a93a8' }
-    if (entity.fields.gesinnung === 'spieler') return { ...meta, color: '#1f5c38', iconInvert: true }
+    if (entity.fields.gesinnung === 'spieler') {
+      return { ...meta, color: '#1f5c38', iconInvert: true, emphasized: true }
+    }
   }
   return meta
+}
+
+/**
+ * Zaehlt der Charakter als Gegner? Boss ist ein Feind mit mehr Gewicht - ueberall, wo es
+ * um Kampf geht (Kampfmodus, Kampfwerte), gelten beide gleich.
+ */
+export function isHostile(entity: Entity): boolean {
+  return entity.type === 'nsc' && (entity.fields.gesinnung === 'feind' || entity.fields.gesinnung === 'boss')
 }
 
 /** Aufgedeckter Kreis fuer den Nebel des Krieges (Weltkoordinaten). */
@@ -233,13 +246,40 @@ export interface FieldDef {
   options?: { value: string; label: string }[]
 }
 
-/** Gesinnung eines Charakters: bestimmt Farbe/Icon auf der Karte. */
-export const GESINNUNG_OPTIONS: { value: string; label: string }[] = [
-  { value: 'freund', label: 'Freund' },
-  { value: 'feind', label: 'Feind' },
-  { value: 'neutral', label: 'Neutral / unklar' },
-  { value: 'spieler', label: 'Spieler' },
+/**
+ * Gesinnung eines Charakters: bestimmt Farbe und Groesse auf der Karte. Gruppiert nach
+ * Haltung zur Gruppe, damit die Auswahl beim Anlegen nicht nur eine flache Liste ist.
+ */
+export interface GesinnungGroup {
+  label: string
+  options: { value: string; label: string }[]
+}
+
+export const GESINNUNG_GROUPS: GesinnungGroup[] = [
+  {
+    label: 'Freundlich',
+    options: [
+      { value: 'spieler', label: 'Spieler' },
+      { value: 'freund', label: 'Freund' },
+    ],
+  },
+  {
+    label: 'Neutral',
+    options: [{ value: 'neutral', label: 'Neutral / unklar' }],
+  },
+  {
+    label: 'Feindlich',
+    options: [
+      { value: 'feind', label: 'Feind' },
+      { value: 'boss', label: 'Boss' },
+    ],
+  },
 ]
+
+/** Dieselben Gesinnungen als flache Liste, fuer einfache Auswahlfelder. */
+export const GESINNUNG_OPTIONS: { value: string; label: string }[] = GESINNUNG_GROUPS.flatMap(
+  (g) => g.options,
+)
 
 /**
  * Kampfwerte eines Feindes (nsc, Gesinnung 'feind'), gespeichert als frei benannte

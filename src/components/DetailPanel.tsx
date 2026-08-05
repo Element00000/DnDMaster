@@ -8,6 +8,7 @@ import {
   SKILLS,
   SKILLS_FIELD,
   entityDisplayMeta,
+  isHostile,
   parseSkills,
   serializeSkills,
 } from '../types'
@@ -50,7 +51,7 @@ export function DetailPanel() {
   const mapLayerId = viewLayerId ?? activeLayer.id
   const mapLayer = campaign.layers.find((l) => l.id === mapLayerId) ?? activeLayer
   const mapEntities = campaign.entities.filter((e) => e.placement?.layerId === mapLayerId)
-  const enemies = mapEntities.filter((e) => e.type === 'nsc' && e.fields.gesinnung === 'feind')
+  const enemies = mapEntities.filter(isHostile)
   const sortedEnemies = [...enemies].sort(
     (a, b) => (initiatives[b.id] ?? -Infinity) - (initiatives[a.id] ?? -Infinity),
   )
@@ -118,7 +119,7 @@ export function DetailPanel() {
     // (Rolle, Motivation, Beschreibung, Geheimnis, Verknuepfungen ...) waere am Tisch
     // waehrend eines Kampfes nur Ballast. Umgekehrt tauchen die Kampfwerte ausserhalb
     // des Kampfmodus gar nicht auf.
-    const isFeind = marker.type === 'nsc' && marker.fields.gesinnung === 'feind'
+    const isFeind = isHostile(marker)
     detailContent = combatMode && isFeind ? (
       <div className="detail__panel" style={{ ['--chip-color' as string]: meta.color }}>
         {header}

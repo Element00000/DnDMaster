@@ -24,6 +24,8 @@ interface Props {
    * gespeichert ist. Nimmt keine Klicks an - bedient wird immer das Original.
    */
   ghost?: boolean
+  /** Hervorgehoben (Spieler, Bosse): etwas groessere Pinnadel. */
+  emphasized?: boolean
   onClick: (e: React.PointerEvent) => void
   onMove: (dxWorld: number, dyWorld: number) => void
   /** Nach einem Ziehen (nicht bei einem reinen Klick): Bildschirmkoordinaten des Loslassens. */
@@ -47,6 +49,7 @@ export function MapPin({
   isMapLink,
   iconInvert,
   ghost,
+  emphasized,
   onClick,
   onMove,
   onDragEnd,
@@ -94,7 +97,7 @@ export function MapPin({
 
   return (
     <div
-      className={`map-pin${selected ? ' is-selected' : ''}${draggable ? ' is-draggable' : ''}${isMapLink ? ' is-map-link' : ''}${iconInvert ? ' is-icon-invert' : ''}${image ? ' has-image' : ''}${ghost ? ' is-ghost' : ''}`}
+      className={`map-pin${selected ? ' is-selected' : ''}${draggable ? ' is-draggable' : ''}${isMapLink ? ' is-map-link' : ''}${iconInvert ? ' is-icon-invert' : ''}${image ? ' has-image' : ''}${ghost ? ' is-ghost' : ''}${emphasized ? ' is-emphasized' : ''}`}
       style={{ left: screenX, top: screenY, ['--pin-color' as string]: color }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}

@@ -416,6 +416,27 @@ button {
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
 }
 
+/* Abschnitte im Auswahlmenue (z.B. Freundlich / Neutral / Feindlich). */
+.picker-popover__group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.picker-popover__group + .picker-popover__group {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+}
+
+.picker-popover__grouplabel {
+  padding: 2px 10px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--ink-faint);
+}
+
 .picker-popover__opt {
   padding: 8px 10px;
   border-radius: var(--radius-sm);
@@ -701,9 +722,9 @@ button {
 /* ---------- Marker-Pin ---------- */
 .map-pin {
   /* Kantenlaenge des Pin-Kopfes - Portraet und Icon leiten ihre Groesse davon ab.
-     Bewusst eine glatte Zahl: Mit gebrochenen Werten bleiben nach Rahmen und Rand halbe
+     Bewusst glatte Zahlen: Mit gebrochenen Werten bleiben nach Rahmen und Rand halbe
      Pixel uebrig, die das gedrehte Portraet sichtbar aus der Mitte ruecken. */
-  --pin-size: 35px;
+  --pin-size: 33px;
   position: absolute;
   z-index: 5;
   transform: translate(-50%, -100%);
@@ -713,6 +734,13 @@ button {
   flex-direction: column;
   align-items: center;
   filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.5));
+}
+
+/* Was auf der Karte Gewicht hat, ist etwas groesser: eingebettete Karten sowie Spieler
+   und Bosse (siehe entityDisplayMeta). Alles andere bleibt schlanker. */
+.map-pin.is-map-link,
+.map-pin.is-emphasized {
+  --pin-size: 37px;
 }
 
 .map-pin__head {

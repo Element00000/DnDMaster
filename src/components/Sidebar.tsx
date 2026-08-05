@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { ENTITY_TYPES, GESINNUNG_OPTIONS, ITEM_ART_OPTIONS } from '../types'
+import { ENTITY_TYPES, GESINNUNG_GROUPS, ITEM_ART_OPTIONS } from '../types'
 import type { EntityType, MapLayer } from '../types'
 import { useStore } from '../store/useStore'
 import type { ToolTab } from '../store/useStore'
@@ -19,10 +19,16 @@ const TOOL_ITEMS: { tab: ToolTab; label: string; icon: string }[] = [
   { tab: 'musik', label: 'Musik', icon: '\u{1F3B5}' },
 ]
 
-/** Typen, die beim Anlegen erst eine Auswahl per PopUp verlangen (Feld -> Optionen). */
-const PICKER_POPUPS: Partial<Record<EntityType, { fieldKey: string; options: { value: string; label: string }[] }>> = {
-  nsc: { fieldKey: 'gesinnung', options: GESINNUNG_OPTIONS },
-  item: { fieldKey: 'art', options: ITEM_ART_OPTIONS },
+/**
+ * Typen, die beim Anlegen erst eine Auswahl per PopUp verlangen (Feld -> Optionen).
+ * Die Optionen stehen in Abschnitten; eine Liste ohne Ueberschrift ist einfach ein
+ * Abschnitt ohne Titel.
+ */
+const PICKER_POPUPS: Partial<
+  Record<EntityType, { fieldKey: string; groups: { label?: string; options: { value: string; label: string }[] }[] }>
+> = {
+  nsc: { fieldKey: 'gesinnung', groups: GESINNUNG_GROUPS },
+  item: { fieldKey: 'art', groups: [{ options: ITEM_ART_OPTIONS }] },
 }
 
 export function Sidebar() {
@@ -396,14 +402,21 @@ export function Sidebar() {
               <>
                 <div className="popover-backdrop" onClick={() => setPopup(null)} />
                 <div className="picker-popover" style={{ top: popup.top, left: popup.left }}>
-                  {PICKER_POPUPS[popup.type]!.options.map((o) => (
-                    <button
-                      key={o.value}
-                      className="picker-popover__opt"
-                      onClick={() => startAddingWithChoice(popup.type, PICKER_POPUPS[popup.type]!.fieldKey, o.value)}
-                    >
-                      {o.label}
-                    </button>
+                  {PICKER_POPUPS[popup.type]!.groups.map((g, gi) => (
+                    <div key={g.label ?? gi} className="picker-popover__group">
+                      {g.label && <span className="picker-popover__grouplabel">{g.label}</span>}
+                      {g.options.map((o) => (
+                        <button
+                          key={o.value}
+                          className="picker-popover__opt"
+                          onClick={() =>
+                            startAddingWithChoice(popup.type, PICKER_POPUPS[popup.type]!.fieldKey, o.value)
+                          }
+                        >
+                          {o.label}
+                        </button>
+                      ))}
+                    </div>
                   ))}
                 </div>
               </>,

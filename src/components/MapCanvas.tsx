@@ -876,6 +876,7 @@ export function MapCanvas() {
               imageRef={e.thumbUrl ?? e.imageUrl}
               color={meta.color}
               iconInvert={meta.iconInvert}
+              emphasized={meta.emphasized}
               label={e.name}
               selected={selectedIds.includes(e.id)}
               draggable={!tableMode && !fogEditing}
@@ -1091,6 +1092,7 @@ function DraftOverlay({
               imageRef={e.thumbUrl ?? e.imageUrl}
               color={meta.color}
               iconInvert={meta.iconInvert}
+              emphasized={meta.emphasized}
               // Uhrzeit im Label: Sie sagt, wofuer die Stelle vorgemerkt ist.
               label={`${formatTime(timeOfDay)} · ${e.name}`}
               selected={false}
@@ -1576,6 +1578,7 @@ function EmbeddedMap({
             imageRef={e.thumbUrl ?? e.imageUrl}
             color={meta.color}
             iconInvert={meta.iconInvert}
+              emphasized={meta.emphasized}
             label={e.name}
             selected={selectedIds.includes(e.id)}
             draggable={interactive}
