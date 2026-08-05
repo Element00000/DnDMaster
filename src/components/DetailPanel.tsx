@@ -93,27 +93,9 @@ export function DetailPanel() {
 
     const portrait = <EntityImageField entity={marker} readOnly={readOnly} />
 
-    // Weder Typ-Icon noch Name in der Kopfzeile: Das Portraet steht direkt darunter, und
-    // der Name steht in der Objektzeile darueber, wo er per Doppelklick geaendert wird.
-    // Nur wenn das Objekt gar nicht in der Liste steht (auf einer anderen Karte, ueber eine
-    // Verknuepfung ausgewaehlt), gaebe es sonst keine Stelle dafuer - dann hier.
-    // Klappt das Objekt direkt unter seiner Listenzeile auf, entfaellt die Kopfzeile ganz:
-    // Der Name steht schon in der Zeile darueber, und geschlossen wird per erneutem Klick
-    // darauf. Sie wuerde nur Leerraum und eine Trennlinie ueber dem Bild erzeugen.
-    const header = showInline ? null : (
-      <div className="detail__header">
-        <input
-          className="detail__title-input"
-          value={marker.name}
-          onChange={(e) => updateEntity(marker.id, { name: e.target.value })}
-          placeholder="Name"
-          disabled={readOnly}
-        />
-        <button className="detail__close" onClick={() => selectEntity(null)} title="Schliessen">
-          &times;
-        </button>
-      </div>
-    )
+    // Keine Kopfzeile: Name und Schliessen stecken in der Objektzeile darueber - beim
+    // Aufklappen in der Liste ebenso wie beim Objekt einer anderen Karte, das weiter unten
+    // seine eigene Zeile bekommt. So sieht die Anzeige ueberall gleich aus.
 
     // Kampfmodus zeigt zu einem Feind ausschliesslich sein Kampfblatt - alles andere
     // (Rolle, Motivation, Beschreibung, Geheimnis, Verknuepfungen ...) waere am Tisch
@@ -122,7 +104,6 @@ export function DetailPanel() {
     const isFeind = isHostile(marker)
     detailContent = combatMode && isFeind ? (
       <div className="detail__panel" style={{ ['--chip-color' as string]: meta.color }}>
-        {header}
         <div className="detail__body">
           {/* Im Kampf nur zur Wiedererkennung - gesetzt wird das Bild in der normalen Ansicht. */}
           {marker.imageUrl && <EntityImageField entity={marker} readOnly />}
@@ -135,7 +116,6 @@ export function DetailPanel() {
       </div>
     ) : (
     <div className="detail__panel" style={{ ['--chip-color' as string]: meta.color }}>
-      {header}
 
       <div className="detail__body">
         {portrait}
@@ -418,7 +398,16 @@ export function DetailPanel() {
           <p>Klicke ein Objekt auf der Karte oder in der Liste, um seine Details zu sehen.</p>
         </div>
       )}
-      {hasFloatingDetail && <div className="detail__floating">{detailContent}</div>}
+      {/* Objekt einer anderen Karte (ueber eine Verknuepfung oder die Suche ausgewaehlt):
+          Es steht in keiner Liste, bekommt hier aber dieselbe Zeile samt Dropdown - so
+          gibt es nur eine Darstellung, mit Namen und Umbenennen an gewohnter Stelle. */}
+      {hasFloatingDetail && marker && (
+        <div className="detail__floating">
+          <ul className="marker-list">
+            <EntityRow entity={marker} selected onSelect={onRowSelect} dropdown={detailContent} />
+          </ul>
+        </div>
+      )}
     </aside>
   )
 }
