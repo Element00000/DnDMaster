@@ -2278,9 +2278,11 @@ button {
 
 /* ---------- Tagesablauf: 24-Stunden-Zeitstrahl ---------- */
 .dayschedule {
-  /* Breite der Spurenbeschriftung plus Abstand. Stundenleiste, Spuren und Abspielkopf
-     richten sich alle danach aus, damit sie exakt dieselbe Zeitachse teilen. */
+  /* Was links und rechts neben der eigentlichen Spur liegt: die Beschriftung und der
+     Knopf zum Punktsetzen, jeweils samt Abstand. Stundenleiste, Spuren und Abspielkopf
+     richten sich daran aus, damit sie exakt dieselbe Zeitachse teilen. */
   --lane-offset: 130px;
+  --lane-tail: 38px;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -2295,11 +2297,13 @@ button {
   padding-top: 22px;
 }
 
-/* Stundenbeschriftung: eigene Zeile, damit die Spuren selbst frei von Text bleiben. */
+/* Stundenbeschriftung: eigene Zeile, damit die Spuren selbst frei von Text bleiben.
+   Deckt genau die Breite der Spuren ab, sonst laegen die Stunden daneben. */
 .daytrack__hours {
   position: relative;
   height: 15px;
   margin-left: var(--lane-offset);
+  margin-right: var(--lane-tail);
 }
 
 .daytrack__hour {
@@ -2330,13 +2334,16 @@ button {
   color: var(--gold-soft);
 }
 
-/* Die Spur selbst: Stundenraster als Hintergrund, Zeitfenster absolut darin. */
+/* Die Spur selbst: Stundenraster als Hintergrund, Schluesselpunkte absolut darin.
+   Der Rahmen liegt bewusst als innerer Schatten auf statt als border: Ein border wuerde
+   den Innenbereich um 1 px verkleinern, sodass Punkte und Raster gegenueber dem
+   Abspielkopf verrutschen, der ueber der vollen Breite liegt. */
 .daytrack__lane {
   position: relative;
   flex: 1;
   min-width: 0;
   height: 40px;
-  border: 1px solid var(--border);
+  box-shadow: inset 0 0 0 1px var(--border);
   border-radius: var(--radius-sm);
   background-color: var(--panel-2);
   background-image: repeating-linear-gradient(
@@ -2420,7 +2427,7 @@ button {
 .daytrack__scale {
   position: absolute;
   left: var(--lane-offset);
-  right: 0;
+  right: var(--lane-tail);
   top: 0;
   bottom: 0;
   pointer-events: none;
@@ -2471,7 +2478,8 @@ button {
 
 /* Punkt in dieser Spur setzen - steht am Ende jeder Spur. */
 .daytrack__add {
-  width: 30px;
+  /* 8px gehen an den Abstand zur Spur, der Rest ergibt --lane-tail. */
+  width: calc(var(--lane-tail) - 8px);
   flex: none;
   align-self: center;
   padding: 6px 0;
