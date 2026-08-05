@@ -237,7 +237,8 @@ interface StoreState extends AppData {
   /** Alle Daten aus einem Backup ersetzen. */
   replaceAllData: (data: AppData) => void
   /** Musik (Spotify) der aktiven Kampagne. */
-  addMusicEntry: (label: string, url: string) => void
+  /** Liefert die Id des neuen Eintrags, damit die Ansicht ihn gleich aufklappen kann. */
+  addMusicEntry: (label: string, url: string) => string
   removeMusicEntry: (id: string) => void
 
   // Ebenen (der aktiven Kampagne)
@@ -340,12 +341,14 @@ interface StoreState extends AppData {
 
 /**
  * Die Zeitleiste zeigt den Tagesablauf des ausgewaehlten Objekts - faellt die Auswahl weg,
- * schliesst sie sich mit. Nur dann: Ohne vorherige Auswahl war sie fuer die
- * Kampagnentage geoeffnet und bleibt stehen.
+ * schliesst sie sich mit, und mit ihr verschwindet die ganze Planungsansicht auf der Karte:
+ * Route, Stationen und noch nicht gespeicherte Vormerkungen. Nur dann: Ohne vorherige
+ * Auswahl war sie fuer die Kampagnentage geoeffnet und bleibt stehen.
  */
-function closedOnDeselect(s: StoreState, stillSelected: boolean): BottomPanel | null {
-  const losesSelection = !stillSelected && s.selectedEntityId !== null
-  return losesSelection && s.bottomPanel === 'zeitleiste' ? null : s.bottomPanel
+function deselectPatch(s: StoreState, stillSelected: boolean): Pick<StoreState, 'bottomPanel' | 'draftPos'> {
+  const closes = !stillSelected && s.selectedEntityId !== null && s.bottomPanel === 'zeitleiste'
+  if (!closes) return { bottomPanel: s.bottomPanel, draftPos: s.draftPos }
+  return { bottomPanel: null, draftPos: {} }
 }
 
 /**
@@ -537,11 +540,14 @@ export const useStore = create<StoreState>()(
         setActiveCampaign: (id) =>
           set({ activeCampaignId: id, selectedEntityId: null, selectedIds: [], undoStack: [], tool: 'select', viewLayerId: null }),
 
-        addMusicEntry: (label, url) =>
+        addMusicEntry: (label, url) => {
+          const id = uid('mus-')
           patchActive((c) => ({
             ...c,
-            music: [{ id: uid('mus-'), label: label.trim() || 'Musik', url: url.trim() }, ...c.music],
-          })),
+            music: [{ id, label: label.trim() || 'Musik', url: url.trim() }, ...c.music],
+          }))
+          return id
+        },
 
         removeMusicEntry: (id) =>
           patchActive((c) => ({ ...c, music: c.music.filter((m) => m.id !== id) })),
@@ -587,7 +593,9 @@ export const useStore = create<StoreState>()(
 
         setActiveLayer: (id) => {
           patchActive((c) => ({ ...c, activeLayerId: id }))
-          set({ viewLayerId: null })
+          // Der Pinsel gehoert zur Ebene, auf der er aufgedeckt hat - beim Wechsel endet er,
+          // sonst malte man auf einer neuen Karte weiter, ohne es gewollt zu haben.
+          set({ viewLayerId: null, fogEditing: false })
         },
 
         goToLayer: (layerId) => {
@@ -691,11 +699,15 @@ export const useStore = create<StoreState>()(
             ),
           })),
 
-        setLayerFog: (id, enabled) =>
+        setLayerFog: (id, enabled) => {
           patchActive((c) => ({
             ...c,
             layers: c.layers.map((l) => (l.id === id ? { ...l, fogEnabled: enabled } : l)),
-          })),
+          }))
+          // Ohne Nebel gibt es auch keinen Pinsel: Der Knopf dazu verschwindet mit dem
+          // Haken, ein noch aktiver Pinsel liesse sich danach nirgends mehr abschalten.
+          if (!enabled) set({ fogEditing: false })
+        },
 
         addReveal: (layerId, x, y, r) =>
           patchActive((c) => ({
@@ -779,13 +791,13 @@ export const useStore = create<StoreState>()(
           set((s) => ({
             selectedEntityId: id,
             selectedIds: id ? [id] : [],
-            bottomPanel: closedOnDeselect(s, id !== null),
+            ...deselectPatch(s, id !== null),
           })),
         setSelectedIds: (ids) =>
           set((s) => ({
             selectedIds: ids,
             selectedEntityId: ids.length ? ids[ids.length - 1] : null,
-            bottomPanel: closedOnDeselect(s, ids.length > 0),
+            ...deselectPatch(s, ids.length > 0),
           })),
         toggleSelectedId: (id) =>
           set((s) => {

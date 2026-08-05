@@ -79,7 +79,7 @@ export function MapCanvas() {
   const selectedEntityId = useStore((s) => s.selectedEntityId)
   const bottomPanel = useStore((s) => s.bottomPanel)
   const setBottomPanel = useStore((s) => s.setBottomPanel)
-  const fogEditing = useStore((s) => s.fogEditing)
+  const fogEditingFlag = useStore((s) => s.fogEditing)
   const fogBrush = useStore((s) => s.fogBrush)
   const addReveal = useStore((s) => s.addReveal)
   const resizeLayer = useStore((s) => s.resizeLayer)
@@ -89,6 +89,15 @@ export function MapCanvas() {
   const setEmbedRect = useStore((s) => s.setEmbedRect)
   const setLayerImage = useStore((s) => s.setLayerImage)
   const fitToViewRequest = useStore((s) => s.fitToViewRequest)
+
+  /**
+   * Der Nebel-Pinsel legt die ganze Karte lahm: kein Auswaehlen, kein Aufziehen, kein
+   * Verschieben - jeder Zeigerdruck deckt stattdessen auf. Das ist nur zu vertreten,
+   * solange die Ebene ueberhaupt Nebel hat. Ist er aus, fehlt jeder sichtbare Hinweis auf
+   * den Pinsel (sein Knopf haengt am Haken "Nebel"), und die Karte waere ohne erkennbaren
+   * Grund stumm. Darum gilt er hier nur zusammen mit dem Nebel selbst.
+   */
+  const fogEditing = fogEditingFlag && layer.fogEnabled
 
   const { width, height } = layer
   const mapImage = useAsset(layer.imageUrl)

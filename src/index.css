@@ -5101,11 +5101,25 @@ button {
   color: var(--danger);
 }
 
+/* Ein Eintrag samt seinem aufgeklappten Player. */
+.music__item {
+  display: flex;
+  flex-direction: column;
+}
+
 /* "height" und "--player-scale" setzt MusicTool inline. */
 .music__player {
   position: relative;
+  margin-top: 4px;
   border-radius: 12px;
   overflow: hidden;
+  transition: height 0.18s ease, margin-top 0.18s ease;
+}
+
+/* Eingeklappt bleibt der Player geladen (die Musik laeuft weiter), nimmt aber keinen
+   Platz mehr ein. */
+.music__player.is-collapsed {
+  margin-top: 0;
 }
 
 /* Bewusst "zoom" statt "transform: scale": Ein Transform verkleinert das fertig

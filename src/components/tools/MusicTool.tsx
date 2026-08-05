@@ -27,9 +27,24 @@ export function MusicTool() {
   const [url, setUrl] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [activeId, setActiveId] = useState<string | null>(null)
+  const [collapsed, setCollapsed] = useState(false)
 
-  const active = entries.find((e) => e.id === activeId) ?? entries[0] ?? null
+  const active = entries.find((e) => e.id === activeId) ?? null
   const embed = active ? toSpotifyEmbed(active.url) : null
+
+  /**
+   * Klick auf einen Eintrag: einen anderen aufschlagen oder den offenen einklappen. Der
+   * Player bleibt beim Einklappen geladen - er wird nur auf Hoehe null gefahren, damit die
+   * Musik weiterlaeuft, waehrend die Liste wieder Platz hat.
+   */
+  function pick(id: string) {
+    if (activeId === id) {
+      setCollapsed((c) => !c)
+      return
+    }
+    setActiveId(id)
+    setCollapsed(false)
+  }
 
   function add() {
     setError(null)
@@ -38,8 +53,8 @@ export function MusicTool() {
       setError('Bitte einen gueltigen Spotify-Link einfuegen (Playlist, Track oder Album).')
       return
     }
-    addMusicEntry(label, url)
-    setActiveId(null) // neuer Eintrag steht vorne und wird aktiv
+    setActiveId(addMusicEntry(label, url))
+    setCollapsed(false)
     setLabel('')
     setUrl('')
   }
@@ -92,42 +107,52 @@ export function MusicTool() {
         {error && <div className="music__error">{error}</div>}
       </div>
 
-      {entries.length > 0 && (
+      {entries.length > 0 ? (
         <div className="music__list">
-          {entries.map((e) => (
-            <div key={e.id} className={`music__entry${active?.id === e.id ? ' is-active' : ''}`}>
-              <button className="music__pick" onClick={() => setActiveId(e.id)} title="Abspielen">
-                🎵 {e.label}
-              </button>
-              <button className="music__remove" title="Entfernen" onClick={() => removeMusicEntry(e.id)}>
-                &times;
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
+          {entries.map((e) => {
+            const open = active?.id === e.id
+            return (
+              <div key={e.id} className="music__item">
+                <div className={`music__entry${open ? ' is-active' : ''}`}>
+                  <button
+                    className="music__pick"
+                    onClick={() => pick(e.id)}
+                    title={open && !collapsed ? 'Player einklappen' : 'Abspielen'}
+                    aria-expanded={open && !collapsed}
+                  >
+                    🎵 {e.label}
+                  </button>
+                  <button className="music__remove" title="Entfernen" onClick={() => removeMusicEntry(e.id)}>
+                    &times;
+                  </button>
+                </div>
 
-      {active && embed ? (
-        // Der Player wird verkleinert dargestellt, damit sein Inhalt in die schmale Spalte
-        // passt. Der Rahmen bekommt die verkleinerte Hoehe, das iframe darin rechnet sie
-        // wieder hoch - so bleibt kein Leerraum unter dem skalierten Bild stehen.
-        <div
-          className="music__player"
-          style={{
-            height: Math.round(embed.height * PLAYER_SCALE),
-            ['--player-scale' as string]: PLAYER_SCALE,
-          }}
-        >
-          <iframe
-            title={active.label}
-            src={embed.src}
-            frameBorder="0"
-            // storage-access: Blockiert der Browser Drittanbieter-Cookies, muss der Player
-            // den Zugriff auf seine Sitzung eigens anfordern - ohne diese Erlaubnis erkennt
-            // er das Spotify-Konto nicht und spielt nur 30-Sekunden-Vorschauen.
-            allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture; storage-access"
-            loading="lazy"
-          />
+                {open && embed && (
+                  // Der Player wird verkleinert dargestellt, damit sein Inhalt in die schmale
+                  // Spalte passt, und sitzt direkt unter seinem Eintrag. Eingeklappt faehrt nur
+                  // die Hoehe auf null - das iframe bleibt geladen, damit die Musik weiterlaeuft.
+                  <div
+                    className={`music__player${collapsed ? ' is-collapsed' : ''}`}
+                    style={{
+                      height: collapsed ? 0 : Math.round(embed.height * PLAYER_SCALE),
+                      ['--player-scale' as string]: PLAYER_SCALE,
+                    }}
+                  >
+                    <iframe
+                      title={e.label}
+                      src={embed.src}
+                      frameBorder="0"
+                      // storage-access: Blockiert der Browser Drittanbieter-Cookies, muss der
+                      // Player den Zugriff auf seine Sitzung eigens anfordern - ohne diese
+                      // Erlaubnis erkennt er das Spotify-Konto nicht und spielt nur Vorschauen.
+                      allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture; storage-access"
+                      loading="lazy"
+                    />
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
       ) : (
         <p className="music__hint">
