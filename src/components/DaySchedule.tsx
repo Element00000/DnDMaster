@@ -11,9 +11,14 @@ function pct(minutes: number): string {
   return `${(minutes / MINUTES_PER_DAY) * 100}%`
 }
 
-/** Auf den Tag begrenzen: 0 Uhr bis zum letzten Rasterschritt davor. */
+/**
+ * Aufs Raster legen und auf den Tag begrenzen: 0 Uhr bis 23:59. Das Tagesende faellt
+ * bewusst aus dem Raster - 24:00 waere wieder 0 Uhr, wo schon die Basis-Platzierung sitzt,
+ * also endet die Spur eine Minute davor.
+ */
 function clampTime(minutes: number): number {
-  return Math.max(0, Math.min(MINUTES_PER_DAY - SNAP, minutes))
+  const snapped = Math.round(minutes / SNAP) * SNAP
+  return Math.max(0, Math.min(MINUTES_PER_DAY - 1, snapped))
 }
 
 /** Welche Punkte gehoeren in eine Spur? */
@@ -101,9 +106,7 @@ export function DaySchedule({ entities }: { entities: Entity[] }) {
     const rect = el.getBoundingClientRect()
     if (rect.width === 0) return 0
     const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width))
-    // Begrenzen statt umlaufen zu lassen: Am rechten Rand ergaebe die Rundung sonst
-    // 24:00 und damit wieder 0 Uhr, der Zeiger spraenge also an den Anfang zurueck.
-    return clampTime(Math.round((ratio * MINUTES_PER_DAY) / SNAP) * SNAP)
+    return clampTime(ratio * MINUTES_PER_DAY)
   }, [])
 
   /** Punkt setzen - fuer alle ausgewaehlten Objekte auf einmal. */
