@@ -2712,10 +2712,12 @@ button {
 }
 
 /* Anklickbar: stellt die Zeitleiste auf die Uhrzeit dieser Station. Das umgebende
-   Overlay laesst Zeigerereignisse durch, nur die Station selbst faengt sie ab. */
+   Overlay laesst Zeigerereignisse durch, nur die Station selbst faengt sie ab.
+   Sitzt bewusst unterhalb des Punktes statt darauf: Ueber ihm steht die Pinnadel samt
+   Namen. Die genaue Stelle markieren weiterhin die Pinnadel und der Knick der Route. */
 .schedule-stop {
   position: absolute;
-  transform: translate(-50%, -50%);
+  transform: translate(-50%, 12px);
   display: flex;
   align-items: center;
   gap: 6px;
