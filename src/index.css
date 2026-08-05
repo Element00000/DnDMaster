@@ -2823,6 +2823,19 @@ button {
   border-color: var(--ink-faint);
 }
 
+/* ---------- Einrasten waehrend des Ziehens ----------
+   Die Station, an der losgelassen wuerde, bekommt einen weiten Ring; die gezogene selbst
+   wird gestrichelt. So ist vor dem Loslassen erkennbar, dass beide zusammenfallen. */
+.schedule-stop__dot.is-snap-target {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 5px var(--accent-tint), 0 0 12px var(--accent);
+}
+
+.schedule-stop__dot.is-snapping {
+  border-style: dashed;
+  border-color: var(--accent);
+}
+
 /* ---------- Entscheidungs-Editor ---------- */
 .decision {
   display: flex;

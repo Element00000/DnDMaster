@@ -1158,7 +1158,13 @@ function ScheduleOverlay({
   moveRef.current = onMoveStop
   const pickRef = useRef(onPickTime)
   pickRef.current = onPickTime
-  const snapRef = useRef<(stopId: string) => void>(() => {})
+  /**
+   * Sucht zu einer gezogenen Station die, an der sie einrasten wuerde, und liefert deren
+   * Id. Mit apply = true wird zugleich eingerastet.
+   */
+  const snapRef = useRef<(stopId: string, apply?: boolean) => string | null>(() => null)
+  /** Welche Station gerade wohin andocken wuerde - nur fuer die Anzeige waehrend des Zugs. */
+  const [snap, setSnap] = useState<{ fromId: string; toId: string } | null>(null)
 
   /**
    * Bewegung und Loslassen haengen am Fenster, nicht am angeklickten Knopf: Beim
@@ -1177,13 +1183,17 @@ function ScheduleOverlay({
       d.lastX = e.clientX
       d.lastY = e.clientY
       moveRef.current(d.id, dx / d.scale, dy / d.scale)
+      // Schon waehrend des Zugs zeigen, wo eingerastet wuerde.
+      const toId = snapRef.current(d.id)
+      setSnap(toId ? { fromId: d.id, toId } : null)
     }
     function onUp() {
       const d = drag.current
       drag.current = null
+      setSnap(null)
       if (!d) return
       // Ohne Bewegung war es ein Klick.
-      if (d.moved) snapRef.current(d.id)
+      if (d.moved) snapRef.current(d.id, true)
       else pickRef.current(d.time)
     }
     window.addEventListener('pointermove', onMove)
@@ -1242,18 +1252,21 @@ function ScheduleOverlay({
    * Uhrzeiten untereinander. Von Hand liesse sich die Stelle sonst nie genau genug
    * treffen, und schon ein Pixel Abstand ergaebe zwei ueberlappende Marken.
    */
-  snapRef.current = (stopId: string) => {
+  snapRef.current = (stopId: string, apply = false) => {
     const dragged = stops.find((s) => s.id === stopId)
-    if (!dragged) return
+    if (!dragged) return null
     for (const s of stops) {
       if (s.id === stopId) continue
       const dx = s.x - dragged.x
       const dy = s.y - dragged.y
+      // Bereits deckungsgleich? Dann gehoeren sie schon zusammen, nichts zu melden.
+      if (dx === 0 && dy === 0) continue
       if (Math.hypot(dx * scale, dy * scale) <= STOP_SNAP_PX) {
-        onMoveStop(stopId, dx, dy)
-        return
+        if (apply) onMoveStop(stopId, dx, dy)
+        return s.id
       }
     }
+    return null
   }
 
   return (
@@ -1271,6 +1284,8 @@ function ScheduleOverlay({
                 key={s.id}
                 className={`schedule-stop__dot${
                   s.id === active?.id || (s.id === '__base__' && !active) ? ' is-now' : ''
+                }${s.id === snap?.toId ? ' is-snap-target' : ''}${
+                  s.id === snap?.fromId ? ' is-snapping' : ''
                 }${s.day != null ? ' is-exception' : ''}${
                   s.id === '__base__' ? ' is-base' : ''
                 }`}
