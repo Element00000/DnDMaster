@@ -27,6 +27,8 @@ interface Props {
   /** Hervorgehoben (Spieler, Bosse): etwas groessere Pinnadel. */
   emphasized?: boolean
   onClick: (e: React.PointerEvent) => void
+  /** Doppelklick auf den Pin. Ohne Angabe bleibt er wirkungslos. */
+  onDoubleClick?: () => void
   onMove: (dxWorld: number, dyWorld: number) => void
   /** Nach einem Ziehen (nicht bei einem reinen Klick): Bildschirmkoordinaten des Loslassens. */
   onDragEnd?: (clientX: number, clientY: number) => void
@@ -51,6 +53,7 @@ export function MapPin({
   ghost,
   emphasized,
   onClick,
+  onDoubleClick,
   onMove,
   onDragEnd,
 }: Props) {
@@ -106,7 +109,10 @@ export function MapPin({
       onLostPointerCapture={onPointerCancelOrLost}
       // Zwei schnelle Klicks auf einen Pin sind kein Doppelklick auf die Karte darunter -
       // sonst passt sich die Ansicht ungewollt ein.
-      onDoubleClick={(e) => e.stopPropagation()}
+      onDoubleClick={(e) => {
+        e.stopPropagation()
+        onDoubleClick?.()
+      }}
     >
       <div className="map-pin__head">
         {image ? (

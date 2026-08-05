@@ -76,6 +76,7 @@ export function MapCanvas() {
   const setDraftPos = useStore((s) => s.setDraftPos)
   const selectedEntityId = useStore((s) => s.selectedEntityId)
   const bottomPanel = useStore((s) => s.bottomPanel)
+  const setBottomPanel = useStore((s) => s.setBottomPanel)
   const fogEditing = useStore((s) => s.fogEditing)
   const fogBrush = useStore((s) => s.fogBrush)
   const addReveal = useStore((s) => s.addReveal)
@@ -732,6 +733,15 @@ export function MapCanvas() {
   const placingActive = placingEntityId !== null || placingLayerId !== null
   const selectedEntity = entities.find((e) => e.id === selectedEntityId && e.placement) ?? null
 
+  /** Doppelklick auf ein Objekt: seinen Tagesablauf in der unteren Leiste aufschlagen. */
+  const openSchedule = useCallback(
+    (entityId: string) => {
+      selectEntity(entityId)
+      setBottomPanel('zeitleiste')
+    },
+    [selectEntity, setBottomPanel],
+  )
+
   /**
    * Karten, die aufgeklappt bleiben, obwohl sie zu klein dafuer geworden sind: die der
    * gerade in der Zeitleiste bearbeiteten Objekte samt aller Karten darueber. Sonst
@@ -887,6 +897,7 @@ export function MapCanvas() {
                 if (ev.ctrlKey || ev.metaKey || ev.shiftKey) toggleSelectedId(e.id)
                 else selectEntity(e.id)
               }}
+              onDoubleClick={() => openSchedule(e.id)}
               onMove={(dxWorld, dyWorld) => {
                 // Ziehen eines markierten Pins bewegt die gesamte Mehrfachauswahl mit.
                 if (selectedIds.length > 1 && selectedIds.includes(e.id)) {
@@ -977,6 +988,7 @@ export function MapCanvas() {
             if (ev.ctrlKey || ev.metaKey || ev.shiftKey) toggleSelectedId(id)
             else selectEntity(id)
           }}
+          onEntityDoubleClick={openSchedule}
           onEntityMove={(id, dxSub, dySub) => {
             const ent = entities.find((x) => x.id === id)
             if (ent) moveEntityTimed(ent, dxSub, dySub)
@@ -1497,6 +1509,7 @@ function EmbeddedMap({
   onZoomTo,
   onReparent,
   onEntityClick,
+  onEntityDoubleClick,
   onEntityMove,
   onEntityDragEnd,
   setEmbedRect,
@@ -1526,6 +1539,8 @@ function EmbeddedMap({
   /** Nach dem Ziehen: prueft, ob die Karte auf eine andere (Vorfahren-)Karte umgehaengt werden soll. */
   onReparent: (draggedId: string, clientX: number, clientY: number) => void
   onEntityClick: (id: string, ev: { ctrlKey: boolean; metaKey: boolean; shiftKey: boolean }) => void
+  /** Doppelklick auf ein Objekt (oeffnet seinen Tagesablauf). */
+  onEntityDoubleClick: (id: string) => void
   onEntityMove: (id: string, dxSub: number, dySub: number) => void
   /** Nach dem Ziehen eines Objekt-Pins: prueft, ob es auf eine andere Karte gehoert. */
   onEntityDragEnd: (id: string, clientX: number, clientY: number) => void
@@ -1730,6 +1745,7 @@ function EmbeddedMap({
             draggable={interactive}
             scale={childView.scale}
             onClick={(ev) => onEntityClick(e.id, ev)}
+            onDoubleClick={() => onEntityDoubleClick(e.id)}
             onMove={(dxSub, dySub) => onEntityMove(e.id, dxSub, dySub)}
             onDragEnd={(clientX, clientY) => onEntityDragEnd(e.id, clientX, clientY)}
           />
@@ -1757,6 +1773,7 @@ function EmbeddedMap({
           onZoomTo={onZoomTo}
           onReparent={onReparent}
           onEntityClick={onEntityClick}
+          onEntityDoubleClick={onEntityDoubleClick}
           onEntityMove={onEntityMove}
           onEntityDragEnd={onEntityDragEnd}
           setEmbedRect={setEmbedRect}
