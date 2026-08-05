@@ -2,6 +2,13 @@ import { useState } from 'react'
 import { useStore } from '../../store/useStore'
 import { toSpotifyEmbed } from '../../utils/spotify'
 
+/**
+ * Verkleinerung des Spotify-Players. Er ist fuer breitere Spalten ausgelegt und schneidet
+ * in der schmalen Werkzeugleiste sonst Bedienelemente ab; die Spaltenbreite selbst soll
+ * dafuer nicht wachsen.
+ */
+const PLAYER_SCALE = 0.8
+
 /** Fuer Screenreader; die Blase am Infopunkt zeigt denselben Inhalt gegliedert. */
 const FULL_TRACKS_HELP =
   'Volle Songs statt 30-Sekunden-Vorschau: Spotify Premium noetig, und im selben Browser ' +
@@ -101,12 +108,19 @@ export function MusicTool() {
       )}
 
       {active && embed ? (
-        <div className="music__player">
+        // Der Player wird verkleinert dargestellt, damit sein Inhalt in die schmale Spalte
+        // passt. Der Rahmen bekommt die verkleinerte Hoehe, das iframe darin rechnet sie
+        // wieder hoch - so bleibt kein Leerraum unter dem skalierten Bild stehen.
+        <div
+          className="music__player"
+          style={{
+            height: Math.round(embed.height * PLAYER_SCALE),
+            ['--player-scale' as string]: PLAYER_SCALE,
+          }}
+        >
           <iframe
             title={active.label}
             src={embed.src}
-            width="100%"
-            height={embed.height}
             frameBorder="0"
             // storage-access: Blockiert der Browser Drittanbieter-Cookies, muss der Player
             // den Zugriff auf seine Sitzung eigens anfordern - ohne diese Erlaubnis erkennt

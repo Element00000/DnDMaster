@@ -5101,13 +5101,22 @@ button {
   color: var(--danger);
 }
 
+/* "height" und "--player-scale" setzt MusicTool inline. */
 .music__player {
+  position: relative;
   border-radius: 12px;
   overflow: hidden;
 }
 
+/* Das iframe rechnet sich um den Kehrwert der Verkleinerung groesser und wird dann
+   zurueckskaliert: So arbeitet der Player intern mit seiner gewohnten Breite - und packt
+   seine Bedienelemente nicht wegen zu wenig Platz um - erscheint aber kleiner. */
 .music__player iframe {
   display: block;
+  width: calc(100% / var(--player-scale, 1));
+  height: calc(100% / var(--player-scale, 1));
+  transform: scale(var(--player-scale, 1));
+  transform-origin: 0 0;
   border: none;
   border-radius: 12px;
 }
