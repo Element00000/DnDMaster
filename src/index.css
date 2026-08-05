@@ -480,7 +480,7 @@ button {
    Groesse richtet sich nach der jeweiligen Liste, die runde Form ist ueberall gleich. */
 .marker-list__icon--image,
 .timeline__event-icon--image,
-.timeline__subject-icon--image,
+.relations__subject-icon--image,
 .session__chip-icon--image,
 .search__hit-icon--image,
 .entity-icon--image {
@@ -501,10 +501,6 @@ button {
   vertical-align: middle;
 }
 
-.timeline__subject-icon--image {
-  width: 26px;
-  height: 26px;
-}
 
 .search__hit-icon--image {
   width: 20px;
@@ -2060,45 +2056,21 @@ button {
   padding: 14px 16px;
 }
 
-.timeline__subject {
+/* Die ausgewaehlten Objekte als Kacheln - dieselbe Darstellung wie in der Objektliste
+   der rechten Leiste, damit man sie sofort wiedererkennt. */
+.timeline__subjects {
+  list-style: none;
+  margin: 0;
+  padding: 0;
   display: flex;
-  align-items: center;
-  gap: 10px;
-  padding-left: 10px;
-  border-left: 3px solid var(--chip-color, var(--gold));
-}
-
-.timeline__subject-icon {
-  font-size: 17px;
-}
-
-.timeline__subject-icon.is-icon-invert {
-  filter: brightness(0) invert(1);
-}
-
-.timeline__subject-name {
-  font-family: var(--font-display);
-  font-size: 15px;
-  color: var(--ink);
-}
-
-.timeline__subject-hint {
-  font-size: 11.5px;
-  color: var(--ink-faint);
-}
-
-/* Kalendertag des Objekts, frueher im Detailpanel. */
-.timeline__day-field {
-  display: flex;
-  align-items: center;
+  flex-wrap: wrap;
   gap: 6px;
-  font-size: 11px;
-  color: var(--ink-faint);
-  white-space: nowrap;
 }
 
-.timeline__day-field input {
-  width: 74px;
+.timeline__subjects .marker-list__item {
+  width: auto;
+  min-width: 160px;
+  max-width: 260px;
 }
 
 /* ---------- Beziehungen-Panel (untere Leiste) ---------- */
@@ -2371,6 +2343,11 @@ button {
   background: color-mix(in srgb, var(--gold) 26%, transparent);
 }
 
+/* Abschnitt der Basis-Platzierung: nur angedeutet, weil hier nichts eingestellt wurde. */
+.daykey__span--base {
+  background: rgba(255, 255, 255, 0.05);
+}
+
 /* Der Schluesselpunkt selbst - eine Raute auf der Zeitachse, wie in Animationswerkzeugen. */
 .daykey {
   position: absolute;
@@ -2405,6 +2382,21 @@ button {
 
 .daykey--exception .daykey__diamond {
   background: var(--gold);
+}
+
+/* Die Basis-Platzierung um 0 Uhr: sichtbar, aber deutlich zurueckgenommen - sie laesst
+   sich weder verschieben noch anwaehlen, sondern zeigt nur, wo der Tag beginnt. */
+.daykey--base {
+  cursor: default;
+  pointer-events: none;
+}
+
+.daykey--base .daykey__diamond {
+  width: 9px;
+  height: 9px;
+  background: transparent;
+  border: 1.5px solid var(--ink-faint);
+  box-shadow: none;
 }
 
 .daykey.is-selected .daykey__diamond {
@@ -2501,10 +2493,27 @@ button {
   cursor: default;
 }
 
+/* Es liegt eine vorgemerkte Position bereit, die nur noch festgehalten werden muss. */
+.daytrack__add.is-pending {
+  border-color: var(--gold);
+  background: color-mix(in srgb, var(--gold) 22%, var(--panel-2));
+  color: var(--gold-soft);
+}
+
+.dayschedule__hint.is-pending {
+  color: var(--gold-soft);
+}
+
+.dayschedule__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-left: var(--lane-offset);
+}
+
 /* Zweite Spur fuer Ausnahmen erst auf Wunsch. */
 .dayschedule__addlane {
-  align-self: flex-start;
-  margin-left: var(--lane-offset);
   padding: 5px 12px;
   border-radius: 999px;
   border: 1px dashed var(--border-strong);

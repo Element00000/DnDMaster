@@ -15,12 +15,15 @@ type Tab = 'objekt' | 'kampagne'
  */
 export function Timeline() {
   const campaign = useStore((s) => s.campaigns.find((c) => c.id === s.activeCampaignId) ?? s.campaigns[0])
-  const selectedEntityId = useStore((s) => s.selectedEntityId)
+  const selectedIds = useStore((s) => s.selectedIds)
   const [tab, setTab] = useState<Tab>('objekt')
 
-  const selected = campaign.entities.find((e) => e.id === selectedEntityId) ?? null
+  // Reihenfolge der Auswahl beibehalten, damit die Spuren nicht springen.
+  const selected = selectedIds
+    .map((id) => campaign.entities.find((e) => e.id === id))
+    .filter((e): e is Entity => !!e)
   // Ohne ausgewaehltes Objekt gibt es keinen Tagesablauf zu zeigen.
-  const activeTab: Tab = selected ? tab : 'kampagne'
+  const activeTab: Tab = selected.length > 0 ? tab : 'kampagne'
 
   return (
     <div className="timeline">
@@ -30,11 +33,11 @@ export function Timeline() {
           <button
             className={`timeline__tab${activeTab === 'objekt' ? ' is-active' : ''}`}
             onClick={() => setTab('objekt')}
-            disabled={!selected}
-            title={selected ? 'Tagesablauf des ausgewaehlten Objekts' : 'Erst ein Objekt auswaehlen'}
+            disabled={selected.length === 0}
+            title={selected.length > 0 ? 'Tagesablauf der ausgewaehlten Objekte' : 'Erst ein Objekt auswaehlen'}
           >
             Tagesablauf
-            {selected && <span className="timeline__tabname">{selected.name}</span>}
+            {selected.length > 1 && <span className="timeline__tabname">{selected.length} Objekte</span>}
           </button>
           <button
             className={`timeline__tab${activeTab === 'kampagne' ? ' is-active' : ''}`}
@@ -47,8 +50,8 @@ export function Timeline() {
       </div>
 
       <div className="timeline__body">
-        {activeTab === 'objekt' && selected ? (
-          <ObjectSchedule entity={selected} />
+        {activeTab === 'objekt' && selected.length > 0 ? (
+          <ObjectSchedule entities={selected} />
         ) : (
           <CampaignDays />
         )}
@@ -57,21 +60,29 @@ export function Timeline() {
   )
 }
 
-/** Tagesablauf-Ansicht eines Objekts inkl. Kopfzeile mit Objektnamen. */
-function ObjectSchedule({ entity }: { entity: Entity }) {
+/**
+ * Tagesablauf der ausgewaehlten Objekte. Oben stehen sie als Kacheln wie in der rechten
+ * Leiste; ein Klick darauf schraenkt die Auswahl auf dieses eine Objekt ein.
+ */
+function ObjectSchedule({ entities }: { entities: Entity[] }) {
   const setPlacingEntity = useStore((s) => s.setPlacingEntity)
-  const updateEntity = useStore((s) => s.updateEntity)
-  const meta = entityDisplayMeta(entity)
+  const selectEntity = useStore((s) => s.selectEntity)
 
-  if (!entity.placement) {
+  // Ein Tagesablauf beschreibt, wo etwas zu welcher Uhrzeit liegt - ohne Kartenposition
+  // gibt es dafuer keine Grundlage.
+  const unplaced = entities.filter((e) => !e.placement)
+  const placed = entities.filter((e) => e.placement)
+
+  if (placed.length === 0) {
+    const first = unplaced[0]
     return (
       <div className="timeline__notice">
         <p>
-          <strong>{entity.name}</strong> liegt noch auf keiner Karte. Ein Tagesablauf beschreibt,
+          <strong>{first.name}</strong> liegt noch auf keiner Karte. Ein Tagesablauf beschreibt,
           wo sich ein Objekt zu welcher Uhrzeit befindet — dafuer braucht es zuerst eine
           Position auf der Karte.
         </p>
-        <button className="btn btn--primary btn--sm" onClick={() => setPlacingEntity(entity.id)}>
+        <button className="btn btn--primary btn--sm" onClick={() => setPlacingEntity(first.id)}>
           Jetzt auf der Karte platzieren
         </button>
       </div>
@@ -80,29 +91,34 @@ function ObjectSchedule({ entity }: { entity: Entity }) {
 
   return (
     <div className="timeline__schedule">
-      <div className="timeline__subject" style={{ ['--chip-color' as string]: meta.color }}>
-        <EntityIcon entity={entity} className="timeline__subject-icon" />
-        <span className="timeline__subject-name">{entity.name}</span>
-        {/* Kalendertag des Objekts: bestimmt, unter welchem Tag es in der Kampagnen-
-            Zeitleiste einsortiert wird. Stand frueher im Detailpanel. */}
-        <label className="timeline__day-field">
-          <span>Kalendertag</span>
-          <input
-            className="field__control field__control--sm"
-            type="number"
-            min={0}
-            value={entity.day ?? ''}
-            placeholder="ohne"
-            onChange={(e) =>
-              updateEntity(entity.id, { day: e.target.value === '' ? null : Number(e.target.value) })
-            }
-          />
-        </label>
-        <span className="timeline__subject-hint">
-          Ausserhalb aller Zeitfenster steht das Objekt an seiner normalen Position.
-        </span>
-      </div>
-      <DaySchedule entity={entity} />
+      <ul className="timeline__subjects">
+        {placed.map((e) => {
+          const meta = entityDisplayMeta(e)
+          return (
+            <li key={e.id}>
+              <button
+                className="marker-list__item is-selected"
+                style={{ ['--chip-color' as string]: meta.color }}
+                onClick={() => selectEntity(e.id)}
+                title={placed.length > 1 ? 'Nur dieses Objekt bearbeiten' : e.name}
+              >
+                <EntityIcon entity={e} className="marker-list__icon" />
+                <span className="marker-list__name">{e.name}</span>
+              </button>
+            </li>
+          )
+        })}
+      </ul>
+
+      {unplaced.length > 0 && (
+        <p className="dayschedule__hint">
+          {unplaced.length === 1
+            ? `${unplaced[0].name} liegt auf keiner Karte und bleibt hier aussen vor.`
+            : `${unplaced.length} ausgewaehlte Objekte liegen auf keiner Karte und bleiben hier aussen vor.`}
+        </p>
+      )}
+
+      <DaySchedule entities={placed} />
     </div>
   )
 }

@@ -276,6 +276,16 @@ interface StoreState extends AppData {
   updateScheduleKey: (entityId: string, keyId: string, patch: Partial<Omit<ScheduleKey, 'id'>>) => void
   removeScheduleKey: (entityId: string, keyId: string) => void
   moveScheduleKey: (entityId: string, keyId: string, dxWorld: number, dyWorld: number) => void
+  /**
+   * Vorgemerkte Positionen beim Planen eines Tagesablaufs, je Objekt-Id: Waehrend die
+   * Zeitleiste offen ist, schiebt man die Objekte auf der Karte erst einmal nur probeweise -
+   * festgehalten werden sie durch "Punkt setzen". Ohne das wuerde das Ziehen den zuletzt
+   * gueltigen Punkt (oder die Basis-Platzierung) veraendern, statt einen neuen Zeitpunkt
+   * vorzubereiten. Fluechtig; wird bei Zeit- oder Tagwechsel verworfen.
+   */
+  draftPos: Record<string, { x: number; y: number }>
+  setDraftPos: (entityId: string, x: number, y: number) => void
+  clearDraftPos: () => void
   /** Schluesselpunkt, dessen Position der naechste Kartenklick setzt; null = kein Setzmodus. */
   placingScheduleId: { entityId: string; scheduleId: string } | null
   setPlacingSchedule: (target: { entityId: string; scheduleId: string } | null) => void
@@ -361,8 +371,11 @@ export const useStore = create<StoreState>()(
         lastUndoPushAt: 0,
         timeOfDay: 12 * 60,
         currentDay: 1,
-        setTimeOfDay: (minutes) => set({ timeOfDay: Math.max(0, Math.min(1439, Math.round(minutes))) }),
-        setCurrentDay: (day) => set({ currentDay: Math.max(0, Math.round(day)) }),
+        // Vorgemerkte Positionen gehoeren immer zu genau einem Zeitpunkt an einem Tag -
+        // wechselt einer davon, sind sie hinfaellig.
+        setTimeOfDay: (minutes) =>
+          set({ timeOfDay: Math.max(0, Math.min(1439, Math.round(minutes))), draftPos: {} }),
+        setCurrentDay: (day) => set({ currentDay: Math.max(0, Math.round(day)), draftPos: {} }),
 
         // ---------- Untere Leiste ----------
         bottomPanel: null,
@@ -771,14 +784,15 @@ export const useStore = create<StoreState>()(
           // Zur selben Uhrzeit auf derselben Ebene gibt es nur einen Punkt - ein zweiter
           // waere nie erreichbar. Ein erneutes Setzen aktualisiert also den vorhandenen.
           const existing = entity.schedule.find((k) => k.time === time && k.day === day)
-          // Der neue Punkt uebernimmt die Stelle, an der das Objekt gerade steht, damit er
-          // sofort sichtbar ist und nur noch verschoben werden muss.
+          // Der Punkt haelt fest, wo das Objekt gerade zu sehen ist: die vorgemerkte
+          // Position, wenn man es eben verschoben hat, sonst die zu dieser Zeit geltende.
+          const draft = s.draftPos[entityId]
           const current = activeScheduleKey(entity.schedule, time, s.currentDay)
           const key: ScheduleKey = {
             id: existing?.id ?? uid('key-'),
             time,
-            x: init?.x ?? current?.x ?? entity.placement.x,
-            y: init?.y ?? current?.y ?? entity.placement.y,
+            x: init?.x ?? draft?.x ?? current?.x ?? entity.placement.x,
+            y: init?.y ?? draft?.y ?? current?.y ?? entity.placement.y,
             label: init?.label ?? existing?.label ?? '',
             day,
           }
@@ -795,8 +809,18 @@ export const useStore = create<StoreState>()(
                   },
             ),
           }))
+          // Die Vormerkung dieses Objekts ist nun festgehalten.
+          set((st) => {
+            const rest = { ...st.draftPos }
+            delete rest[entityId]
+            return { draftPos: rest }
+          })
           return key.id
         },
+
+        draftPos: {},
+        setDraftPos: (entityId, x, y) => set((s) => ({ draftPos: { ...s.draftPos, [entityId]: { x, y } } })),
+        clearDraftPos: () => set({ draftPos: {} }),
 
         placingScheduleId: null,
         setPlacingSchedule: (target) => set({ placingScheduleId: target, tool: 'select' }),

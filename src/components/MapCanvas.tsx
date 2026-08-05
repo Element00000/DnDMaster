@@ -69,6 +69,8 @@ export function MapCanvas() {
   const setTool = useStore((s) => s.setTool)
   const timeOfDay = useStore((s) => s.timeOfDay)
   const currentDay = useStore((s) => s.currentDay)
+  const draftPos = useStore((s) => s.draftPos)
+  const setDraftPos = useStore((s) => s.setDraftPos)
   const placingScheduleId = useStore((s) => s.placingScheduleId)
   const setPlacingSchedule = useStore((s) => s.setPlacingSchedule)
   const setSchedulePosition = useStore((s) => s.setSchedulePosition)
@@ -110,26 +112,49 @@ export function MapCanvas() {
     (e) => e.placement && e.placement.layerId === layer.id && (!tableMode || e.visibility === 'spieler'),
   )
 
-  // Effektive Position eines Objekts: aktiver Zeitplan-Eintrag (falls vorhanden), sonst Basis-Platzierung.
+  /**
+   * Wo ein Objekt gerade zu sehen ist: die eben vorgemerkte Position, sonst der zur
+   * Uhrzeit geltende Schluesselpunkt, sonst die Basis-Platzierung.
+   */
   const effectivePos = useCallback(
     (e: Entity): { x: number; y: number } => {
+      const draft = draftPos[e.id]
+      if (draft) return draft
       if (e.schedule.length > 0) {
         const active = activeScheduleKey(e.schedule, timeOfDay, currentDay)
         if (active) return { x: active.x, y: active.y }
       }
       return { x: e.placement!.x, y: e.placement!.y }
     },
-    [timeOfDay, currentDay],
+    [timeOfDay, currentDay, draftPos],
   )
 
-  // Bewegt bei aktivem Zeitplan-Eintrag dessen Position, sonst die Basis-Platzierung.
+  /**
+   * Ziehen eines Pins - was dabei verschoben wird, haengt davon ab, was man gerade tut:
+   *
+   * - Liegt die Uhrzeit genau auf einem Schluesselpunkt, wird dieser bearbeitet.
+   * - Plant man gerade den Tagesablauf dieses Objekts (Zeitleiste offen, Objekt gewaehlt,
+   *   Uhrzeit nach 0 Uhr), wird die neue Stelle nur vorgemerkt und erst durch "Punkt
+   *   setzen" festgehalten. Sonst wuerde das Ziehen den zuletzt gueltigen Punkt
+   *   mitverschieben, statt einen neuen Zeitpunkt vorzubereiten.
+   * - Sonst gilt die Basis-Platzierung des Objekts (auch um 0 Uhr, denn das ist sie).
+   */
   const moveEntityTimed = useCallback(
     (e: Entity, dxWorld: number, dyWorld: number) => {
       const active = activeScheduleKey(e.schedule, timeOfDay, currentDay)
-      if (active) moveScheduleKey(e.id, active.id, dxWorld, dyWorld)
-      else moveEntity(e.id, dxWorld, dyWorld)
+      if (active && active.time === timeOfDay) {
+        moveScheduleKey(e.id, active.id, dxWorld, dyWorld)
+        return
+      }
+      const planning = bottomPanel === 'zeitleiste' && selectedIds.includes(e.id) && timeOfDay > 0
+      if (planning) {
+        const from = draftPos[e.id] ?? { x: active?.x ?? e.placement!.x, y: active?.y ?? e.placement!.y }
+        setDraftPos(e.id, from.x + dxWorld, from.y + dyWorld)
+        return
+      }
+      moveEntity(e.id, dxWorld, dyWorld)
     },
-    [timeOfDay, currentDay, moveScheduleKey, moveEntity],
+    [timeOfDay, currentDay, moveScheduleKey, moveEntity, bottomPanel, selectedIds, draftPos, setDraftPos],
   )
 
   /**
