@@ -69,6 +69,7 @@ export function MapCanvas() {
   const setTool = useStore((s) => s.setTool)
   const timeOfDay = useStore((s) => s.timeOfDay)
   const currentDay = useStore((s) => s.currentDay)
+  const setTimeOfDay = useStore((s) => s.setTimeOfDay)
   const draftPos = useStore((s) => s.draftPos)
   const setDraftPos = useStore((s) => s.setDraftPos)
   const placingScheduleId = useStore((s) => s.placingScheduleId)
@@ -927,6 +928,7 @@ export function MapCanvas() {
           currentDay={currentDay}
           timeOfDay={timeOfDay}
           activeScheduleId={placingScheduleId?.scheduleId ?? null}
+          onPickTime={setTimeOfDay}
         />
       )}
 
@@ -1118,6 +1120,7 @@ function ScheduleOverlay({
   currentDay,
   timeOfDay,
   activeScheduleId,
+  onPickTime,
 }: {
   entity: Entity
   layers: MapLayer[]
@@ -1126,6 +1129,8 @@ function ScheduleOverlay({
   currentDay: number
   timeOfDay: number
   activeScheduleId: string | null
+  /** Klick auf eine Station stellt die Zeitleiste auf deren Uhrzeit. */
+  onPickTime: (minutes: number) => void
 }) {
   if (!entity.placement) return null
   const lv = layerScreenView(layers, rootLayerId, entity.placement.layerId, view)
@@ -1152,19 +1157,23 @@ function ScheduleOverlay({
         </svg>
       )}
       {stops.map((s, i) => (
-        <div
+        <button
           key={s.id}
           className={`schedule-stop${s.id === active?.id || (s.id === '__base__' && !active) ? ' is-now' : ''}${
             s.id === activeScheduleId ? ' is-target' : ''
           }${s.day != null ? ' is-exception' : ''}${s.id === '__base__' ? ' is-base' : ''}`}
           style={{ left: points[i].x, top: points[i].y }}
+          title={`Zeitleiste auf ${formatTime(s.time)} stellen`}
+          // Sonst zieht der Kartenhintergrund darunter eine Rechteck-Markierung auf.
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={() => onPickTime(s.time)}
         >
           <span className="schedule-stop__dot">{i + 1}</span>
           <span className="schedule-stop__label">
             {s.id === '__base__' ? 'Start' : formatTime(s.time)}
             {s.label ? ` · ${s.label}` : ''}
           </span>
-        </div>
+        </button>
       ))}
     </div>
   )

@@ -2642,12 +2642,27 @@ button {
   opacity: 0.65;
 }
 
+/* Anklickbar: stellt die Zeitleiste auf die Uhrzeit dieser Station. Das umgebende
+   Overlay laesst Zeigerereignisse durch, nur die Station selbst faengt sie ab. */
 .schedule-stop {
   position: absolute;
   transform: translate(-50%, -50%);
   display: flex;
   align-items: center;
   gap: 6px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.schedule-stop:hover .schedule-stop__dot {
+  border-color: var(--accent);
+}
+
+.schedule-stop:hover .schedule-stop__label {
+  color: var(--ink);
 }
 
 .schedule-stop__dot {
