@@ -2278,23 +2278,28 @@ button {
 
 /* ---------- Tagesablauf: 24-Stunden-Zeitstrahl ---------- */
 .dayschedule {
+  /* Breite der Spurenbeschriftung plus Abstand. Stundenleiste, Spuren und Abspielkopf
+     richten sich alle danach aus, damit sie exakt dieselbe Zeitachse teilen. */
+  --lane-offset: 130px;
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
 
 .daytrack {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 6px;
+  /* Platz fuer den Griff des Abspielkopfes ueber der Stundenleiste. */
+  padding-top: 22px;
 }
 
-/* Stundenbeschriftung: eigene Zeile, damit die Spuren selbst frei von Text bleiben.
-   Der linke Einzug entspricht der Breite der Spurenbeschriftung. */
+/* Stundenbeschriftung: eigene Zeile, damit die Spuren selbst frei von Text bleiben. */
 .daytrack__hours {
   position: relative;
   height: 15px;
-  margin-left: 104px;
+  margin-left: var(--lane-offset);
 }
 
 .daytrack__hour {
@@ -2312,7 +2317,8 @@ button {
 }
 
 .daytrack__lanelabel {
-  width: 96px;
+  /* 8px gehen an den Abstand zur Spur, der Rest ergibt --lane-offset. */
+  width: calc(var(--lane-offset) - 8px);
   flex: none;
   align-self: center;
   font-size: 11px;
@@ -2408,39 +2414,101 @@ button {
   pointer-events: none;
 }
 
-/* Kopfzeile des Zeitstrahls: Zeitpunkt waehlen und Punkt setzen. */
-.dayschedule__toolbar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
+
+/* Ebene, die genau den Bereich der Spuren abdeckt - inklusive Stundenleiste und dem
+   Streifen darueber. Nur der Abspielkopf darin nimmt Zeigerereignisse an. */
+.daytrack__scale {
+  position: absolute;
+  left: var(--lane-offset);
+  right: 0;
+  top: 0;
+  bottom: 0;
+  pointer-events: none;
 }
 
-.dayschedule__clock {
-  font-family: var(--font-display);
-  font-size: 15px;
-  color: var(--gold-soft);
-  font-variant-numeric: tabular-nums;
-  min-width: 52px;
-}
-
-.dayschedule__range {
-  flex: 1;
-  min-width: 140px;
-  accent-color: var(--gold);
-}
-
-/* Aktuell eingestellte Uhrzeit als Marker ueber allen Spuren. */
+/* Aktuell eingestellte Uhrzeit: durchgehende Linie ueber alle Spuren, oben mit Griff. */
 .daytrack__now {
   position: absolute;
   top: 0;
   bottom: 0;
+  width: 13px;
+  margin-left: -6px;
+  display: flex;
+  justify-content: center;
+  pointer-events: auto;
+  cursor: ew-resize;
+  touch-action: none;
+  z-index: 3;
+}
+
+.daytrack__now::before {
+  content: '';
   width: 2px;
-  margin-left: -1px;
   background: var(--gold);
   box-shadow: 0 0 6px var(--gold);
-  pointer-events: none;
-  z-index: 3;
+}
+
+/* Der Griff sitzt ueber der Stundenleiste, wo keine Spur im Weg ist. */
+.daytrack__now-grip {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--gold);
+  color: #1a1206;
+  font-size: 10px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+
+.daytrack__now:hover .daytrack__now-grip {
+  background: var(--gold-soft);
+}
+
+/* Punkt in dieser Spur setzen - steht am Ende jeder Spur. */
+.daytrack__add {
+  width: 30px;
+  flex: none;
+  align-self: center;
+  padding: 6px 0;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  color: var(--ink-dim);
+  font-size: 13px;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.daytrack__add:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent-soft);
+}
+
+.daytrack__add:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* Zweite Spur fuer Ausnahmen erst auf Wunsch. */
+.dayschedule__addlane {
+  align-self: flex-start;
+  margin-left: var(--lane-offset);
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px dashed var(--border-strong);
+  background: transparent;
+  color: var(--ink-faint);
+  font-size: 11.5px;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.dayschedule__addlane:hover {
+  border-color: var(--gold);
+  color: var(--gold-soft);
 }
 
 .dayschedule__hint {

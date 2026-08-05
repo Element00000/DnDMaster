@@ -16,8 +16,8 @@ function pct(minutes: number): string {
  * haelt fest, wo das Objekt ab dieser Uhrzeit steht - bis der naechste Punkt es
  * weiterschickt. Die Basis-Platzierung ist der feste Punkt um 0 Uhr.
  *
- * Zwei Spuren: der Standardplan, der an jedem Kampagnentag gilt, und die Ausnahmen des
- * aktuell eingestellten Kalendertags, die den Standard ueberschreiben.
+ * Standardmaessig gibt es nur die Spur, die an jedem Kampagnentag gilt. Eine zweite Spur
+ * fuer Ausnahmen eines einzelnen Tages wird erst auf Wunsch eingeblendet.
  */
 export function DaySchedule({ entity }: { entity: Entity }) {
   const timeOfDay = useStore((s) => s.timeOfDay)
@@ -31,7 +31,9 @@ export function DaySchedule({ entity }: { entity: Entity }) {
   const setPlacingSchedule = useStore((s) => s.setPlacingSchedule)
 
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const drag = useRef<{ keyId: string; grabbedAt: number; origTime: number; moved: boolean } | null>(null)
+  const [exceptionOpen, setExceptionOpen] = useState(false)
+  const scaleRef = useRef<HTMLDivElement>(null)
+  const keyDrag = useRef<{ keyId: string; grabbedAt: number; origTime: number } | null>(null)
   const lastKeyAt = useRef(0)
 
   const readOnly = tableMode
@@ -39,10 +41,14 @@ export function DaySchedule({ entity }: { entity: Entity }) {
   const standard = entity.schedule.filter((k) => k.day == null).sort((a, b) => a.time - b.time)
   const exceptions = entity.schedule.filter((k) => k.day === currentDay).sort((a, b) => a.time - b.time)
   const selected = entity.schedule.find((k) => k.id === selectedId) ?? null
-  // Was gerade gilt - beides zusammen, wie es die Karte auswertet.
   const today = scheduleForDay(entity.schedule, currentDay)
+  // Sind fuer diesen Tag schon Ausnahmen hinterlegt, muss die Spur natuerlich zu sehen sein.
+  const showException = exceptionOpen || exceptions.length > 0
 
-  const minutesFromPointer = useCallback((el: HTMLElement, clientX: number): number => {
+  /** Uhrzeit an einer Zeigerposition - gemessen an der Skala, die alle Spuren teilen. */
+  const minutesFromPointer = useCallback((clientX: number): number => {
+    const el = scaleRef.current
+    if (!el) return 0
     const rect = el.getBoundingClientRect()
     if (rect.width === 0) return 0
     const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width))
@@ -55,6 +61,27 @@ export function DaySchedule({ entity }: { entity: Entity }) {
     if (id) setSelectedId(id)
   }
 
+  // ---------- Abspielkopf ziehen ----------
+  const onScrubDown = useCallback((e: React.PointerEvent) => {
+    if (e.button !== 0) return
+    e.preventDefault()
+    e.stopPropagation()
+    ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+  }, [])
+
+  const onScrubMove = useCallback(
+    (e: React.PointerEvent) => {
+      if (!(e.currentTarget as HTMLElement).hasPointerCapture(e.pointerId)) return
+      setTimeOfDay(minutesFromPointer(e.clientX))
+    },
+    [minutesFromPointer, setTimeOfDay],
+  )
+
+  const onScrubUp = useCallback((e: React.PointerEvent) => {
+    const el = e.currentTarget as HTMLElement
+    if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId)
+  }, [])
+
   // ---------- Schluesselpunkt verschieben ----------
   const onKeyDown = useCallback(
     (e: React.PointerEvent, key: ScheduleKey) => {
@@ -64,12 +91,7 @@ export function DaySchedule({ entity }: { entity: Entity }) {
       if (!lane) return
       lane.setPointerCapture(e.pointerId)
       lastKeyAt.current = Date.now()
-      drag.current = {
-        keyId: key.id,
-        grabbedAt: minutesFromPointer(lane, e.clientX),
-        origTime: key.time,
-        moved: false,
-      }
+      keyDrag.current = { keyId: key.id, grabbedAt: minutesFromPointer(e.clientX), origTime: key.time }
       setSelectedId(key.id)
       setTimeOfDay(key.time)
     },
@@ -78,13 +100,11 @@ export function DaySchedule({ entity }: { entity: Entity }) {
 
   const onLaneMove = useCallback(
     (e: React.PointerEvent) => {
-      const d = drag.current
+      const d = keyDrag.current
       const lane = e.currentTarget as HTMLElement
       if (!d || !lane.hasPointerCapture(e.pointerId)) return
-      const now = minutesFromPointer(lane, e.clientX)
-      const delta = now - d.grabbedAt
+      const delta = minutesFromPointer(e.clientX) - d.grabbedAt
       if (delta === 0) return
-      d.moved = true
       // 0 Uhr bleibt der Basis-Platzierung vorbehalten, daher erst ab dem naechsten Raster.
       const time = Math.max(SNAP, Math.min(MINUTES_PER_DAY - SNAP, d.origTime + delta))
       updateScheduleKey(entity.id, d.keyId, { time })
@@ -96,91 +116,77 @@ export function DaySchedule({ entity }: { entity: Entity }) {
   const onLaneUp = useCallback((e: React.PointerEvent) => {
     const lane = e.currentTarget as HTMLElement
     if (lane.hasPointerCapture(e.pointerId)) lane.releasePointerCapture(e.pointerId)
-    if (drag.current) lastKeyAt.current = Date.now()
-    drag.current = null
+    if (keyDrag.current) lastKeyAt.current = Date.now()
+    keyDrag.current = null
   }, [])
 
-  // Klick auf freie Spurflaeche setzt nur die Uhrzeit - gesetzt wird per Knopf, damit
-  // nicht jeder Klick auf der Suche nach dem richtigen Moment einen Punkt hinterlaesst.
+  // Klick auf freie Spurflaeche setzt nur die Uhrzeit - Punkte entstehen ueber den Knopf,
+  // damit nicht jeder Klick auf der Suche nach dem richtigen Moment einen hinterlaesst.
   const onLaneClick = useCallback(
     (e: React.MouseEvent) => {
       if (Date.now() - lastKeyAt.current < 400) return
-      setTimeOfDay(minutesFromPointer(e.currentTarget as HTMLElement, e.clientX))
+      setTimeOfDay(minutesFromPointer(e.clientX))
     },
     [minutesFromPointer, setTimeOfDay],
   )
 
-  function renderLane(keys: ScheduleKey[], day: number | null) {
+  function renderRow(label: string, keys: ScheduleKey[], day: number | null) {
     return (
-      <div
-        className="daytrack__lane"
-        onClick={onLaneClick}
-        onPointerMove={onLaneMove}
-        onPointerUp={onLaneUp}
-        onPointerCancel={onLaneUp}
-        onLostPointerCapture={onLaneUp}
-      >
-        {/* Der Abschnitt, den ein Punkt abdeckt: von ihm bis zum naechsten. */}
-        {keys.map((k, i) => (
-          <div
-            key={`span-${k.id}`}
-            className={`daykey__span${day != null ? ' is-exception' : ''}`}
-            style={{
-              left: pct(k.time),
-              width: pct(keyEndsAt(keys, i) - k.time),
-              ['--chip-color' as string]: meta.color,
-            }}
-          />
-        ))}
+      <div className="daytrack__row">
+        <span className={`daytrack__lanelabel${day != null ? ' daytrack__lanelabel--exception' : ''}`}>
+          {label}
+        </span>
+        <div
+          className="daytrack__lane"
+          onClick={onLaneClick}
+          onPointerMove={onLaneMove}
+          onPointerUp={onLaneUp}
+          onPointerCancel={onLaneUp}
+          onLostPointerCapture={onLaneUp}
+        >
+          {/* Der Abschnitt, den ein Punkt abdeckt: von ihm bis zum naechsten. */}
+          {keys.map((k, i) => (
+            <div
+              key={`span-${k.id}`}
+              className={`daykey__span${day != null ? ' is-exception' : ''}`}
+              style={{
+                left: pct(k.time),
+                width: pct(keyEndsAt(keys, i) - k.time),
+                ['--chip-color' as string]: meta.color,
+              }}
+            />
+          ))}
 
-        {keys.map((k) => (
-          <button
-            key={k.id}
-            className={`daykey${selectedId === k.id ? ' is-selected' : ''}${
-              day != null ? ' daykey--exception' : ''
-            }`}
-            style={{ left: pct(k.time), ['--chip-color' as string]: meta.color }}
-            title={`${formatTime(k.time)}${k.label ? ` · ${k.label}` : ''}`}
-            onPointerDown={(e) => onKeyDown(e, k)}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <span className="daykey__diamond" />
-            {k.label && <span className="daykey__label">{k.label}</span>}
-          </button>
-        ))}
-
-        <div className="daytrack__now" style={{ left: pct(timeOfDay) }} />
+          {keys.map((k) => (
+            <button
+              key={k.id}
+              className={`daykey${selectedId === k.id ? ' is-selected' : ''}${
+                day != null ? ' daykey--exception' : ''
+              }`}
+              style={{ left: pct(k.time), ['--chip-color' as string]: meta.color }}
+              title={`${formatTime(k.time)}${k.label ? ` · ${k.label}` : ''}`}
+              onPointerDown={(e) => onKeyDown(e, k)}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <span className="daykey__diamond" />
+              {k.label && <span className="daykey__label">{k.label}</span>}
+            </button>
+          ))}
+        </div>
+        <button
+          className="daytrack__add"
+          disabled={readOnly}
+          onClick={() => setKey(day)}
+          title={`Punkt bei ${formatTime(timeOfDay)} setzen`}
+        >
+          ◆
+        </button>
       </div>
     )
   }
 
   return (
     <div className="dayschedule">
-      <div className="dayschedule__toolbar">
-        <span className="dayschedule__clock">{formatTime(timeOfDay)}</span>
-        <input
-          className="dayschedule__range"
-          type="range"
-          min={0}
-          max={MINUTES_PER_DAY - SNAP}
-          step={SNAP}
-          value={timeOfDay}
-          onChange={(e) => setTimeOfDay(Number(e.target.value))}
-          title="Zeitpunkt waehlen"
-        />
-        <button className="btn btn--sm btn--primary" disabled={readOnly} onClick={() => setKey(null)}>
-          ◆ Punkt setzen
-        </button>
-        <button
-          className="btn btn--sm"
-          disabled={readOnly}
-          onClick={() => setKey(currentDay)}
-          title={`Nur fuer Tag ${currentDay}`}
-        >
-          ◇ Nur Tag {currentDay}
-        </button>
-      </div>
-
       <div className="daytrack">
         <div className="daytrack__hours">
           {Array.from({ length: 9 }, (_, i) => i * 3).map((h) => (
@@ -190,21 +196,37 @@ export function DaySchedule({ entity }: { entity: Entity }) {
           ))}
         </div>
 
-        <div className="daytrack__row">
-          <span className="daytrack__lanelabel">Jeden Tag</span>
-          {renderLane(standard, null)}
-        </div>
+        {renderRow('Jeden Tag', standard, null)}
+        {showException && renderRow(`Nur Tag ${currentDay}`, exceptions, currentDay)}
 
-        <div className="daytrack__row">
-          <span className="daytrack__lanelabel daytrack__lanelabel--exception">Nur Tag {currentDay}</span>
-          {renderLane(exceptions, currentDay)}
+        {/* Abspielkopf ueber alle Spuren. Liegt in einer eigenen Ebene, die genau den
+            Bereich der Spuren abdeckt - so laesst er sich auch oben an der Stundenleiste
+            greifen, wo keine Spur im Weg ist. */}
+        <div className="daytrack__scale" ref={scaleRef}>
+          <div
+            className="daytrack__now"
+            style={{ left: pct(timeOfDay) }}
+            title={`${formatTime(timeOfDay)} — ziehen, um die Uhrzeit zu aendern`}
+            onPointerDown={onScrubDown}
+            onPointerMove={onScrubMove}
+            onPointerUp={onScrubUp}
+            onPointerCancel={onScrubUp}
+          >
+            <span className="daytrack__now-grip">{formatTime(timeOfDay)}</span>
+          </div>
         </div>
       </div>
+
+      {!showException && !readOnly && (
+        <button className="dayschedule__addlane" onClick={() => setExceptionOpen(true)}>
+          + Ausnahme fuer Tag {currentDay}
+        </button>
+      )}
 
       <p className="dayschedule__hint">
         {readOnly
           ? 'Im Spieltischmodus ist der Tagesablauf schreibgeschuetzt.'
-          : 'Ab 0 Uhr gilt die normale Position des Objekts. Zeitpunkt waehlen, dann Punkt setzen — ab dort steht es an der neuen Stelle, bis der naechste Punkt kommt.'}
+          : 'Ab 0 Uhr gilt die normale Position des Objekts. Uhrzeit am Zeiger ziehen, dann mit ◆ einen Punkt setzen — ab dort steht es an der neuen Stelle, bis der naechste Punkt kommt.'}
       </p>
 
       {selected ? (
@@ -238,11 +260,11 @@ export function DaySchedule({ entity }: { entity: Entity }) {
               className="field__control field__control--sm"
               value={selected.day == null ? 'standard' : 'exception'}
               disabled={readOnly}
-              onChange={(e) =>
-                updateScheduleKey(entity.id, selected.id, {
-                  day: e.target.value === 'standard' ? null : currentDay,
-                })
-              }
+              onChange={(e) => {
+                const day = e.target.value === 'standard' ? null : currentDay
+                if (day != null) setExceptionOpen(true)
+                updateScheduleKey(entity.id, selected.id, { day })
+              }}
             >
               <option value="standard">Jeden Tag</option>
               <option value="exception">Nur Tag {currentDay}</option>
