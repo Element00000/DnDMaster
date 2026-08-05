@@ -2,13 +2,18 @@ import { useCallback, useRef, useState } from 'react'
 import { entityDisplayMeta } from '../types'
 import type { Entity, ScheduleKey } from '../types'
 import { useStore } from '../store/useStore'
-import { MINUTES_PER_DAY, formatTime, keyEndsAt, parseTime, scheduleForDay, wrapMinutes } from '../utils/time'
+import { MINUTES_PER_DAY, formatTime, keyEndsAt, parseTime, scheduleForDay } from '../utils/time'
 
 /** Raster, auf das Ziehen und Klicken im Zeitstrahl einrastet (Minuten). */
 const SNAP = 15
 
 function pct(minutes: number): string {
   return `${(minutes / MINUTES_PER_DAY) * 100}%`
+}
+
+/** Auf den Tag begrenzen: 0 Uhr bis zum letzten Rasterschritt davor. */
+function clampTime(minutes: number): number {
+  return Math.max(0, Math.min(MINUTES_PER_DAY - SNAP, minutes))
 }
 
 /**
@@ -52,7 +57,9 @@ export function DaySchedule({ entity }: { entity: Entity }) {
     const rect = el.getBoundingClientRect()
     if (rect.width === 0) return 0
     const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width))
-    return wrapMinutes(Math.round((ratio * MINUTES_PER_DAY) / SNAP) * SNAP)
+    // Begrenzen statt umlaufen zu lassen: Am rechten Rand ergaebe die Rundung sonst
+    // 24:00 und damit wieder 0 Uhr, der Zeiger spraenge also an den Anfang zurueck.
+    return clampTime(Math.round((ratio * MINUTES_PER_DAY) / SNAP) * SNAP)
   }, [])
 
   function setKey(day: number | null) {
@@ -105,8 +112,7 @@ export function DaySchedule({ entity }: { entity: Entity }) {
       if (!d || !lane.hasPointerCapture(e.pointerId)) return
       const delta = minutesFromPointer(e.clientX) - d.grabbedAt
       if (delta === 0) return
-      // 0 Uhr bleibt der Basis-Platzierung vorbehalten, daher erst ab dem naechsten Raster.
-      const time = Math.max(SNAP, Math.min(MINUTES_PER_DAY - SNAP, d.origTime + delta))
+      const time = clampTime(d.origTime + delta)
       updateScheduleKey(entity.id, d.keyId, { time })
       setTimeOfDay(time)
     },
@@ -226,7 +232,7 @@ export function DaySchedule({ entity }: { entity: Entity }) {
       <p className="dayschedule__hint">
         {readOnly
           ? 'Im Spieltischmodus ist der Tagesablauf schreibgeschuetzt.'
-          : 'Ab 0 Uhr gilt die normale Position des Objekts. Uhrzeit am Zeiger ziehen, dann mit ◆ einen Punkt setzen — ab dort steht es an der neuen Stelle, bis der naechste Punkt kommt.'}
+          : 'Vor dem ersten Punkt gilt die normale Position des Objekts. Uhrzeit am Zeiger ziehen, dann mit ◆ einen Punkt setzen — ab dort steht es an der neuen Stelle, bis der naechste Punkt kommt.'}
       </p>
 
       {selected ? (
