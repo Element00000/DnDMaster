@@ -116,17 +116,17 @@ export function MapCanvas() {
    * Wo ein Objekt gerade zu sehen ist: die eben vorgemerkte Position, sonst der zur
    * Uhrzeit geltende Schluesselpunkt, sonst die Basis-Platzierung.
    */
+  // Eine vorgemerkte Position bewegt den Pin bewusst NICHT: Sie erscheint als eigenes
+  // Doppel daneben (siehe DraftOverlay), damit man sieht, dass noch nichts gespeichert ist.
   const effectivePos = useCallback(
     (e: Entity): { x: number; y: number } => {
-      const draft = draftPos[e.id]
-      if (draft) return draft
       if (e.schedule.length > 0) {
         const active = activeScheduleKey(e.schedule, timeOfDay, currentDay)
         if (active) return { x: active.x, y: active.y }
       }
       return { x: e.placement!.x, y: e.placement!.y }
     },
-    [timeOfDay, currentDay, draftPos],
+    [timeOfDay, currentDay],
   )
 
   /**
@@ -906,6 +906,17 @@ export function MapCanvas() {
         })}
       </div>
 
+      {/* Vorgemerkte Positionen als Doppel neben dem Original. */}
+      <DraftOverlay
+        entities={entities}
+        drafts={draftPos}
+        layers={campaign.layers}
+        rootLayerId={layer.id}
+        view={view}
+        timeOfDay={timeOfDay}
+        effectivePos={effectivePos}
+      />
+
       {/* Beim Planen in der Zeitleiste: alle Stationen des ausgewaehlten Objekts als Route. */}
       {bottomPanel === 'zeitleiste' && selectedEntity && (
         <ScheduleOverlay
@@ -1032,6 +1043,69 @@ export function MapCanvas() {
 }
 
 /**
+ * Vorgemerkte Positionen: Waehrend man einen Tagesablauf plant, wandert nicht der Pin
+ * selbst, sondern ein Doppel von ihm. Eine gestrichelte Linie verbindet beide, damit
+ * erkennbar bleibt, wozu das Doppel gehoert und dass es noch nicht festgehalten ist.
+ */
+function DraftOverlay({
+  entities,
+  drafts,
+  layers,
+  rootLayerId,
+  view,
+  timeOfDay,
+  effectivePos,
+}: {
+  entities: Entity[]
+  drafts: Record<string, { x: number; y: number }>
+  layers: MapLayer[]
+  rootLayerId: string
+  view: View
+  timeOfDay: number
+  effectivePos: (e: Entity) => { x: number; y: number }
+}) {
+  const items = entities.filter((e) => e.placement && drafts[e.id])
+  if (items.length === 0) return null
+
+  return (
+    <div className="draft-overlay">
+      {items.map((e) => {
+        const lv = layerScreenView(layers, rootLayerId, e.placement!.layerId, view)
+        if (!lv) return null
+        const meta = entityDisplayMeta(e)
+        const origin = effectivePos(e)
+        const draft = drafts[e.id]
+        const from = { x: origin.x * lv.scale + lv.tx, y: origin.y * lv.scale + lv.ty }
+        const to = { x: draft.x * lv.scale + lv.tx, y: draft.y * lv.scale + lv.ty }
+        return (
+          <div key={e.id} style={{ ['--chip-color' as string]: meta.color }}>
+            <svg className="draft-overlay__link">
+              <line x1={from.x} y1={from.y} x2={to.x} y2={to.y} />
+            </svg>
+            <MapPin
+              screenX={to.x}
+              screenY={to.y}
+              icon={meta.icon}
+              imageRef={e.thumbUrl ?? e.imageUrl}
+              color={meta.color}
+              iconInvert={meta.iconInvert}
+              // Uhrzeit im Label: Sie sagt, wofuer die Stelle vorgemerkt ist.
+              label={`${formatTime(timeOfDay)} · ${e.name}`}
+              selected={false}
+              draggable={false}
+              scale={view.scale}
+              ghost
+              onClick={() => {}}
+              onMove={() => {}}
+            />
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+/**
  * Route eines Objekts ueber den Tag: alle heute geltenden Zeitfenster als nummerierte
  * Stationen mit Verbindungslinie. Rein zur Orientierung beim Planen in der Zeitleiste -
  * nimmt keine Klicks entgegen, damit Karte und Pins normal bedienbar bleiben.
@@ -1058,8 +1132,13 @@ function ScheduleOverlay({
   if (!lv) return null
 
   // Nur was heute wirklich gilt: Standardplan plus die Ausnahmen des aktuellen Tages.
-  const stops = scheduleForDay(entity.schedule, currentDay)
-  if (stops.length === 0) return null
+  const keys = scheduleForDay(entity.schedule, currentDay)
+  if (keys.length === 0) return null
+
+  // Der Tag beginnt an der Basis-Platzierung - sie ist Station 1, auch wenn sie nicht in
+  // den Daten steht. Nur wenn dort schon ein echter Punkt liegt, gilt dieser als erster.
+  const base = { id: '__base__', time: 0, x: entity.placement.x, y: entity.placement.y, label: '', day: null }
+  const stops = keys.some((k) => k.time === 0) ? keys : [base, ...keys]
 
   const meta = entityDisplayMeta(entity)
   const active = activeScheduleKey(entity.schedule, timeOfDay, currentDay)
@@ -1075,14 +1154,14 @@ function ScheduleOverlay({
       {stops.map((s, i) => (
         <div
           key={s.id}
-          className={`schedule-stop${s.id === active?.id ? ' is-now' : ''}${
+          className={`schedule-stop${s.id === active?.id || (s.id === '__base__' && !active) ? ' is-now' : ''}${
             s.id === activeScheduleId ? ' is-target' : ''
-          }${s.day != null ? ' is-exception' : ''}`}
+          }${s.day != null ? ' is-exception' : ''}${s.id === '__base__' ? ' is-base' : ''}`}
           style={{ left: points[i].x, top: points[i].y }}
         >
           <span className="schedule-stop__dot">{i + 1}</span>
           <span className="schedule-stop__label">
-            {formatTime(s.time)}
+            {s.id === '__base__' ? 'Start' : formatTime(s.time)}
             {s.label ? ` · ${s.label}` : ''}
           </span>
         </div>

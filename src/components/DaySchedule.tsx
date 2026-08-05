@@ -120,6 +120,28 @@ export function DaySchedule({ entities }: { entities: Entity[] }) {
     if (firstId) setSelectedId(firstId)
   }
 
+  /**
+   * Punkt setzen, der zurueck an die Startposition fuehrt. Ohne ihn gilt der letzte Punkt
+   * bis Mitternacht - die Figur bliebe also fuer den Rest des Tages dort stehen, wo sie
+   * zuletzt hingeschickt wurde.
+   */
+  function setHomeKeys() {
+    if (readOnly) return
+    let firstId: string | null = null
+    for (const e of entities) {
+      if (!e.placement) continue
+      const id = addScheduleKey(e.id, {
+        time: timeOfDay,
+        day: null,
+        x: e.placement.x,
+        y: e.placement.y,
+        label: 'Start',
+      })
+      if (id && !firstId) firstId = id
+    }
+    if (firstId) setSelectedId(firstId)
+  }
+
   // ---------- Abspielkopf ziehen ----------
   const onScrubDown = useCallback((e: React.PointerEvent) => {
     if (e.button !== 0) return
@@ -303,6 +325,15 @@ export function DaySchedule({ entities }: { entities: Entity[] }) {
         {!single && !readOnly && (
           <button className="btn btn--sm btn--primary" onClick={() => setKeys(null)}>
             ◆ Punkt fuer alle {entities.length} setzen
+          </button>
+        )}
+        {!readOnly && (
+          <button
+            className="btn btn--sm"
+            onClick={setHomeKeys}
+            title="Punkt setzen, ab dem wieder die Startposition gilt"
+          >
+            ↩ Zurueck zum Start
           </button>
         )}
         {single && !showException && !readOnly && (

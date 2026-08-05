@@ -19,6 +19,11 @@ interface Props {
   isMapLink?: boolean
   /** Icon weiss statt in Originalfarbe darstellen (z.B. Spieler-Charaktere). */
   iconInvert?: boolean
+  /**
+   * Vorschau-Doppel eines Pins: zeigt eine erst vorgemerkte Position an, die noch nicht
+   * gespeichert ist. Nimmt keine Klicks an - bedient wird immer das Original.
+   */
+  ghost?: boolean
   onClick: (e: React.PointerEvent) => void
   onMove: (dxWorld: number, dyWorld: number) => void
   /** Nach einem Ziehen (nicht bei einem reinen Klick): Bildschirmkoordinaten des Loslassens. */
@@ -41,6 +46,7 @@ export function MapPin({
   scale,
   isMapLink,
   iconInvert,
+  ghost,
   onClick,
   onMove,
   onDragEnd,
@@ -88,7 +94,7 @@ export function MapPin({
 
   return (
     <div
-      className={`map-pin${selected ? ' is-selected' : ''}${draggable ? ' is-draggable' : ''}${isMapLink ? ' is-map-link' : ''}${iconInvert ? ' is-icon-invert' : ''}${image ? ' has-image' : ''}`}
+      className={`map-pin${selected ? ' is-selected' : ''}${draggable ? ' is-draggable' : ''}${isMapLink ? ' is-map-link' : ''}${iconInvert ? ' is-icon-invert' : ''}${image ? ' has-image' : ''}${ghost ? ' is-ghost' : ''}`}
       style={{ left: screenX, top: screenY, ['--pin-color' as string]: color }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
