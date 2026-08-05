@@ -3,7 +3,9 @@ import { useStore } from './store/useStore'
 
 /**
  * Position eines schwebenden Bedienelements ueber der unteren Leiste: Ist ein Panel
- * geoeffnet, sitzt das Element auf dessen Oberkante statt am Kartenrand.
+ * geoeffnet, sitzt das Element auf dessen Oberkante statt am Kartenrand. Gerechnet wird mit
+ * der tatsaechlich gemessenen Hoehe, weil die Leiste standardmaessig mit ihrem Inhalt
+ * waechst - eine Prozentangabe saegt darueber nichts aus.
  *
  * "snap" ist genau in dem Moment gesetzt, in dem sich das Panel oeffnet oder schliesst.
  * Dann soll die neue Position ohne weichen Nachlauf uebernommen werden - das Panel steht
@@ -14,7 +16,7 @@ import { useStore } from './store/useStore'
  */
 export function useBottomPanelOffset(gap: number): { bottom: string; snap: boolean } {
   const bottomPanel = useStore((s) => s.bottomPanel)
-  const bottomPanelHeight = useStore((s) => s.bottomPanelHeight)
+  const bottomPanelPx = useStore((s) => s.bottomPanelPx)
 
   const open = bottomPanel !== null
   const [snap, setSnap] = useState(false)
@@ -33,5 +35,5 @@ export function useBottomPanelOffset(gap: number): { bottom: string; snap: boole
     return () => cancelAnimationFrame(id)
   }, [snap])
 
-  return { bottom: `calc(${open ? bottomPanelHeight : 0}% + ${gap}px)`, snap }
+  return { bottom: `${(open ? bottomPanelPx : 0) + gap}px`, snap }
 }

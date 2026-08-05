@@ -8,6 +8,12 @@ import { EntityIcon } from './EntityIcon'
 
 type Tab = 'objekt' | 'kampagne'
 
+/** Kurzanleitung zum Tagesablauf; haengt am Infopunkt neben dem Reiter. */
+const SCHEDULE_HELP =
+  'Zuerst die Uhrzeit am Zeiger ziehen, dann die Figur auf der Karte an ihren Platz ' +
+  'schieben, dann mit ◆ den Punkt setzen. Vor dem ersten Punkt gilt die normale Position. ' +
+  'Mit ◇ kehrt die Figur ab dieser Uhrzeit wieder dorthin zurueck.'
+
 /**
  * Inhalt der unteren Zeitleiste. Zeigt zum ausgewaehlten Objekt dessen Tagesablauf
  * (wann es sich wo auf der Karte aufhaelt) und daneben die Kampagnen-Zeitleiste
@@ -39,6 +45,17 @@ export function Timeline() {
             Tagesablauf
             {selected.length > 1 && <span className="timeline__tabname">{selected.length} Objekte</span>}
           </button>
+          {/* Die Anleitung steckt hier statt unter dem Zeitstrahl - dort nahm sie
+              dauerhaft Hoehe weg, obwohl man sie nur einmal braucht. */}
+          <span
+            className="infodot"
+            tabIndex={0}
+            role="note"
+            aria-label={SCHEDULE_HELP}
+            title={SCHEDULE_HELP}
+          >
+            i<span className="infodot__bubble">{SCHEDULE_HELP}</span>
+          </span>
           <button
             className={`timeline__tab${activeTab === 'kampagne' ? ' is-active' : ''}`}
             onClick={() => setTab('kampagne')}

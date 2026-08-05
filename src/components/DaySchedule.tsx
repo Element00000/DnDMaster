@@ -77,8 +77,6 @@ export function DaySchedule({ entities }: { entities: Entity[] }) {
   const single = entities.length === 1
   const selected = entities.flatMap((e) => e.schedule).find((k) => k.id === selectedId) ?? null
   const selectedOwner = entities.find((e) => e.schedule.some((k) => k.id === selectedId)) ?? null
-  const hasDraft = entities.some((e) => draftPos[e.id])
-  const anyKeys = entities.some((e) => scheduleForDay(e.schedule, currentDay).length > 0)
   const hasExceptions = entities.some((e) => e.schedule.some((k) => k.day === currentDay))
   // Sind fuer diesen Tag schon Ausnahmen hinterlegt, muss die Spur natuerlich zu sehen sein.
   const showException = single && (exceptionOpen || hasExceptions)
@@ -367,14 +365,9 @@ export function DaySchedule({ entities }: { entities: Entity[] }) {
         )}
       </div>
 
-      <p className={`dayschedule__hint${hasDraft ? ' is-pending' : ''}`}>
-        {readOnly
-          ? 'Im Spieltischmodus ist der Tagesablauf schreibgeschuetzt.'
-          : hasDraft
-            ? `Neue Stelle fuer ${formatTime(timeOfDay)} vorgemerkt — mit ◆ festhalten.`
-            : 'Zuerst die Uhrzeit am Zeiger ziehen, dann die Figur auf der Karte an ihren Platz schieben, dann mit ◆ den Punkt setzen. Vor dem ersten Punkt gilt die normale Position.'}
-      </p>
-
+      {/* Die Anleitung steht am Infopunkt neben dem Reiter, nicht mehr hier - sie haette
+          dauerhaft Hoehe gekostet. Dass eine Stelle vorgemerkt ist, zeigen das Doppel auf
+          der Karte und der hervorgehobene Knopf an der Spur. */}
       {selected && selectedOwner ? (
         <div className="dayedit">
           <label className="dayedit__field">
@@ -445,11 +438,9 @@ export function DaySchedule({ entities }: { entities: Entity[] }) {
           </button>
         </div>
       ) : (
-        <p className="dayschedule__empty">
-          {!anyKeys
-            ? 'Noch kein Tagesablauf — die Objekte bleiben den ganzen Tag an ihrer Position.'
-            : 'Punkt anklicken, um Uhrzeit, Beschriftung und Ort zu bearbeiten.'}
-        </p>
+        // Nichts ausgewaehlt: Die Bearbeitungszeile bleibt einfach weg, statt Platz fuer
+        // einen Hinweis zu belegen.
+        null
       )}
     </div>
   )

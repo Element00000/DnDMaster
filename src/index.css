@@ -1914,6 +1914,8 @@ button {
   left: 0;
   right: 0;
   bottom: 0;
+  /* Nie hoeher als der Kartenbereich, egal wie viel Inhalt es gibt. */
+  max-height: 92%;
   z-index: 18;
   background: rgba(18, 21, 29, 0.97);
   border-top: 1px solid var(--border);
@@ -1921,6 +1923,23 @@ button {
   display: flex;
   flex-direction: column;
   backdrop-filter: blur(4px);
+}
+
+/* Standardfall: Die Leiste ist nur so hoch wie ihr Inhalt und waechst mit, wenn Spuren
+   oder Objekte dazukommen. Erst wenn man am Griff zieht, gilt eine feste Hoehe (dann
+   setzt BottomPanel sie inline). */
+.bottompanel.is-auto {
+  height: auto;
+}
+
+/* Damit die natuerliche Hoehe ueberhaupt durchschlaegt, darf die Kette darunter nicht
+   auf "flex: 1" stehen: Mit flex-basis 0 und min-height 0 fiele der Inhalt auf null
+   zusammen, sobald der Rahmen keine feste Hoehe mehr vorgibt. "0 1 auto" heisst
+   stattdessen: natuerlich hoch, darf aber schrumpfen, wenn die Obergrenze greift. */
+.bottompanel.is-auto .bottompanel__content,
+.bottompanel.is-auto .timeline,
+.bottompanel.is-auto .timeline__body {
+  flex: 0 1 auto;
 }
 
 /* Ziehgriff: liegt auf der Oberkante und ragt etwas darueber hinaus, damit er gut
@@ -2040,6 +2059,62 @@ button {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* ---------- Infopunkt ----------
+   Kreis mit "i". Die Erlaeuterung steht als eigene Blase darin, damit sie sofort
+   erscheint statt erst nach der Verzoegerung eines Browser-Tooltips. */
+.infodot {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex: none;
+  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+  color: var(--ink-faint);
+  font-family: var(--font-display);
+  font-size: 11px;
+  line-height: 1;
+  cursor: help;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.infodot:hover,
+.infodot:focus-visible {
+  border-color: var(--accent);
+  color: var(--accent-soft);
+  outline: none;
+}
+
+.infodot__bubble {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 40;
+  width: max-content;
+  max-width: 320px;
+  padding: 9px 11px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  box-shadow: var(--shadow);
+  color: var(--ink-dim);
+  font-family: var(--font-ui);
+  font-size: 11.5px;
+  line-height: 1.5;
+  text-align: left;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.12s;
+}
+
+.infodot:hover .infodot__bubble,
+.infodot:focus-visible .infodot__bubble {
+  opacity: 1;
+  visibility: visible;
 }
 
 .timeline__body {
@@ -2550,9 +2625,6 @@ button {
   color: var(--gold-soft);
 }
 
-.dayschedule__hint.is-pending {
-  color: var(--gold-soft);
-}
 
 .dayschedule__actions {
   display: flex;
@@ -2584,11 +2656,6 @@ button {
   line-height: 1.5;
 }
 
-.dayschedule__empty {
-  margin: 0;
-  font-size: 12px;
-  color: var(--ink-faint);
-}
 
 /* Bearbeitungszeile des ausgewaehlten Zeitfensters. */
 .dayedit {

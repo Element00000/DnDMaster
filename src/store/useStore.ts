@@ -183,8 +183,21 @@ interface StoreState extends AppData {
   // Untere, hochfahrende Leiste (Zeitleiste / Handlungsbaum / Beziehungen)
   /** Geoeffnete Ansicht; null = Leiste zu. */
   bottomPanel: BottomPanel | null
-  /** Hoehe der Leiste in Prozent der Fensterhoehe. */
+  /** Hoehe der Leiste in Prozent der Fensterhoehe - gilt erst, wenn man selbst gezogen hat. */
   bottomPanelHeight: number
+  /**
+   * Hoehe folgt dem Inhalt, statt fest zu sein: Die Leiste ist nur so hoch wie noetig und
+   * waechst mit, wenn Spuren dazukommen. Sobald man selbst am Griff zieht, gilt die
+   * eingestellte Hoehe; beim naechsten Oeffnen passt sie sich wieder an.
+   */
+  bottomPanelAuto: boolean
+  /**
+   * Tatsaechliche Hoehe der Leiste in Pixeln, vom Panel gemeldet. Im mitwachsenden Zustand
+   * ist die Prozentangabe nicht aussagekraeftig - die schwebenden Leisten darueber
+   * (Panel-Knoepfe, Zoom) richten sich daher an diesem Wert aus.
+   */
+  bottomPanelPx: number
+  setBottomPanelPx: (px: number) => void
   /** Ansicht oeffnen; derselbe Wert erneut schliesst sie wieder. */
   toggleBottomPanel: (panel: BottomPanel) => void
   setBottomPanel: (panel: BottomPanel | null) => void
@@ -380,10 +393,19 @@ export const useStore = create<StoreState>()(
         // ---------- Untere Leiste ----------
         bottomPanel: null,
         bottomPanelHeight: BOTTOM_PANEL_DEFAULT,
-        toggleBottomPanel: (panel) => set((s) => ({ bottomPanel: s.bottomPanel === panel ? null : panel })),
-        setBottomPanel: (panel) => set({ bottomPanel: panel }),
+        bottomPanelAuto: true,
+        bottomPanelPx: 0,
+        setBottomPanelPx: (px) => set({ bottomPanelPx: px }),
+        // Frisch geoeffnet passt sich die Hoehe wieder dem Inhalt an.
+        toggleBottomPanel: (panel) =>
+          set((s) => ({ bottomPanel: s.bottomPanel === panel ? null : panel, bottomPanelAuto: true })),
+        setBottomPanel: (panel) => set({ bottomPanel: panel, bottomPanelAuto: true }),
+        // Am Griff gezogen: ab jetzt gilt die eingestellte Hoehe.
         setBottomPanelHeight: (percent) =>
-          set({ bottomPanelHeight: Math.max(BOTTOM_PANEL_MIN, Math.min(BOTTOM_PANEL_MAX, percent)) }),
+          set({
+            bottomPanelHeight: Math.max(BOTTOM_PANEL_MIN, Math.min(BOTTOM_PANEL_MAX, percent)),
+            bottomPanelAuto: false,
+          }),
 
         // ---------- DM-Werkzeuge ----------
         toolsOpen: false,
