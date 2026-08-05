@@ -21,6 +21,18 @@ function clampTime(minutes: number): number {
   return Math.max(0, Math.min(MINUTES_PER_DAY - 1, snapped))
 }
 
+/**
+ * Steht das Objekt an diesem Punkt wieder an seiner Startposition? Solche Punkte werden
+ * wie der Basispunkt um 0 Uhr dargestellt - grau und hohl -, denn inhaltlich sagen sie
+ * dasselbe: "ab hier wieder dort, wo der Tag begann". Erkannt wird das an der Position
+ * statt an der Beschriftung, damit es auch fuer von Hand dorthin gezogene Punkte gilt.
+ */
+function isAtBase(entity: Entity, key: ScheduleKey): boolean {
+  const p = entity.placement
+  if (!p) return false
+  return Math.abs(key.x - p.x) < 1 && Math.abs(key.y - p.y) < 1
+}
+
 /** Welche Punkte gehoeren in eine Spur? */
 interface Lane {
   /** Objekt, dessen Tagesablauf die Spur zeigt. */
@@ -236,11 +248,11 @@ export function DaySchedule({ entities }: { entities: Entity[] }) {
           {showBase && (
             <>
               <div
-                className="daykey__span daykey__span--base"
+                className="daykey__span is-athome"
                 style={{ left: 0, width: pct(lane.keys[0]?.time ?? MINUTES_PER_DAY) }}
               />
               <span
-                className="daykey daykey--base"
+                className="daykey daykey--base is-athome"
                 style={{ left: 0 }}
                 title="Basisposition — gilt, bis der erste Punkt kommt"
               >
@@ -253,7 +265,9 @@ export function DaySchedule({ entities }: { entities: Entity[] }) {
           {lane.keys.map((k, i) => (
             <div
               key={`span-${k.id}`}
-              className={`daykey__span${k.day != null ? ' is-exception' : ''}`}
+              className={`daykey__span${k.day != null ? ' is-exception' : ''}${
+                isAtBase(lane.entity, k) ? ' is-athome' : ''
+              }`}
               style={{
                 left: pct(k.time),
                 width: pct(keyEndsAt(lane.keys, i) - k.time),
@@ -267,7 +281,7 @@ export function DaySchedule({ entities }: { entities: Entity[] }) {
               key={k.id}
               className={`daykey${selectedId === k.id ? ' is-selected' : ''}${
                 k.day != null ? ' daykey--exception' : ''
-              }`}
+              }${isAtBase(lane.entity, k) ? ' is-athome' : ''}`}
               style={{ left: pct(k.time), ['--chip-color' as string]: meta.color }}
               title={`${formatTime(k.time)}${k.label ? ` · ${k.label}` : ''}`}
               onPointerDown={(e) => onKeyPointerDown(e, lane.entity.id, k)}

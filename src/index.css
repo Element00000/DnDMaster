@@ -2368,8 +2368,10 @@ button {
   background: color-mix(in srgb, var(--gold) 26%, transparent);
 }
 
-/* Abschnitt der Basis-Platzierung: nur angedeutet, weil hier nichts eingestellt wurde. */
-.daykey__span--base {
+/* Abschnitte, in denen das Objekt an seiner Startposition steht - der vor dem ersten
+   Punkt ebenso wie jeder, der spaeter dorthin zurueckfuehrt. Nur angedeutet, weil dort
+   inhaltlich nichts Neues eingestellt ist. */
+.daykey__span.is-athome {
   background: rgba(255, 255, 255, 0.05);
 }
 
@@ -2409,8 +2411,21 @@ button {
   background: var(--gold);
 }
 
-/* Die Basis-Platzierung um 0 Uhr: sichtbar, aber deutlich zurueckgenommen - sie laesst
-   sich weder verschieben noch anwaehlen, sondern zeigt nur, wo der Tag beginnt. */
+/* Steht das Objekt an diesem Punkt wieder an seiner Startposition, wird er grau und hohl
+   gezeichnet - der feste Punkt um 0 Uhr genauso wie jeder spaetere, der dorthin
+   zurueckfuehrt. So sieht man auf einen Blick, wann die Figur "wieder zu Hause" ist. */
+.daykey.is-athome .daykey__diamond {
+  background: transparent;
+  border: 1.5px solid var(--ink-faint);
+  box-shadow: none;
+}
+
+.daykey.is-athome.is-selected .daykey__diamond {
+  border-color: var(--accent);
+}
+
+/* Die Basis-Platzierung um 0 Uhr steht nicht in den Daten: Sie laesst sich weder
+   verschieben noch anwaehlen und ist daher zusaetzlich kleiner. */
 .daykey--base {
   cursor: default;
   pointer-events: none;
@@ -2419,9 +2434,6 @@ button {
 .daykey--base .daykey__diamond {
   width: 9px;
   height: 9px;
-  background: transparent;
-  border: 1.5px solid var(--ink-faint);
-  box-shadow: none;
 }
 
 .daykey.is-selected .daykey__diamond {
