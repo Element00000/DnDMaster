@@ -1,5 +1,5 @@
 import { useStore } from '../store/useStore'
-import { formatTime } from '../utils/time'
+import { MINUTES_PER_DAY, formatTime } from '../utils/time'
 
 /**
  * Uhrzeit-Regler ueber der Karte. Tageszeit und Tag/Nacht-Einfaerbung sind immer aktiv -
@@ -39,8 +39,10 @@ export function TimeSlider() {
           className="time-slider__range"
           type="range"
           min={0}
-          max={1439}
-          step={5}
+          max={MINUTES_PER_DAY - 1}
+          // Minutenweise: Mit groesseren Schritten waere das Tagesende (23:59) nicht
+          // erreichbar, weil es auf keinem Vielfachen davon liegt.
+          step={1}
           value={timeOfDay}
           onChange={(e) => setTime(Number(e.target.value))}
         />

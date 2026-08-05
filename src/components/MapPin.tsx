@@ -104,6 +104,9 @@ export function MapPin({
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerCancelOrLost}
       onLostPointerCapture={onPointerCancelOrLost}
+      // Zwei schnelle Klicks auf einen Pin sind kein Doppelklick auf die Karte darunter -
+      // sonst passt sich die Ansicht ungewollt ein.
+      onDoubleClick={(e) => e.stopPropagation()}
     >
       <div className="map-pin__head">
         {image ? (
