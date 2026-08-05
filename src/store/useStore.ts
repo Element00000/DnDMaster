@@ -339,6 +339,16 @@ interface StoreState extends AppData {
 }
 
 /**
+ * Die Zeitleiste zeigt den Tagesablauf des ausgewaehlten Objekts - faellt die Auswahl weg,
+ * schliesst sie sich mit. Nur dann: Ohne vorherige Auswahl war sie fuer die
+ * Kampagnentage geoeffnet und bleibt stehen.
+ */
+function closedOnDeselect(s: StoreState, stillSelected: boolean): BottomPanel | null {
+  const losesSelection = !stillSelected && s.selectedEntityId !== null
+  return losesSelection && s.bottomPanel === 'zeitleiste' ? null : s.bottomPanel
+}
+
+/**
  * Eine vorgemerkte Position samt dem Timestone, der beim Vormerken gerade galt (null =
  * Basis-Platzierung). Daran haengt ihre Lebensdauer: Sie beschreibt, wo das Objekt in
  * diesem Zeitabschnitt stehen soll, und bleibt gueltig, solange man sich darin bewegt.
@@ -765,8 +775,18 @@ export const useStore = create<StoreState>()(
           }))
         },
 
-        selectEntity: (id) => set({ selectedEntityId: id, selectedIds: id ? [id] : [] }),
-        setSelectedIds: (ids) => set({ selectedIds: ids, selectedEntityId: ids.length ? ids[ids.length - 1] : null }),
+        selectEntity: (id) =>
+          set((s) => ({
+            selectedEntityId: id,
+            selectedIds: id ? [id] : [],
+            bottomPanel: closedOnDeselect(s, id !== null),
+          })),
+        setSelectedIds: (ids) =>
+          set((s) => ({
+            selectedIds: ids,
+            selectedEntityId: ids.length ? ids[ids.length - 1] : null,
+            bottomPanel: closedOnDeselect(s, ids.length > 0),
+          })),
         toggleSelectedId: (id) =>
           set((s) => {
             const has = s.selectedIds.includes(id)
