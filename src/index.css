@@ -1821,11 +1821,14 @@ button {
 }
 
 /* ---------- Tag/Nacht-Ueberlagerung ---------- */
+/* Liegt ueber allen Karten, auch den eingebetteten (z-index 4) - sonst waere nur die
+   Wurzelkarte eingefaerbt. Pinnadeln und Bedienelemente stehen im DOM danach und bleiben
+   damit unverdunkelt, also lesbar. */
 .map-daynight {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  z-index: 1;
+  z-index: 5;
   transition: background 0.3s ease;
   mix-blend-mode: multiply;
 }
