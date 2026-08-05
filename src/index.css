@@ -2428,23 +2428,25 @@ button {
   border-color: var(--accent);
 }
 
-/* Die Basis-Platzierung um 0 Uhr steht nicht in den Daten: Sie laesst sich weder
-   verschieben noch anwaehlen und ist daher zusaetzlich kleiner. */
+/* Die Basis-Platzierung um 0 Uhr steht nicht in den Daten und laesst sich daher weder
+   verschieben noch anwaehlen. Ihre Groesse entspricht aber den uebrigen Punkten - sie
+   markiert denselben Rang auf der Zeitachse. */
 .daykey--base {
   cursor: default;
   pointer-events: none;
-}
-
-.daykey--base .daykey__diamond {
-  width: 9px;
-  height: 9px;
 }
 
 .daykey.is-selected .daykey__diamond {
   box-shadow: 0 0 0 3px var(--accent-tint), 0 0 0 1.5px var(--accent);
 }
 
+/* Absolut unter der Raute statt darunter im Fluss: So bleibt die Raute exakt auf der
+   Mitte der Spur, egal ob eine Beschriftung da ist oder nicht. */
 .daykey__label {
+  position: absolute;
+  top: calc(50% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
   max-width: 80px;
   font-size: 9.5px;
   color: var(--ink-dim);
