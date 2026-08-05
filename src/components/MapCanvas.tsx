@@ -927,6 +927,12 @@ export function MapCanvas() {
           currentDay={currentDay}
           timeOfDay={timeOfDay}
           onPickTime={setTimeOfDay}
+          // Station 1 ist die Basis-Platzierung des Objekts, alle anderen sind Timestones.
+          onMoveStop={(stopId, dx, dy) =>
+            stopId === '__base__'
+              ? moveEntity(selectedEntity.id, dx, dy)
+              : moveTimestone(selectedEntity.id, stopId, dx, dy)
+          }
         />
       )}
 
@@ -1120,6 +1126,7 @@ function ScheduleOverlay({
   currentDay,
   timeOfDay,
   onPickTime,
+  onMoveStop,
 }: {
   entity: Entity
   layers: MapLayer[]
@@ -1129,7 +1136,12 @@ function ScheduleOverlay({
   timeOfDay: number
   /** Klick auf eine Station stellt die Zeitleiste auf deren Uhrzeit. */
   onPickTime: (minutes: number) => void
+  /** Ziehen an einer Station verschiebt sie auf der Karte (Delta in Weltkoordinaten). */
+  onMoveStop: (stopId: string, dxWorld: number, dyWorld: number) => void
 }) {
+  // Ziehen wird vom Klicken per Schwelle getrennt, wie bei den Pinnadeln auch.
+  const drag = useRef<{ id: string; lastX: number; lastY: number; moved: boolean } | null>(null)
+
   if (!entity.placement) return null
   const lv = layerScreenView(layers, rootLayerId, entity.placement.layerId, view)
   if (!lv) return null
@@ -1159,6 +1171,36 @@ function ScheduleOverlay({
     marks.set(key, mark)
   })
 
+  /** Ziehen an Nummer oder Uhrzeit verschiebt den Timestone; ein Klick stellt die Zeit. */
+  function onStopDown(e: React.PointerEvent, stopId: string) {
+    if (e.button !== 0) return
+    // Sonst zieht der Kartenhintergrund darunter eine Rechteck-Markierung auf.
+    e.stopPropagation()
+    e.preventDefault()
+    ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+    drag.current = { id: stopId, lastX: e.clientX, lastY: e.clientY, moved: false }
+  }
+
+  function onStopMove(e: React.PointerEvent) {
+    const d = drag.current
+    if (!d || !lv) return
+    const dx = e.clientX - d.lastX
+    const dy = e.clientY - d.lastY
+    if (!d.moved && Math.hypot(dx, dy) > 3) d.moved = true
+    if (!d.moved) return
+    d.lastX = e.clientX
+    d.lastY = e.clientY
+    onMoveStop(d.id, dx / lv.scale, dy / lv.scale)
+  }
+
+  function onStopUp(e: React.PointerEvent, time: number) {
+    const d = drag.current
+    drag.current = null
+    const el = e.currentTarget as HTMLElement
+    if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId)
+    if (!d?.moved) onPickTime(time)
+  }
+
   return (
     <div className="schedule-overlay" style={{ ['--chip-color' as string]: meta.color }}>
       {points.length > 1 && (
@@ -1177,26 +1219,38 @@ function ScheduleOverlay({
                 }${s.day != null ? ' is-exception' : ''}${
                   s.id === '__base__' ? ' is-base' : ''
                 }`}
-                title={`Zeitleiste auf ${formatTime(s.time)} stellen`}
-                // Sonst zieht der Kartenhintergrund darunter eine Rechteck-Markierung auf.
-                onPointerDown={(e) => e.stopPropagation()}
-                onClick={() => onPickTime(s.time)}
+                title={`Ziehen verschiebt · Klick stellt die Zeitleiste auf ${formatTime(s.time)}`}
+                onPointerDown={(e) => onStopDown(e, s.id)}
+                onPointerMove={onStopMove}
+                onPointerUp={(e) => onStopUp(e, s.time)}
               >
                 {no}
               </button>
             ))}
           </div>
-          <span className="schedule-stop__label">
-            {mark.items
-              .map(({ stop: s }) => {
-                if (s.id === '__base__') return 'Start'
-                // "Start" gilt genau solange der Timestone auf der Startposition liegt - es
-                // steht bewusst nicht in den Daten, sonst bliebe es beim Verschieben stehen.
-                const caption = s.label || (isAtBase(entity, s) ? 'Start' : '')
-                return `${formatTime(s.time)}${caption ? ` · ${caption}` : ''}`
-              })
-              .join(' · ')}
-          </span>
+
+          {/* Je Station eine eigene Zeile: So laesst sich auch die Uhrzeit anfassen, und
+              bei mehreren Stationen an einer Stelle bleiben sie auseinanderzuhalten. */}
+          <div className="schedule-stop__labels">
+            {mark.items.map(({ stop: s }) => {
+              // "Start" gilt genau solange der Timestone auf der Startposition liegt - es
+              // steht bewusst nicht in den Daten, sonst bliebe es beim Verschieben stehen.
+              const caption = s.id === '__base__' ? '' : s.label || (isAtBase(entity, s) ? 'Start' : '')
+              return (
+                <button
+                  key={s.id}
+                  className="schedule-stop__label"
+                  title={`Ziehen verschiebt · Klick stellt die Zeitleiste auf ${formatTime(s.time)}`}
+                  onPointerDown={(e) => onStopDown(e, s.id)}
+                  onPointerMove={onStopMove}
+                  onPointerUp={(e) => onStopUp(e, s.time)}
+                >
+                  {s.id === '__base__' ? 'Start' : formatTime(s.time)}
+                  {caption ? ` · ${caption}` : ''}
+                </button>
+              )
+            })}
+          </div>
         </div>
       ))}
     </div>

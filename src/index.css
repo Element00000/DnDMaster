@@ -2731,6 +2731,7 @@ button {
 }
 
 .schedule-stop__dot {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2745,26 +2746,59 @@ button {
   font-family: inherit;
   font-size: 10px;
   font-variant-numeric: tabular-nums;
-  /* Nur die Nummern nehmen Klicks an, die Marke selbst nicht - sonst laege ein
-     unsichtbarer Block ueber der Karte. */
+  /* Nur Nummern und Uhrzeiten nehmen Zeigerereignisse an, die Marke selbst nicht -
+     sonst laege ein unsichtbarer Block ueber der Karte. */
   pointer-events: auto;
-  cursor: pointer;
+  cursor: grab;
+  touch-action: none;
+}
+
+/* Unsichtbarer Rand rundherum: Die Nummer bleibt klein, laesst sich aber bequem
+   treffen und ziehen. */
+.schedule-stop__dot::before {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
 }
 
 .schedule-stop__dot:hover {
   border-color: var(--accent);
 }
 
+.schedule-stop__dot:active,
+.schedule-stop__label:active {
+  cursor: grabbing;
+}
+
+/* Je Station eine Zeile, damit sich auch die Uhrzeit anfassen laesst. */
+.schedule-stop__labels {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
 .schedule-stop__label {
   max-width: 220px;
-  padding: 2px 6px;
+  padding: 3px 7px;
+  border: none;
   border-radius: 5px;
   background: rgba(13, 15, 20, 0.82);
   color: var(--ink-dim);
+  font-family: inherit;
   font-size: 10.5px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  pointer-events: auto;
+  cursor: grab;
+  touch-action: none;
+}
+
+.schedule-stop__label:hover {
+  color: var(--ink);
+  background: rgba(13, 15, 20, 0.95);
 }
 
 /* Station, an der das Objekt zur eingestellten Uhrzeit gerade steht. */
