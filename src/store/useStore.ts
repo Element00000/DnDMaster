@@ -1208,7 +1208,9 @@ function normalizeScheduleKey(s: Partial<ScheduleKey> & { timeStart?: number }):
     time: s.time ?? s.timeStart ?? 0,
     x: s.x ?? 0,
     y: s.y ?? 0,
-    label: s.label ?? '',
+    // "Start" wurde eine Zeit lang mitgespeichert und blieb dadurch auch stehen, wenn der
+    // Punkt laengst woanders lag. Heute wird es aus der Position abgeleitet (isAtBase).
+    label: s.label === 'Start' ? '' : s.label ?? '',
     day: s.day ?? null,
   }
 }

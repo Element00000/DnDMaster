@@ -166,6 +166,17 @@ export function isHostile(entity: Entity): boolean {
   return entity.type === 'nsc' && (entity.fields.gesinnung === 'feind' || entity.fields.gesinnung === 'boss')
 }
 
+/**
+ * Steht das Objekt an diesem Schluesselpunkt wieder an seiner Startposition? Wird bei
+ * jeder Anzeige neu aus der Position bestimmt, nie gespeichert - sonst behielte ein
+ * verschobener Punkt die Kennzeichnung "Start", obwohl er laengst woanders liegt.
+ */
+export function isAtBase(entity: Entity, key: { x: number; y: number }): boolean {
+  const p = entity.placement
+  if (!p) return false
+  return Math.abs(key.x - p.x) < 1 && Math.abs(key.y - p.y) < 1
+}
+
 /** Aufgedeckter Kreis fuer den Nebel des Krieges (Weltkoordinaten). */
 export interface RevealCircle {
   x: number

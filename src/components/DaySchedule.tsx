@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react'
-import { entityDisplayMeta } from '../types'
+import { entityDisplayMeta, isAtBase } from '../types'
 import type { Entity, ScheduleKey } from '../types'
 import { useStore } from '../store/useStore'
 import { MINUTES_PER_DAY, formatTime, keyEndsAt, parseTime, scheduleForDay } from '../utils/time'
@@ -19,18 +19,6 @@ function pct(minutes: number): string {
 function clampTime(minutes: number): number {
   const snapped = Math.round(minutes / SNAP) * SNAP
   return Math.max(0, Math.min(MINUTES_PER_DAY - 1, snapped))
-}
-
-/**
- * Steht das Objekt an diesem Punkt wieder an seiner Startposition? Solche Punkte werden
- * wie der Basispunkt um 0 Uhr dargestellt - grau und hohl -, denn inhaltlich sagen sie
- * dasselbe: "ab hier wieder dort, wo der Tag begann". Erkannt wird das an der Position
- * statt an der Beschriftung, damit es auch fuer von Hand dorthin gezogene Punkte gilt.
- */
-function isAtBase(entity: Entity, key: ScheduleKey): boolean {
-  const p = entity.placement
-  if (!p) return false
-  return Math.abs(key.x - p.x) < 1 && Math.abs(key.y - p.y) < 1
 }
 
 /** Welche Punkte gehoeren in eine Spur? */
@@ -140,13 +128,9 @@ export function DaySchedule({ entities }: { entities: Entity[] }) {
     let firstId: string | null = null
     for (const e of list) {
       if (!e.placement) continue
-      const id = addScheduleKey(e.id, {
-        time: timeOfDay,
-        day,
-        x: e.placement.x,
-        y: e.placement.y,
-        label: 'Start',
-      })
+      // Ohne Beschriftung: Dass es die Startposition ist, ergibt sich aus der Position
+      // selbst (isAtBase). Ein gespeichertes "Start" wuerde beim Verschieben luegen.
+      const id = addScheduleKey(e.id, { time: timeOfDay, day, x: e.placement.x, y: e.placement.y })
       if (id && !firstId) firstId = id
     }
     if (firstId) setSelectedId(firstId)
@@ -274,21 +258,26 @@ export function DaySchedule({ entities }: { entities: Entity[] }) {
             />
           ))}
 
-          {lane.keys.map((k) => (
-            <button
-              key={k.id}
-              className={`daykey${selectedId === k.id ? ' is-selected' : ''}${
-                k.day != null ? ' daykey--exception' : ''
-              }${isAtBase(lane.entity, k) ? ' is-athome' : ''}`}
-              style={{ left: pct(k.time), ['--chip-color' as string]: meta.color }}
-              title={`${formatTime(k.time)}${k.label ? ` · ${k.label}` : ''}`}
-              onPointerDown={(e) => onKeyPointerDown(e, lane.entity.id, k)}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <span className="daykey__diamond" />
-              {k.label && <span className="daykey__label">{k.label}</span>}
-            </button>
-          ))}
+          {lane.keys.map((k) => {
+            // "Start" ist keine gespeicherte Beschriftung, sondern gilt genau solange der
+            // Punkt auf der Startposition liegt.
+            const caption = k.label || (isAtBase(lane.entity, k) ? 'Start' : '')
+            return (
+              <button
+                key={k.id}
+                className={`daykey${selectedId === k.id ? ' is-selected' : ''}${
+                  k.day != null ? ' daykey--exception' : ''
+                }${isAtBase(lane.entity, k) ? ' is-athome' : ''}`}
+                style={{ left: pct(k.time), ['--chip-color' as string]: meta.color }}
+                title={`${formatTime(k.time)}${caption ? ` · ${caption}` : ''}`}
+                onPointerDown={(e) => onKeyPointerDown(e, lane.entity.id, k)}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <span className="daykey__diamond" />
+                {caption && <span className="daykey__label">{caption}</span>}
+              </button>
+            )
+          })}
         </div>
         <div className="daytrack__laneactions">
           <button

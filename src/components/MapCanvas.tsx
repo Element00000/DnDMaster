@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from '../store/useStore'
-import { entityDisplayMeta } from '../types'
+import { entityDisplayMeta, isAtBase } from '../types'
 import type { Entity, MapLayer } from '../types'
 import { activeScheduleKey, dayNightOverlay, formatTime, scheduleForDay } from '../utils/time'
 import { useAsset } from '../useAsset'
@@ -1214,9 +1214,13 @@ function ScheduleOverlay({
           </div>
           <span className="schedule-stop__label">
             {mark.items
-              .map(({ stop: s }) =>
-                `${s.id === '__base__' ? 'Start' : formatTime(s.time)}${s.label ? ` · ${s.label}` : ''}`,
-              )
+              .map(({ stop: s }) => {
+                if (s.id === '__base__') return 'Start'
+                // "Start" gilt genau solange der Punkt auf der Startposition liegt - es
+                // steht bewusst nicht in den Daten, sonst bliebe es beim Verschieben stehen.
+                const caption = s.label || (isAtBase(entity, s) ? 'Start' : '')
+                return `${formatTime(s.time)}${caption ? ` · ${caption}` : ''}`
+              })
               .join(' · ')}
           </span>
         </div>
