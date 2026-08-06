@@ -15,6 +15,7 @@ import { useAsset } from '../useAsset'
 import { useBottomPanelOffset } from '../useBottomPanelOffset'
 import { PlaceholderMap } from './PlaceholderMap'
 import { MapPin } from './MapPin'
+import { DayPicker } from './DayPicker'
 import { fileToScaledDataUrl } from '../utils/image'
 import { deleteAsset, putAsset } from '../utils/assets'
 
@@ -85,6 +86,7 @@ export function MapCanvas() {
   const setDraftPos = useStore((s) => s.setDraftPos)
   const clearDraftPos = useStore((s) => s.clearDraftPos)
   const setDraftTime = useStore((s) => s.setDraftTime)
+  const setDraftDay = useStore((s) => s.setDraftDay)
   const commitDraft = useStore((s) => s.commitDraft)
   const selectedEntityId = useStore((s) => s.selectedEntityId)
   const bottomPanel = useStore((s) => s.bottomPanel)
@@ -1079,8 +1081,10 @@ export function MapCanvas() {
         layers={campaign.layers}
         rootLayerId={layer.id}
         view={view}
+        currentDay={currentDay}
         placementOf={(e) => placementAt(e, timeOfDay, currentDay)}
         onSetTime={setDraftTime}
+        onSetDay={setDraftDay}
         onMove={(id, dxWorld, dyWorld) => {
           const d = draftPos[id]
           if (d) setDraftPos(id, d.x + dxWorld, d.y + dyWorld, d.layerId)
@@ -1238,8 +1242,10 @@ function DraftOverlay({
   layers,
   rootLayerId,
   view,
+  currentDay,
   placementOf,
   onSetTime,
+  onSetDay,
   onMove,
   onDrop,
   onCommit,
@@ -1250,8 +1256,10 @@ function DraftOverlay({
   layers: MapLayer[]
   rootLayerId: string
   view: View
+  currentDay: number
   placementOf: (e: Entity) => { layerId: string; x: number; y: number } | null
   onSetTime: (entityId: string, minutes: number) => void
+  onSetDay: (entityId: string, day: number | null) => void
   /** Doppel weiterschieben (Delta in Weltkoordinaten seiner Karte). */
   onMove: (entityId: string, dxWorld: number, dyWorld: number) => void
   /** Doppel loslassen: Kartenwechsel und Einrasten. */
@@ -1261,6 +1269,8 @@ function DraftOverlay({
   /** Vormerkung dieses Objekts verwerfen. */
   onCancel: (entityId: string) => void
 }) {
+  /** Fuer welches Objekt der Kalender gerade offen ist (immer hoechstens einer). */
+  const [dayPickerFor, setDayPickerFor] = useState<string | null>(null)
   const items = entities.filter((e) => e.placement && drafts[e.id])
   if (items.length === 0) return null
 
@@ -1328,12 +1338,31 @@ function DraftOverlay({
                   if (minutes != null) onSetTime(e.id, minutes)
                 }}
               />
+              <button
+                className="draft-ask__day"
+                title="Kalendertag waehlen"
+                onClick={() => setDayPickerFor(dayPickerFor === e.id ? null : e.id)}
+              >
+                {draft.day == null ? 'Jeden Tag' : `Tag ${draft.day}`}
+              </button>
               <button className="draft-ask__ok" title="Timestone setzen" onClick={() => onCommit(e.id)}>
                 ✓
               </button>
               <button className="draft-ask__cancel" title="Verwerfen" onClick={() => onCancel(e.id)}>
                 ×
               </button>
+
+              {dayPickerFor === e.id && (
+                <DayPicker
+                  value={draft.day}
+                  today={currentDay}
+                  onPick={(day) => {
+                    onSetDay(e.id, day)
+                    setDayPickerFor(null)
+                  }}
+                  onClose={() => setDayPickerFor(null)}
+                />
+              )}
             </div>
           </div>
         )

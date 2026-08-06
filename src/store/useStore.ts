@@ -21,7 +21,7 @@ import type {
 } from '../types'
 import { emptyDecision, emptyEvent } from '../types'
 import { uid } from '../utils/id'
-import { MINUTES_PER_DAY, activeTimestone, placementAt } from '../utils/time'
+import { MINUTES_PER_DAY, activeTimestone, placementAt, scheduleForDay } from '../utils/time'
 
 function makeLayer(name = 'Weltkarte'): MapLayer {
   return {
@@ -102,6 +102,13 @@ function rescaleLayerContent(c: Campaign, layerId: string, sx: number, sy: numbe
 }
 
 /** Maximale Anzahl an Undo-Schritten. */
+/**
+ * Ueblicher Abstand zwischen zwei Stationen (Minuten). Weil die Uhr nach dem Bestaetigen
+ * auf dem eben gesetzten Punkt steht, schlaegt die naechste Vormerkung genau so viel
+ * spaeter vor - eine Station nach der anderen, ohne die Uhr anzufassen.
+ */
+const DRAFT_STEP = 60
+
 const UNDO_LIMIT = 50
 /** Aenderungen innerhalb dieses Fensters zaehlen als ein Undo-Schritt (Tippen, Ziehen). */
 const UNDO_COALESCE_MS = 700
@@ -316,8 +323,10 @@ interface StoreState extends AppData {
   setDraftPos: (entityId: string, x: number, y: number, layerId: string) => void
   /** Uhrzeit der Vormerkung setzen (die Wahl direkt neben der Figur auf der Karte). */
   setDraftTime: (entityId: string, minutes: number) => void
+  /** Kalendertag der Vormerkung setzen; null = gilt an jedem Tag. */
+  setDraftDay: (entityId: string, day: number | null) => void
   /** Vormerkung als Timestone festhalten. Liefert dessen Id, oder null ohne Vormerkung. */
-  commitDraft: (entityId: string, day?: number | null) => string | null
+  commitDraft: (entityId: string) => string | null
   /** Ohne Id alle Vormerkungen verwerfen, mit Id nur die des Objekts. */
   clearDraftPos: (entityId?: string) => void
 
@@ -382,6 +391,8 @@ export interface DraftPos {
   layerId: string
   /** Ab wann das Objekt hier stehen soll (Minuten seit Mitternacht). */
   time: number
+  /** An welchem Kalendertag - null = an jedem Tag. */
+  day: number | null
 }
 
 /** Was ueber ein Neuladen hinweg erhalten bleibt. */
@@ -935,16 +946,30 @@ export const useStore = create<StoreState>()(
               return { draftPos: { ...s.draftPos, [entityId]: { ...running, x, y, layerId } } }
             }
             // Vorschlag fuer eine neue: die eingestellte Uhrzeit - aber nicht eine, auf der
-            // schon ein Punkt liegt. Sonst uebernaehme das Bestaetigen ungewollt den
-            // vorhandenen, und aus drei Stationen hintereinander wuerde immer wieder dieselbe.
+            // an diesem Tag schon ein Punkt liegt. Sonst uebernaehme das Bestaetigen ungewollt
+            // den vorhandenen, und aus drei Stationen hintereinander wuerde immer wieder
+            // dieselbe. Weil die Uhr nach dem Bestaetigen auf dem neuen Punkt steht, ergibt
+            // der Schritt zugleich den ueblichen Abstand zwischen zwei Stationen.
             // Wer einen Punkt bewusst ersetzen will, traegt seine Uhrzeit von Hand ein.
             const entity = s.activeCampaign().entities.find((e) => e.id === entityId)
-            const taken = new Set((entity?.schedule ?? []).filter((k) => k.day == null).map((k) => k.time))
+            const takenAt = (d: number) =>
+              new Set(entity ? scheduleForDay(entity.schedule, d).map((k) => k.time) : [])
             let time = s.timeOfDay
-            while (taken.has(time) && time < MINUTES_PER_DAY - 1) {
-              time = Math.min(MINUTES_PER_DAY - 1, time + 15)
+            let day = s.currentDay
+            let taken = takenAt(day)
+            // Ueber Mitternacht hinaus geht es am naechsten Kalendertag weiter - ein Punkt um
+            // 23 Uhr fuehrt also auf 0 Uhr des Folgetags, nicht zurueck an den Tagesanfang.
+            // Hoechstens ein paar Tage weit suchen, sonst liefe die Schleife bei einem randvoll
+            // belegten Ablauf endlos.
+            for (let i = 0; i < 72 && taken.has(time); i++) {
+              time += DRAFT_STEP
+              if (time >= MINUTES_PER_DAY) {
+                time -= MINUTES_PER_DAY
+                day += 1
+                taken = takenAt(day)
+              }
             }
-            return { draftPos: { ...s.draftPos, [entityId]: { x, y, layerId, time } } }
+            return { draftPos: { ...s.draftPos, [entityId]: { x, y, layerId, time, day } } }
           }),
         setDraftTime: (entityId, minutes) =>
           set((s) => {
@@ -953,21 +978,28 @@ export const useStore = create<StoreState>()(
             const time = Math.max(0, Math.min(MINUTES_PER_DAY - 1, Math.round(minutes)))
             return { draftPos: { ...s.draftPos, [entityId]: { ...draft, time } } }
           }),
-        commitDraft: (entityId, day = null) => {
+        setDraftDay: (entityId, day) =>
+          set((s) => {
+            const draft = s.draftPos[entityId]
+            if (!draft) return {}
+            return { draftPos: { ...s.draftPos, [entityId]: { ...draft, day } } }
+          }),
+        commitDraft: (entityId) => {
           const draft = get().draftPos[entityId]
           if (!draft) return null
           const id = get().addTimestone(entityId, {
             time: draft.time,
-            day,
+            day: draft.day,
             layerId: draft.layerId,
             x: draft.x,
             y: draft.y,
           })
-          // Die Uhr springt auf den eben gesetzten Punkt: Die Figur steht damit sichtbar da,
-          // wo man sie hingeschoben hat, statt an ihre vorige Station zurueckzuspringen. Der
-          // naechste Vorschlag setzt dort auf und ruecke wieder ein Stueck weiter - so
-          // entsteht eine Station nach der anderen, ohne die Uhr je von Hand anzufassen.
-          if (id) set({ timeOfDay: draft.time })
+          // Die Uhr springt auf den eben gesetzten Punkt - mitsamt Kalendertag, wenn der Punkt
+          // an einem bestimmten haengt. Die Figur steht damit sichtbar da, wo man sie
+          // hingeschoben hat, statt an ihre vorige Station zurueckzuspringen. Der naechste
+          // Vorschlag setzt dort auf und rueckt wieder ein Stueck weiter - so entsteht eine
+          // Station nach der anderen, ohne Uhr oder Tag je von Hand anzufassen.
+          if (id) set(draft.day == null ? { timeOfDay: draft.time } : { timeOfDay: draft.time, currentDay: draft.day })
           return id
         },
         clearDraftPos: (entityId) =>
