@@ -1,7 +1,7 @@
 // Hilfsfunktionen fuer die Tageszeit (Minuten seit Mitternacht, 0..1439).
 
 import type { Entity, Timestone } from '../types'
-import { effectivePlacement } from '../types'
+import { effectivePlacement, isDead } from '../types'
 
 export const MINUTES_PER_DAY = 24 * 60
 
@@ -146,6 +146,9 @@ export function placementAt(
   minutes: number,
   day: number,
 ): { layerId: string; x: number; y: number } | null {
+  // Tote gehen nicht mehr weiter: Ihr Tagesablauf ist gestrichen, sie bleiben an der Stelle
+  // stehen, die beim Sterben zu ihrer Platzierung wurde.
+  if (isDead(entity)) return effectivePlacement(entity, undefined)
   return effectivePlacement(entity, activeTimestone(entity.schedule, minutes, day))
 }
 

@@ -152,6 +152,9 @@ export interface Entity {
  */
 export function entityDisplayMeta(entity: Entity): EntityTypeMeta {
   const meta = entityMeta(entity.type)
+  // Tot geht allem vor: Wer gestorben ist, ist nicht mehr Freund oder Feind, und auf der
+  // Karte soll das auf einen Blick zu sehen sein.
+  if (isDead(entity)) return { ...meta, color: '#141414', iconInvert: true }
   if (entity.type === 'nsc') {
     if (entity.fields.gesinnung === 'freund') return { ...meta, color: '#3fa34d' }
     if (entity.fields.gesinnung === 'feind') return { ...meta, color: '#c0392b' }
@@ -172,18 +175,29 @@ export function isHostile(entity: Entity): boolean {
   return entity.type === 'nsc' && (entity.fields.gesinnung === 'feind' || entity.fields.gesinnung === 'boss')
 }
 
+/**
+ * Ist die Figur tot? Dann steht sie still: Ihr Tagesablauf gilt nicht mehr, sie bleibt an
+ * der Stelle, an der sie gestorben ist (siehe setEntityField im Store).
+ */
+export function isDead(entity: Entity): boolean {
+  return entity.type === 'nsc' && entity.fields.status === 'tot'
+}
+
 /** Ist das ein Spieler-Charakter? */
 export function isPlayer(entity: Entity): boolean {
   return entity.type === 'nsc' && entity.fields.gesinnung === 'spieler'
 }
 
 /**
- * Darf dieses Objekt einen Tagesablauf haben? Spieler-Charaktere nicht: Wo sie sich
- * aufhalten, entscheiden die Spieler am Tisch. Ein hinterlegter Ablauf wuerde sie gegen
- * deren Willen durch die Karte schicken.
+ * Darf dieses Objekt einen Tagesablauf haben?
+ *
+ * - Spieler-Charaktere nicht: Wo sie sich aufhalten, entscheiden die Spieler am Tisch. Ein
+ *   hinterlegter Ablauf wuerde sie gegen deren Willen durch die Karte schicken.
+ * - Tote nicht: Sie gehen nirgendwo mehr hin. Ihr bisheriger Ablauf bleibt gespeichert und
+ *   gilt wieder, falls sich das Ganze als Irrtum herausstellt.
  */
 export function canSchedule(entity: Entity): boolean {
-  return !isPlayer(entity)
+  return !isPlayer(entity) && !isDead(entity)
 }
 
 /**
@@ -439,6 +453,17 @@ export const FIELD_SCHEMA: Record<EntityType, FieldDef[]> = {
     },
   ],
   nsc: [
+    {
+      key: 'status',
+      label: 'Zustand',
+      kind: 'select',
+      // Die Auswahlfelder stellen von sich aus ein leeres "-" voran; das steht hier fuer
+      // "lebendig", weshalb es die ausdrueckliche Angabe nur der Vollstaendigkeit halber gibt.
+      options: [
+        { value: 'lebendig', label: 'Lebendig' },
+        { value: 'tot', label: 'Tot' },
+      ],
+    },
     { key: 'rolle', label: 'Rolle', kind: 'text', placeholder: 'z.B. Wirtin, Hauptmann ...' },
     { key: 'motivation', label: 'Motivation', kind: 'textarea', placeholder: 'Was treibt die Figur an?' },
     { key: 'gesinnung', label: 'Gesinnung', kind: 'select', options: GESINNUNG_OPTIONS },

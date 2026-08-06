@@ -19,7 +19,7 @@ import type {
   Session,
   UndoEntry,
 } from '../types'
-import { emptyDecision, emptyEvent } from '../types'
+import { emptyDecision, emptyEvent, isDead } from '../types'
 import { uid } from '../utils/id'
 import { MINUTES_PER_DAY, activeTimestone, placementAt, scheduleForDay } from '../utils/time'
 
@@ -817,13 +817,30 @@ export const useStore = create<StoreState>()(
             }),
           })),
 
-        setEntityField: (id, key, value) =>
+        setEntityField: (id, key, value) => {
+          const s = get()
+          const entity = s.activeCampaign().entities.find((e) => e.id === id)
+          // Beim Sterben bleibt die Figur, wo sie gerade steht: Ihre aktuelle Stelle wird zur
+          // Platzierung. Ohne das saesse sie fortan an ihrem Ausgangsort, denn ihr
+          // Tagesablauf gilt ab jetzt nicht mehr (siehe isDead) - und die Basis-Platzierung
+          // ist der Ort, an dem ihr Tag begonnen hat, nicht der, an dem er endete.
+          const freeze =
+            key === 'status' && value === 'tot' && entity && !isDead(entity)
+              ? placementAt(entity, s.timeOfDay, s.currentDay)
+              : null
           patchActive((c) => ({
             ...c,
             entities: c.entities.map((e) =>
-              e.id === id ? { ...e, fields: { ...e.fields, [key]: value } } : e,
+              e.id === id
+                ? {
+                    ...e,
+                    fields: { ...e.fields, [key]: value },
+                    placement: freeze ?? e.placement,
+                  }
+                : e,
             ),
-          })),
+          }))
+        },
 
         deleteEntity: (id) => {
           patchActive((c) => ({

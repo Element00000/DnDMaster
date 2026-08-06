@@ -26,6 +26,8 @@ interface Props {
   ghost?: boolean
   /** Hervorgehoben (Spieler, Bosse): etwas groessere Pinnadel. */
   emphasized?: boolean
+  /** Tote Figur: weisses Kreuz ueber dem Kopf, auch ueber einem Portraet. */
+  dead?: boolean
   onClick: (e: React.PointerEvent) => void
   /** Doppelklick auf den Pin. Ohne Angabe bleibt er wirkungslos. */
   onDoubleClick?: () => void
@@ -52,6 +54,7 @@ export function MapPin({
   iconInvert,
   ghost,
   emphasized,
+  dead,
   onClick,
   onDoubleClick,
   onMove,
@@ -125,6 +128,10 @@ export function MapPin({
           <span className="map-pin__icon">{icon}</span>
         )}
       </div>
+      {/* Bewusst neben dem Kopf statt in ihm: Der Kopf ist gedreht (die Tropfenform), was
+          das Kreuz zum Plus machen wuerde. Hier liegt es im ungedrehten Raum der Pinnadel
+          und deckt den Kopf genau ab - auch ein Portraet darin. */}
+      {dead && <span className="map-pin__cross" aria-hidden="true" />}
       <div className="map-pin__label">{label}</div>
     </div>
   )

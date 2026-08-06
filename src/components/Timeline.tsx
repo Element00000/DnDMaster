@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { canSchedule, entityDisplayMeta, entityMeta } from '../types'
+import { canSchedule, entityDisplayMeta, entityMeta, isDead } from '../types'
 import type { Entity } from '../types'
 import { useStore } from '../store/useStore'
 import { formatTime } from '../utils/time'
@@ -93,8 +93,8 @@ function ObjectSchedule({ entities }: { entities: Entity[] }) {
   const setPlacingEntity = useStore((s) => s.setPlacingEntity)
   const selectEntity = useStore((s) => s.selectEntity)
 
-  // Spieler-Charaktere haben keinen Tagesablauf - wo sie sind, entscheiden die Spieler.
-  const players = entities.filter((e) => !canSchedule(e))
+  // Spieler-Charaktere und Tote haben keinen Tagesablauf (siehe canSchedule).
+  const excluded = entities.filter((e) => !canSchedule(e))
   const schedulable = entities.filter(canSchedule)
   // Ein Tagesablauf beschreibt, wo etwas zu welcher Uhrzeit liegt - ohne Kartenposition
   // gibt es dafuer keine Grundlage.
@@ -105,15 +105,16 @@ function ObjectSchedule({ entities }: { entities: Entity[] }) {
     return (
       <div className="timeline__notice">
         <p>
-          {players.length === 1 ? (
+          {excluded.length === 1 ? (
             <>
-              <strong>{players[0].name}</strong> ist ein Spieler-Charakter und hat keinen
-              Tagesablauf.
+              <strong>{excluded[0].name}</strong> hat keinen Tagesablauf:{' '}
+              {isDead(excluded[0])
+                ? 'Tote gehen nirgendwo mehr hin.'
+                : 'Wo ein Spieler-Charakter sich aufhaelt, entscheiden die Spieler am Tisch.'}
             </>
           ) : (
-            <>Spieler-Charaktere haben keinen Tagesablauf.</>
-          )}{' '}
-          Wo sie sich aufhalten, entscheiden die Spieler am Tisch — nicht ein hinterlegter Ablauf.
+            <>Spieler-Charaktere und Tote haben keinen Tagesablauf.</>
+          )}
         </p>
       </div>
     )
@@ -164,11 +165,11 @@ function ObjectSchedule({ entities }: { entities: Entity[] }) {
         </p>
       )}
 
-      {players.length > 0 && (
+      {excluded.length > 0 && (
         <p className="dayschedule__hint">
-          {players.length === 1
-            ? `${players[0].name} ist ein Spieler-Charakter und bleibt hier aussen vor.`
-            : `${players.length} Spieler-Charaktere bleiben hier aussen vor.`}
+          {excluded.length === 1
+            ? `${excluded[0].name} hat keinen Tagesablauf und bleibt hier aussen vor.`
+            : `${excluded.length} Objekte ohne Tagesablauf bleiben hier aussen vor.`}
         </p>
       )}
 

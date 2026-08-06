@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from '../store/useStore'
 import type { DraftPos } from '../store/useStore'
-import { canSchedule, entityDisplayMeta } from '../types'
+import { canSchedule, entityDisplayMeta, isDead } from '../types'
 import type { Entity, MapLayer } from '../types'
 import {
   activeTimestone,
@@ -1039,6 +1039,7 @@ export function MapCanvas() {
               color={meta.color}
               iconInvert={meta.iconInvert}
               emphasized={meta.emphasized}
+              dead={isDead(e)}
               label={e.name}
               selected={selectedIds.includes(e.id)}
               draggable={!tableMode && !fogEditing}
@@ -1304,6 +1305,7 @@ function DraftOverlay({
               color={meta.color}
               iconInvert={meta.iconInvert}
               emphasized={meta.emphasized}
+              dead={isDead(e)}
               label={e.name}
               selected={false}
               // Auch nach dem ersten Absetzen noch zu greifen: Die Stelle steht ja erst
@@ -2137,6 +2139,7 @@ function EmbeddedMap({
             color={meta.color}
             iconInvert={meta.iconInvert}
               emphasized={meta.emphasized}
+              dead={isDead(e)}
             label={e.name}
             selected={selectedIds.includes(e.id)}
             draggable={interactive}

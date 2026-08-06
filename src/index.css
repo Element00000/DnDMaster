@@ -777,6 +777,41 @@ button {
    Der farbige Kopf bleibt als Rahmen sichtbar und zeigt weiterhin die Gesinnung an. */
 /* Groesse ueber eine feste Differenz statt einen Faktor: 2 px Rahmen und 1 px Luft je
    Seite gehen bei glatter Kopfgroesse ohne Rest auf, das Portraet sitzt also exakt mittig. */
+/* Totenkreuz. Liegt ueber dem Pin-Kopf, aber ausserhalb von dessen Drehung - deshalb sitzt
+   es am oberen Rand der Pinnadel und ist genau so gross wie der Kopf. Im Kopf selbst waere
+   es mitgedreht und saehe wie ein Plus aus. */
+.map-pin__cross {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: var(--pin-size);
+  height: var(--pin-size);
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.map-pin__cross::before,
+.map-pin__cross::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: calc(var(--pin-size) * 0.6);
+  height: 3px;
+  border-radius: 2px;
+  background: #fff;
+  /* Der dunkle Saum haelt das Kreuz auch ueber einem hellen Portraet lesbar. */
+  box-shadow: 0 0 3px rgba(0, 0, 0, 0.75);
+}
+
+.map-pin__cross::before {
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+.map-pin__cross::after {
+  transform: translate(-50%, -50%) rotate(-45deg);
+}
+
 .map-pin__portrait {
   position: relative;
   width: calc(var(--pin-size) - 6px);
