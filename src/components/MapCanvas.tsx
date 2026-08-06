@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from '../store/useStore'
 import type { DraftPos } from '../store/useStore'
-import { entityDisplayMeta } from '../types'
+import { canSchedule, entityDisplayMeta } from '../types'
 import type { Entity, MapLayer } from '../types'
 import {
   activeTimestone,
@@ -167,7 +167,8 @@ export function MapCanvas() {
    */
   const moveEntityTimed = useCallback(
     (e: Entity, dxWorld: number, dyWorld: number) => {
-      const recording = bottomPanel === 'zeitleiste' && selectedIds.includes(e.id)
+      // Spieler-Charaktere haben keinen Tagesablauf; sie werden immer nur verschoben.
+      const recording = bottomPanel === 'zeitleiste' && selectedIds.includes(e.id) && canSchedule(e)
       if (!recording) {
         const active = activeTimestone(e.schedule, timeOfDay, currentDay)
         if (active) {
@@ -811,47 +812,75 @@ export function MapCanvas() {
   const selectedEntity = entities.find((e) => e.id === selectedEntityId && e.placement) ?? null
 
   /**
-   * Nach dem Ziehen einer vorgemerkten Stelle an einer bestehenden Station einrasten -
-   * genauso wie beim Ziehen der Stationen selbst. Von Hand liesse sich eine Stelle nie
-   * genau treffen, und schon ein Pixel Abstand ergaebe spaeter zwei getrennte Marken.
+   * Loslassen eines Doppels - egal ob man die Figur gezogen hat oder das Doppel selbst.
+   * Zwei Dinge auf einmal, weil beide erst hier entschieden werden koennen:
+   *
+   * 1. Liegt der Zeiger ueber einer anderen Karte, setzt das Doppel dort neu an. Waehrend
+   *    des Ziehens laeuft es noch in den Koordinaten der alten.
+   * 2. Nahe an einer bestehenden Station rastet es auf deren Stelle ein. Von Hand liesse
+   *    sich die nie genau treffen, und schon ein Pixel Abstand ergaebe spaeter zwei
+   *    getrennte Marken statt einer gemeinsamen.
+   *
+   * Liest den Stand frisch aus dem Store, damit beide Schritte aufeinander aufbauen.
    */
-  const snapDraft = useCallback(
-    (entityId: string) => {
-      const e = entities.find((x) => x.id === entityId)
-      const draft = draftPos[entityId]
+  const dropDraft = useCallback(
+    (entityId: string, clientX: number, clientY: number) => {
+      const el = containerRef.current
+      if (!el) return
+      const st = useStore.getState()
+      const c = st.activeCampaign()
+      const e = c.entities.find((x) => x.id === entityId)
+      const draft = st.draftPos[entityId]
       if (!e?.placement || !draft) return
-      const lv = layerScreenView(campaign.layers, layer.id, draft.layerId, view)
-      if (!lv) return
-      // Nur an Stellen auf derselben Karte einrasten - Koordinaten anderer Karten haben
-      // hier keine Bedeutung und laegen sonst zufaellig in Reichweite.
-      const targets = [
-        { layerId: e.placement.layerId, x: e.placement.x, y: e.placement.y },
-        ...scheduleForDay(e.schedule, currentDay).map((s) => ({
-          layerId: s.layerId ?? e.placement!.layerId,
-          x: s.x,
-          y: s.y,
-        })),
-      ].filter((t) => t.layerId === draft.layerId)
-      for (const t of targets) {
-        const dx = t.x - draft.x
-        const dy = t.y - draft.y
-        if (dx === 0 && dy === 0) return
-        if (Math.hypot(dx * lv.scale, dy * lv.scale) <= STOP_SNAP_PX) {
-          setDraftPos(entityId, t.x, t.y, draft.layerId)
-          return
+
+      const rect = el.getBoundingClientRect()
+      const v = viewRef.current
+      const wx = (clientX - rect.left - v.tx) / v.scale
+      const wy = (clientY - rect.top - v.ty) / v.scale
+      const target = resolveDeepTarget(c.layers, layer.id, wx, wy, v.scale)
+      const pos =
+        target.layerId === draft.layerId
+          ? { layerId: draft.layerId, x: draft.x, y: draft.y }
+          : { layerId: target.layerId, x: target.x, y: target.y }
+
+      const lv = layerScreenView(c.layers, layer.id, pos.layerId, v)
+      if (lv) {
+        // Nur an Stellen auf derselben Karte einrasten - Koordinaten anderer Karten haben
+        // hier keine Bedeutung und laegen sonst zufaellig in Reichweite.
+        const stops = [
+          { layerId: e.placement.layerId, x: e.placement.x, y: e.placement.y },
+          ...scheduleForDay(e.schedule, st.currentDay).map((s) => ({
+            layerId: s.layerId ?? e.placement!.layerId,
+            x: s.x,
+            y: s.y,
+          })),
+        ].filter((t) => t.layerId === pos.layerId)
+        for (const t of stops) {
+          const dx = t.x - pos.x
+          const dy = t.y - pos.y
+          if (dx === 0 && dy === 0) break
+          if (Math.hypot(dx * lv.scale, dy * lv.scale) <= STOP_SNAP_PX) {
+            pos.x = t.x
+            pos.y = t.y
+            break
+          }
         }
       }
+      setDraftPos(entityId, pos.x, pos.y, pos.layerId)
     },
-    [entities, draftPos, campaign.layers, layer.id, view, currentDay, setDraftPos],
+    [layer.id, setDraftPos],
   )
 
   /** Doppelklick auf ein Objekt: seinen Tagesablauf in der unteren Leiste aufschlagen. */
   const openSchedule = useCallback(
     (entityId: string) => {
       selectEntity(entityId)
-      setBottomPanel('zeitleiste')
+      // Spieler-Charaktere haben keinen - dort bleibt es beim blossen Auswaehlen, statt eine
+      // Leiste aufzuschlagen, die nur erklaeren kann, warum sie leer ist.
+      const e = entities.find((x) => x.id === entityId)
+      if (e && canSchedule(e)) setBottomPanel('zeitleiste')
     },
-    [selectEntity, setBottomPanel],
+    [entities, selectEntity, setBottomPanel],
   )
 
   /**
@@ -1033,9 +1062,8 @@ export function MapCanvas() {
                 selectedIds.length > 1 && selectedIds.includes(e.id)
                   ? undefined
                   : (clientX, clientY) => {
-                      // Eine vorgemerkte Stelle rastet an bestehenden Stationen ein, statt
-                      // das Objekt auf eine andere Karte umzuhaengen.
-                      if (draftPos[e.id]) snapDraft(e.id)
+                      // Bei laufender Aufnahme wandert das Doppel, nicht das Objekt selbst.
+                      if (draftPos[e.id]) dropDraft(e.id, clientX, clientY)
                       else onReparentEntity(e.id, clientX, clientY)
                     }
               }
@@ -1053,12 +1081,17 @@ export function MapCanvas() {
         view={view}
         placementOf={(e) => placementAt(e, timeOfDay, currentDay)}
         onSetTime={setDraftTime}
+        onMove={(id, dxWorld, dyWorld) => {
+          const d = draftPos[id]
+          if (d) setDraftPos(id, d.x + dxWorld, d.y + dyWorld, d.layerId)
+        }}
+        onDrop={dropDraft}
         onCommit={commitDraft}
         onCancel={clearDraftPos}
       />
 
       {/* Beim Planen in der Zeitleiste: alle Stationen des ausgewaehlten Objekts als Route. */}
-      {bottomPanel === 'zeitleiste' && selectedEntity && (
+      {bottomPanel === 'zeitleiste' && selectedEntity && canSchedule(selectedEntity) && (
         <ScheduleOverlay
           entity={selectedEntity}
           layers={campaign.layers}
@@ -1207,6 +1240,8 @@ function DraftOverlay({
   view,
   placementOf,
   onSetTime,
+  onMove,
+  onDrop,
   onCommit,
   onCancel,
 }: {
@@ -1217,6 +1252,10 @@ function DraftOverlay({
   view: View
   placementOf: (e: Entity) => { layerId: string; x: number; y: number } | null
   onSetTime: (entityId: string, minutes: number) => void
+  /** Doppel weiterschieben (Delta in Weltkoordinaten seiner Karte). */
+  onMove: (entityId: string, dxWorld: number, dyWorld: number) => void
+  /** Doppel loslassen: Kartenwechsel und Einrasten. */
+  onDrop: (entityId: string, clientX: number, clientY: number) => void
   /** Vormerkung als Timestone festhalten. */
   onCommit: (entityId: string) => void
   /** Vormerkung dieses Objekts verwerfen. */
@@ -1254,11 +1293,17 @@ function DraftOverlay({
               emphasized={meta.emphasized}
               label={e.name}
               selected={false}
-              draggable={false}
-              scale={view.scale}
+              // Auch nach dem ersten Absetzen noch zu greifen: Die Stelle steht ja erst
+              // fest, wenn man sie bestaetigt - bis dahin soll sie sich nachjustieren
+              // lassen, ohne die Figur erneut ueber die halbe Karte zu ziehen.
+              draggable
+              // Massstab der Karte, auf der das Doppel liegt - nicht der der Wurzelkarte.
+              // Sonst liefe es auf einer eingebetteten Karte zu schnell mit.
+              scale={dv.scale}
               ghost
               onClick={() => {}}
-              onMove={() => {}}
+              onMove={(dxWorld, dyWorld) => onMove(e.id, dxWorld, dyWorld)}
+              onDragEnd={(clientX, clientY) => onDrop(e.id, clientX, clientY)}
             />
             {/* Sitzt unter dem Doppel, wo weder Pin noch Name im Weg sind. */}
             <div

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { entityDisplayMeta, entityMeta } from '../types'
+import { canSchedule, entityDisplayMeta, entityMeta } from '../types'
 import type { Entity } from '../types'
 import { useStore } from '../store/useStore'
 import { formatTime } from '../utils/time'
@@ -32,6 +32,9 @@ export function Timeline() {
     .filter((e): e is Entity => !!e)
   // Ohne ausgewaehltes Objekt gibt es keinen Tagesablauf zu zeigen.
   const activeTab: Tab = selected.length > 0 ? tab : 'kampagne'
+  // Aufgezeichnet wird nur, wenn unter der Auswahl ueberhaupt etwas mit Tagesablauf ist -
+  // Spieler-Charaktere haben keinen.
+  const recording = activeTab === 'objekt' && selected.some(canSchedule)
 
   return (
     <div className="timeline">
@@ -39,7 +42,7 @@ export function Timeline() {
         <h2 className="timeline__title">Zeitleiste</h2>
         {/* Sichtbar machen, dass das Verschieben auf der Karte gerade aufgezeichnet wird -
             sonst waere nicht erklaerlich, warum die Figur nach der Uhrzeit gefragt wird. */}
-        {activeTab === 'objekt' && selected.length > 0 && (
+        {recording && (
           <span className="timeline__rec" title="Verschieben auf der Karte legt einen Timestone an">
             Aufnahme
           </span>
@@ -90,10 +93,31 @@ function ObjectSchedule({ entities }: { entities: Entity[] }) {
   const setPlacingEntity = useStore((s) => s.setPlacingEntity)
   const selectEntity = useStore((s) => s.selectEntity)
 
+  // Spieler-Charaktere haben keinen Tagesablauf - wo sie sind, entscheiden die Spieler.
+  const players = entities.filter((e) => !canSchedule(e))
+  const schedulable = entities.filter(canSchedule)
   // Ein Tagesablauf beschreibt, wo etwas zu welcher Uhrzeit liegt - ohne Kartenposition
   // gibt es dafuer keine Grundlage.
-  const unplaced = entities.filter((e) => !e.placement)
-  const placed = entities.filter((e) => e.placement)
+  const unplaced = schedulable.filter((e) => !e.placement)
+  const placed = schedulable.filter((e) => e.placement)
+
+  if (placed.length === 0 && unplaced.length === 0) {
+    return (
+      <div className="timeline__notice">
+        <p>
+          {players.length === 1 ? (
+            <>
+              <strong>{players[0].name}</strong> ist ein Spieler-Charakter und hat keinen
+              Tagesablauf.
+            </>
+          ) : (
+            <>Spieler-Charaktere haben keinen Tagesablauf.</>
+          )}{' '}
+          Wo sie sich aufhalten, entscheiden die Spieler am Tisch — nicht ein hinterlegter Ablauf.
+        </p>
+      </div>
+    )
+  }
 
   if (placed.length === 0) {
     const first = unplaced[0]
@@ -137,6 +161,14 @@ function ObjectSchedule({ entities }: { entities: Entity[] }) {
           {unplaced.length === 1
             ? `${unplaced[0].name} liegt auf keiner Karte und bleibt hier aussen vor.`
             : `${unplaced.length} ausgewaehlte Objekte liegen auf keiner Karte und bleiben hier aussen vor.`}
+        </p>
+      )}
+
+      {players.length > 0 && (
+        <p className="dayschedule__hint">
+          {players.length === 1
+            ? `${players[0].name} ist ein Spieler-Charakter und bleibt hier aussen vor.`
+            : `${players.length} Spieler-Charaktere bleiben hier aussen vor.`}
         </p>
       )}
 

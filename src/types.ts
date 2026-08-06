@@ -172,6 +172,20 @@ export function isHostile(entity: Entity): boolean {
   return entity.type === 'nsc' && (entity.fields.gesinnung === 'feind' || entity.fields.gesinnung === 'boss')
 }
 
+/** Ist das ein Spieler-Charakter? */
+export function isPlayer(entity: Entity): boolean {
+  return entity.type === 'nsc' && entity.fields.gesinnung === 'spieler'
+}
+
+/**
+ * Darf dieses Objekt einen Tagesablauf haben? Spieler-Charaktere nicht: Wo sie sich
+ * aufhalten, entscheiden die Spieler am Tisch. Ein hinterlegter Ablauf wuerde sie gegen
+ * deren Willen durch die Karte schicken.
+ */
+export function canSchedule(entity: Entity): boolean {
+  return !isPlayer(entity)
+}
+
 /**
  * Steht das Objekt an diesem Timestone wieder an seiner Startposition? Wird bei
  * jeder Anzeige neu aus der Position bestimmt, nie gespeichert - sonst behielte ein
