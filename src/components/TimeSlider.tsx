@@ -1,22 +1,49 @@
-import { useRef } from 'react'
+import { useCallback, useRef } from 'react'
 import { useStore } from '../store/useStore'
 import { MINUTES_PER_DAY, formatTime } from '../utils/time'
 
 /**
+ * Breite des Reglerknopfes. Der Browser laesst ihn an beiden Enden ganz im Feld stehen, die
+ * Skala liegt also um je eine halbe Knopfbreite eingerueckt. Ohne diese Korrektur liefe der
+ * Knopf beim Ziehen dem Zeiger davon.
+ */
+const THUMB = 16
+
+/**
  * Uhrzeit-Regler ueber der Karte. Tageszeit und Tag/Nacht-Einfaerbung sind immer aktiv -
  * es gibt keine Schalter mehr dafuer, die Zeit ist fester Teil der Karte.
+ *
+ * Das Ziehen ist selbst gebaut statt dem Feld ueberlassen: Nur so laesst sich ueber das
+ * Tagesende hinausziehen. Zieht man weiter nach rechts, laeuft die Zeit in den naechsten
+ * Kalendertag hinein, nach links in den vorherigen - eine Reglerbreite entspricht einem Tag.
+ * Ein Bereichsfeld kann das nicht: Es kennt nur seine eigenen Grenzen und wuerde am Anschlag
+ * stehenbleiben.
+ *
+ * Gerechnet wird dabei vom Tag, in dem der Zug begonnen hat. Sonst wuerde jede weitere
+ * Bewegung am Anschlag den eben gewechselten Tag erneut weiterschieben.
  */
 export function TimeSlider() {
   const timeOfDay = useStore((s) => s.timeOfDay)
   const currentDay = useStore((s) => s.currentDay)
-  const setTime = useStore((s) => s.setTimeOfDay)
+  const setMoment = useStore((s) => s.setMoment)
   const setCurrentDay = useStore((s) => s.setCurrentDay)
-  /**
-   * Ein Tageswechsel je Zug. Nach dem Umschlagen steht der Regler am anderen Ende, waehrend
-   * der Finger noch am Anschlag liegt - schon ein Zittern wuerde sonst gleich den naechsten
-   * Tag aufschlagen. Loslassen gibt ihn wieder frei.
-   */
-  const wrapped = useRef(false)
+
+  const rangeRef = useRef<HTMLInputElement>(null)
+  const dragDay = useRef(currentDay)
+
+  const applyFromPointer = useCallback(
+    (clientX: number) => {
+      const el = rangeRef.current
+      if (!el) return
+      const rect = el.getBoundingClientRect()
+      const usable = Math.max(1, rect.width - THUMB)
+      // Bewusst nicht begrenzt: Werte unter 0 und ueber einem Tag sind der Uebergang in den
+      // Nachbartag, den setMoment umrechnet.
+      const ratio = (clientX - rect.left - THUMB / 2) / usable
+      setMoment(dragDay.current, ratio * MINUTES_PER_DAY)
+    },
+    [setMoment],
+  )
 
   return (
     <div className="time-slider">
@@ -43,33 +70,46 @@ export function TimeSlider() {
       <div className="time-slider__body">
         <span className="time-slider__icon">{iconForTime(timeOfDay)}</span>
         <input
+          ref={rangeRef}
           className="time-slider__range"
           type="range"
-          // Je einen Schritt ueber den Tag hinaus: Wer bis ans Ende zieht, landet auf 0 Uhr
-          // des naechsten Tages, wer darueber hinaus nach links zieht, auf 23:59 des
-          // vorherigen (setTimeOfDay rechnet das um). Der Regler springt dabei ans andere
-          // Ende - genau das macht den Uebergang sichtbar.
-          min={-1}
-          max={MINUTES_PER_DAY}
+          min={0}
+          max={MINUTES_PER_DAY - 1}
           // Minutenweise: Mit groesseren Schritten waere das Tagesende (23:59) nicht
           // erreichbar, weil es auf keinem Vielfachen davon liegt.
           step={1}
           value={timeOfDay}
-          onChange={(e) => {
-            const value = Number(e.target.value)
-            const wraps = value < 0 || value >= MINUTES_PER_DAY
-            if (wraps && wrapped.current) return
-            if (wraps) wrapped.current = true
-            setTime(value)
+          // Das Feld zeigt nur an; gezogen wird von Hand (siehe oben). preventDefault haelt
+          // sein eigenes Ziehen zurueck, das am Tagesende stehenbliebe.
+          onPointerDown={(e) => {
+            if (e.button !== 0) return
+            e.preventDefault()
+            e.currentTarget.setPointerCapture(e.pointerId)
+            e.currentTarget.focus()
+            dragDay.current = currentDay
+            applyFromPointer(e.clientX)
           }}
-          onPointerUp={() => {
-            wrapped.current = false
+          onPointerMove={(e) => {
+            if (!e.currentTarget.hasPointerCapture(e.pointerId)) return
+            applyFromPointer(e.clientX)
           }}
-          onKeyUp={() => {
-            wrapped.current = false
+          onPointerUp={(e) => {
+            if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+              e.currentTarget.releasePointerCapture(e.pointerId)
+            }
           }}
-          onBlur={() => {
-            wrapped.current = false
+          // Pfeiltasten bedient weiterhin das Feld selbst - minutenweise, und am Tagesrand
+          // ebenfalls in den Nachbartag.
+          onChange={(e) => setMoment(currentDay, Number(e.target.value))}
+          onKeyDown={(e) => {
+            if (e.key === 'ArrowRight' && timeOfDay >= MINUTES_PER_DAY - 1) {
+              e.preventDefault()
+              setMoment(currentDay, MINUTES_PER_DAY)
+            }
+            if (e.key === 'ArrowLeft' && timeOfDay <= 0) {
+              e.preventDefault()
+              setMoment(currentDay, -1)
+            }
           }}
         />
         <span className="time-slider__clock">{formatTime(timeOfDay)}</span>

@@ -200,6 +200,13 @@ interface StoreState extends AppData {
    */
   currentDay: number
   setTimeOfDay: (minutes: number) => void
+  /**
+   * Uhrzeit und Kalendertag in einem Schritt: "minutes" darf ausserhalb des Tages liegen und
+   * laeuft dann in die Nachbartage ueber. Damit laesst sich der Zeitregler in einem Zug ueber
+   * Tagesgrenzen hinwegziehen, ohne dass jede weitere Bewegung am Anschlag den eben
+   * gewechselten Tag erneut weiterschiebt.
+   */
+  setMoment: (day: number, minutes: number) => void
   setCurrentDay: (day: number) => void
 
   // Untere, hochfahrende Leiste (Zeitleiste / Handlungsbaum / Beziehungen)
@@ -443,30 +450,25 @@ export const useStore = create<StoreState>()(
         lastUndoPushAt: 0,
         timeOfDay: 12 * 60,
         currentDay: 1,
+        // Vormerkungen haben ihre eigene Uhrzeit und bleiben davon unberuehrt.
+        setTimeOfDay: (minutes) => get().setMoment(get().currentDay, minutes),
+
         /**
-         * Uhrzeit setzen. Werte ausserhalb des Tages laufen in den Nachbartag ueber: Hinter
-         * 23:59 kommt 0 Uhr des naechsten Tages, vor 0 Uhr 23:59 des vorherigen. Nur Tag 1
-         * hat keinen Vorgaenger - dort ist bei 0 Uhr Schluss.
-         *
-         * Vormerkungen haben ihre eigene Uhrzeit und bleiben davon unberuehrt.
+         * Uhrzeit setzen, gerechnet ab einem bestimmten Kalendertag. Werte ausserhalb des
+         * Tages laufen dabei in die Nachbartage ueber - beliebig weit, damit sich der Regler
+         * in einem Zug ueber mehrere Tage ziehen laesst. Vor Tag 1 liegt nichts; dort ist
+         * bei 0 Uhr Schluss.
          */
-        setTimeOfDay: (minutes) =>
-          set((s) => {
+        setMoment: (day, minutes) =>
+          set(() => {
             let time = Math.round(minutes)
-            let day = s.currentDay
-            while (time >= MINUTES_PER_DAY) {
-              time -= MINUTES_PER_DAY
-              day += 1
-            }
-            while (time < 0) {
-              if (day <= 1) {
-                time = 0
-                break
-              }
-              time += MINUTES_PER_DAY
-              day -= 1
-            }
-            return { timeOfDay: time, currentDay: day }
+            // Math.floor rundet auch bei negativen Werten nach unten - genau das ergibt den
+            // Uebertrag in den vorherigen Tag.
+            const carry = Math.floor(time / MINUTES_PER_DAY)
+            time -= carry * MINUTES_PER_DAY
+            const target = Math.round(day) + carry
+            if (target < 1) return { timeOfDay: 0, currentDay: 1 }
+            return { timeOfDay: time, currentDay: target }
           }),
         // Der Kalendertag wechselt den ganzen Ablauf - Vormerkungen sind dann hinfaellig.
         // Tag 1 ist der erste; davor liegt nichts.
