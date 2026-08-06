@@ -36,9 +36,10 @@ interface Lane {
  * Objekt ab dieser Uhrzeit steht - bis der naechste Timestone es weiterschickt. Die
  * Basis-Platzierung ist der feste Timestone um 0 Uhr.
  *
- * Der Ablauf ist dreiteilig: Uhrzeit am Zeiger einstellen, Objekte auf der Karte an ihren
- * Platz schieben, Timestone setzen. Das Verschieben wird bis dahin nur vorgemerkt (siehe
- * draftPos im Store), damit es nicht den zuletzt gueltigen Timestone mitverschiebt.
+ * Angelegt werden Timestones auf der Karte: Figur an ihren Platz schieben, daneben die
+ * Uhrzeit waehlen. Diese Spur zeigt das Ergebnis - wie lange das Objekt wo bleibt - und ist
+ * der Platz fuer Ausnahmen an einzelnen Kalendertagen, die es auf der Karte nicht gibt.
+ * Zeiten lassen sich hier nachtraeglich per Ziehen der Rauten geraderuecken.
  *
  * Sind mehrere Objekte ausgewaehlt, bekommt jedes eine eigene Spur und ein Klick auf ◆
  * setzt fuer alle gemeinsam einen Timestone.
@@ -51,7 +52,6 @@ export function DaySchedule({ entities }: { entities: Entity[] }) {
   const addTimestone = useStore((s) => s.addTimestone)
   const updateTimestone = useStore((s) => s.updateTimestone)
   const removeTimestone = useStore((s) => s.removeTimestone)
-  const draftPos = useStore((s) => s.draftPos)
 
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [exceptionOpen, setExceptionOpen] = useState(false)
@@ -287,7 +287,7 @@ export function DaySchedule({ entities }: { entities: Entity[] }) {
         </div>
         <div className="daytrack__laneactions">
           <button
-            className={`daytrack__add${draftPos[lane.entity.id] && isBaseLane ? ' is-pending' : ''}`}
+            className="daytrack__add"
             disabled={readOnly}
             onClick={() => (single ? setKeys(lane.day) : addTimestone(lane.entity.id, { time: timeOfDay }))}
             title={`Timestone bei ${formatTime(timeOfDay)} setzen`}

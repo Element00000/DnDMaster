@@ -10,9 +10,11 @@ type Tab = 'objekt' | 'kampagne'
 
 /** Kurzanleitung zum Tagesablauf; haengt am Infopunkt neben dem Reiter. */
 const SCHEDULE_HELP =
-  'Zuerst die Uhrzeit am Zeiger ziehen, dann die Figur auf der Karte an ihren Platz ' +
-  'schieben, dann mit ◆ den Timestone setzen. Vor dem ersten Timestone gilt die normale Position. ' +
-  'Mit ◇ kehrt die Figur ab dieser Uhrzeit wieder dorthin zurueck.'
+  'Solange diese Leiste offen ist, wird aufgezeichnet: Figur auf der Karte an ihren Platz ' +
+  'schieben, daneben die Uhrzeit waehlen, bestaetigen - fertig. Vor dem ersten Timestone gilt ' +
+  'die normale Position. Mit ◇ kehrt die Figur ab der eingestellten Uhrzeit wieder dorthin zurueck. ' +
+  'Hier unten laesst sich ablesen, wie lange sie wo bleibt, und eine Ausnahme fuer einen ' +
+  'einzelnen Kalendertag hinterlegen.'
 
 /**
  * Inhalt der unteren Zeitleiste. Zeigt zum ausgewaehlten Objekt dessen Tagesablauf
@@ -35,6 +37,13 @@ export function Timeline() {
     <div className="timeline">
       <div className="timeline__header">
         <h2 className="timeline__title">Zeitleiste</h2>
+        {/* Sichtbar machen, dass das Verschieben auf der Karte gerade aufgezeichnet wird -
+            sonst waere nicht erklaerlich, warum die Figur nach der Uhrzeit gefragt wird. */}
+        {activeTab === 'objekt' && selected.length > 0 && (
+          <span className="timeline__rec" title="Verschieben auf der Karte legt einen Timestone an">
+            Aufnahme
+          </span>
+        )}
         <div className="timeline__tabs">
           <button
             className={`timeline__tab${activeTab === 'objekt' ? ' is-active' : ''}`}

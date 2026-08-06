@@ -848,26 +848,75 @@ button {
   opacity: 0.7;
 }
 
-/* Sitzt unter dem Doppel, wo weder Pin noch Name im Weg sind. */
-.draft-overlay__cancel {
+/* Die Frage "ab wann?" direkt am Doppel: Der Ort steht schon fest, die Uhrzeit ist das
+   Einzige, was noch fehlt. Sitzt unter dem Doppel, wo weder Pin noch Name im Weg sind. */
+.draft-ask {
   position: absolute;
-  transform: translate(-50%, 10px);
-  padding: 3px 9px;
+  transform: translate(-50%, 12px);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 4px 3px 8px;
   border-radius: 999px;
-  border: 1px solid var(--border-strong);
-  background: rgba(13, 15, 20, 0.9);
-  color: var(--ink-dim);
-  font-family: inherit;
-  font-size: 10.5px;
+  border: 1px solid var(--chip-color, var(--gold));
+  background: rgba(13, 15, 20, 0.94);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
   white-space: nowrap;
   pointer-events: auto;
-  cursor: pointer;
-  transition: border-color 0.15s, color 0.15s;
 }
 
-.draft-overlay__cancel:hover {
-  border-color: var(--danger);
-  color: var(--danger);
+.draft-ask__label {
+  font-size: 10.5px;
+  color: var(--ink-faint);
+}
+
+.draft-ask__time {
+  width: 62px;
+  padding: 2px 4px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--panel-2);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 11.5px;
+}
+
+.draft-ask__time:focus {
+  outline: none;
+  border-color: var(--chip-color, var(--gold));
+}
+
+/* Die eigene Uhr des Browsers im Zeitfeld ist auf hellem Grund gezeichnet - hier wird sie
+   aufgehellt, sonst steht sie als dunkler Fleck im dunklen Feld. */
+.draft-ask__time::-webkit-calendar-picker-indicator {
+  filter: invert(0.8);
+  cursor: pointer;
+}
+
+.draft-ask__ok,
+.draft-ask__cancel {
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ink-dim);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.draft-ask__ok:hover {
+  background: var(--chip-color, var(--gold));
+  color: #0d0f14;
+}
+
+.draft-ask__cancel:hover {
+  background: var(--danger);
+  color: #fff;
 }
 
 .map-pin__label {
@@ -2032,6 +2081,29 @@ button {
   font-size: 15px;
   color: var(--gold-soft);
   margin: 0;
+}
+
+/* Aufnahme laeuft: Verschieben auf der Karte legt einen Timestone an. */
+.timeline__rec {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 9px 2px 7px;
+  border-radius: 999px;
+  border: 1px solid rgba(192, 57, 43, 0.5);
+  background: rgba(192, 57, 43, 0.14);
+  color: #e08b80;
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.timeline__rec::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #c0392b;
 }
 
 .timeline__tabs {

@@ -314,6 +314,10 @@ interface StoreState extends AppData {
    */
   draftPos: Record<string, DraftPos>
   setDraftPos: (entityId: string, x: number, y: number, layerId: string) => void
+  /** Uhrzeit der Vormerkung setzen (die Wahl direkt neben der Figur auf der Karte). */
+  setDraftTime: (entityId: string, minutes: number) => void
+  /** Vormerkung als Timestone festhalten. Liefert dessen Id, oder null ohne Vormerkung. */
+  commitDraft: (entityId: string, day?: number | null) => string | null
   /** Ohne Id alle Vormerkungen verwerfen, mit Id nur die des Objekts. */
   clearDraftPos: (entityId?: string) => void
 
@@ -367,16 +371,17 @@ function deselectPatch(s: StoreState, stillSelected: boolean): Pick<StoreState, 
 }
 
 /**
- * Eine vorgemerkte Position samt dem Timestone, der beim Vormerken gerade galt (null =
- * Basis-Platzierung). Daran haengt ihre Lebensdauer: Sie beschreibt, wo das Objekt in
- * diesem Zeitabschnitt stehen soll, und bleibt gueltig, solange man sich darin bewegt.
+ * Eine vorgemerkte Station: der Ort steht schon fest (man hat die Figur hingeschoben), die
+ * Uhrzeit waehlt man unmittelbar daneben auf der Karte. Erst mit dem Bestaetigen wird
+ * daraus ein Timestone - bis dahin laesst sich alles noch verwerfen.
  */
 export interface DraftPos {
   x: number
   y: number
   /** Karte, auf der die vorgemerkte Stelle liegt - x und y gelten in deren Koordinaten. */
   layerId: string
-  keyId: string | null
+  /** Ab wann das Objekt hier stehen soll (Minuten seit Mitternacht). */
+  time: number
 }
 
 /** Was ueber ein Neuladen hinweg erhalten bleibt. */
@@ -427,25 +432,9 @@ export const useStore = create<StoreState>()(
         lastUndoPushAt: 0,
         timeOfDay: 12 * 60,
         currentDay: 1,
-        /**
-         * Eine Vormerkung gilt fuer den Zeitabschnitt, in dem sie entstanden ist. Sie
-         * ueberlebt daher das Verschieben der Uhrzeit innerhalb dieses Abschnitts und
-         * faellt erst weg, sobald ein anderer Timestone gilt - sonst waere sie schon beim
-         * kleinsten Nachjustieren der Uhrzeit verloren.
-         */
+        // Vormerkungen haben ihre eigene Uhrzeit und bleiben davon unberuehrt.
         setTimeOfDay: (minutes) =>
-          set((s) => {
-            const timeOfDay = Math.max(0, Math.min(MINUTES_PER_DAY - 1, Math.round(minutes)))
-            const entities = s.activeCampaign().entities
-            const draftPos: Record<string, DraftPos> = {}
-            for (const [id, d] of Object.entries(s.draftPos)) {
-              const entity = entities.find((e) => e.id === id)
-              if (!entity) continue
-              const nowId = activeTimestone(entity.schedule, timeOfDay, s.currentDay)?.id ?? null
-              if (nowId === d.keyId) draftPos[id] = d
-            }
-            return { timeOfDay, draftPos }
-          }),
+          set({ timeOfDay: Math.max(0, Math.min(MINUTES_PER_DAY - 1, Math.round(minutes))) }),
         // Der Kalendertag wechselt den ganzen Ablauf - Vormerkungen sind dann hinfaellig.
         setCurrentDay: (day) => set({ currentDay: Math.max(0, Math.round(day)), draftPos: {} }),
 
@@ -896,19 +885,16 @@ export const useStore = create<StoreState>()(
           // Zur selben Uhrzeit auf derselben Ebene gibt es nur einen Punkt - ein zweiter
           // waere nie erreichbar. Ein erneutes Setzen aktualisiert also den vorhandenen.
           const existing = entity.schedule.find((k) => k.time === time && k.day === day)
-          // Der Punkt haelt fest, wo das Objekt gerade zu sehen ist: die vorgemerkte
-          // Position, wenn man es eben verschoben hat, sonst die zu dieser Zeit geltende.
-          const draft = s.draftPos[entityId]
-          const current = activeTimestone(entity.schedule, time, s.currentDay)
+          // Ohne Angabe haelt der Punkt fest, wo das Objekt zu dieser Zeit ohnehin steht.
           // Karte und Koordinaten stammen immer aus derselben Quelle - sonst laege der Punkt
           // bei den Koordinaten der einen auf der anderen Karte.
+          const current = activeTimestone(entity.schedule, time, s.currentDay)
           const from =
             init?.x != null && init?.y != null
               ? { layerId: init.layerId ?? entity.placement.layerId, x: init.x, y: init.y }
-              : (draft ??
-                (current
-                  ? { layerId: current.layerId ?? entity.placement.layerId, x: current.x, y: current.y }
-                  : entity.placement))
+              : current
+                ? { layerId: current.layerId ?? entity.placement.layerId, x: current.x, y: current.y }
+                : entity.placement
           const key: Timestone = {
             id: existing?.id ?? uid('key-'),
             time,
@@ -943,12 +929,29 @@ export const useStore = create<StoreState>()(
         draftPos: {},
         setDraftPos: (entityId, x, y, layerId) =>
           set((s) => {
-            const entity = s.activeCampaign().entities.find((e) => e.id === entityId)
-            const keyId = entity
-              ? activeTimestone(entity.schedule, s.timeOfDay, s.currentDay)?.id ?? null
-              : null
-            return { draftPos: { ...s.draftPos, [entityId]: { x, y, layerId, keyId } } }
+            // Die Uhrzeit einer laufenden Vormerkung bleibt beim Weiterschieben stehen;
+            // eine neue startet bei der eingestellten Uhrzeit als Vorschlag.
+            const time = s.draftPos[entityId]?.time ?? s.timeOfDay
+            return { draftPos: { ...s.draftPos, [entityId]: { x, y, layerId, time } } }
           }),
+        setDraftTime: (entityId, minutes) =>
+          set((s) => {
+            const draft = s.draftPos[entityId]
+            if (!draft) return {}
+            const time = Math.max(0, Math.min(MINUTES_PER_DAY - 1, Math.round(minutes)))
+            return { draftPos: { ...s.draftPos, [entityId]: { ...draft, time } } }
+          }),
+        commitDraft: (entityId, day = null) => {
+          const draft = get().draftPos[entityId]
+          if (!draft) return null
+          return get().addTimestone(entityId, {
+            time: draft.time,
+            day,
+            layerId: draft.layerId,
+            x: draft.x,
+            y: draft.y,
+          })
+        },
         clearDraftPos: (entityId) =>
           set((s) => {
             if (!entityId) return { draftPos: {} }

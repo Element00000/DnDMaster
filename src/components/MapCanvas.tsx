@@ -3,7 +3,14 @@ import { useStore } from '../store/useStore'
 import type { DraftPos } from '../store/useStore'
 import { entityDisplayMeta } from '../types'
 import type { Entity, MapLayer } from '../types'
-import { activeTimestone, dayNightOverlay, formatTime, placementAt, scheduleForDay } from '../utils/time'
+import {
+  activeTimestone,
+  dayNightOverlay,
+  formatTime,
+  parseTime,
+  placementAt,
+  scheduleForDay,
+} from '../utils/time'
 import { useAsset } from '../useAsset'
 import { useBottomPanelOffset } from '../useBottomPanelOffset'
 import { PlaceholderMap } from './PlaceholderMap'
@@ -77,6 +84,8 @@ export function MapCanvas() {
   const draftPos = useStore((s) => s.draftPos)
   const setDraftPos = useStore((s) => s.setDraftPos)
   const clearDraftPos = useStore((s) => s.clearDraftPos)
+  const setDraftTime = useStore((s) => s.setDraftTime)
+  const commitDraft = useStore((s) => s.commitDraft)
   const selectedEntityId = useStore((s) => s.selectedEntityId)
   const bottomPanel = useStore((s) => s.bottomPanel)
   const setBottomPanel = useStore((s) => s.setBottomPanel)
@@ -147,22 +156,27 @@ export function MapCanvas() {
   /**
    * Ziehen eines Pins - was dabei verschoben wird, haengt davon ab, was man gerade tut:
    *
+   * - Aufnahme (Tagesablauf dieses Objekts offen): Die neue Stelle wird vorgemerkt, und die
+   *   Uhrzeit dazu waehlt man unmittelbar daneben auf der Karte. Ort und Zeitpunkt bleiben
+   *   so beieinander, statt sich auf Karte und untere Leiste zu verteilen.
    * - Liegt die Uhrzeit genau auf einem Timestone, wird dieser bearbeitet.
-   * - Plant man gerade den Tagesablauf dieses Objekts (Zeitleiste offen, Objekt gewaehlt,
-   *   Uhrzeit nach 0 Uhr), wird die neue Stelle nur vorgemerkt und erst durch "Punkt
-   *   setzen" festgehalten. Sonst wuerde das Ziehen den zuletzt gueltigen Timestone
-   *   mitverschieben, statt einen neuen Zeitpunkt vorzubereiten.
-   * - Sonst gilt die Basis-Platzierung des Objekts (auch um 0 Uhr, denn das ist sie).
+   * - Gilt sonst ein Timestone, wandert dieser mit: Seine Stelle ist die, die man sieht.
+   * - Gilt keiner (0 Uhr, oder ohne Tagesablauf), gilt die Basis-Platzierung.
    */
   const moveEntityTimed = useCallback(
     (e: Entity, dxWorld: number, dyWorld: number) => {
       const active = activeTimestone(e.schedule, timeOfDay, currentDay)
-      if (active && active.time === timeOfDay) {
+      const recording = bottomPanel === 'zeitleiste' && selectedIds.includes(e.id)
+      if (!recording && active) {
         moveTimestone(e.id, active.id, dxWorld, dyWorld)
         return
       }
-      const planning = bottomPanel === 'zeitleiste' && selectedIds.includes(e.id) && timeOfDay > 0
-      if (planning) {
+      if (recording && active && active.time === timeOfDay) {
+        // Genau auf einem Punkt: Der wird bearbeitet, nicht ein zweiter danebengelegt.
+        moveTimestone(e.id, active.id, dxWorld, dyWorld)
+        return
+      }
+      if (recording) {
         // Waehrend des Ziehens bleibt die Karte dieselbe; auf eine andere umgesetzt wird die
         // Vormerkung erst beim Loslassen (siehe onReparentEntity), wo die Bildschirmstelle
         // bekannt ist.
@@ -1040,8 +1054,9 @@ export function MapCanvas() {
         layers={campaign.layers}
         rootLayerId={layer.id}
         view={view}
-        timeOfDay={timeOfDay}
         placementOf={(e) => placementAt(e, timeOfDay, currentDay)}
+        onSetTime={setDraftTime}
+        onCommit={commitDraft}
         onCancel={clearDraftPos}
       />
 
@@ -1179,9 +1194,13 @@ export function MapCanvas() {
 }
 
 /**
- * Vorgemerkte Positionen: Waehrend man einen Tagesablauf plant, wandert nicht der Pin
+ * Vorgemerkte Stationen: Waehrend man einen Tagesablauf aufzeichnet, wandert nicht der Pin
  * selbst, sondern ein Doppel von ihm. Eine gestrichelte Linie verbindet beide, damit
  * erkennbar bleibt, wozu das Doppel gehoert und dass es noch nicht festgehalten ist.
+ *
+ * Daran haengt die Uhrzeit-Wahl: Der Ort steht fest, sobald man die Figur losgelassen hat -
+ * "ab wann?" ist die einzige offene Frage und wird deshalb hier beantwortet, nicht in der
+ * unteren Leiste.
  */
 function DraftOverlay({
   entities,
@@ -1189,8 +1208,9 @@ function DraftOverlay({
   layers,
   rootLayerId,
   view,
-  timeOfDay,
   placementOf,
+  onSetTime,
+  onCommit,
   onCancel,
 }: {
   entities: Entity[]
@@ -1198,8 +1218,10 @@ function DraftOverlay({
   layers: MapLayer[]
   rootLayerId: string
   view: View
-  timeOfDay: number
   placementOf: (e: Entity) => { layerId: string; x: number; y: number } | null
+  onSetTime: (entityId: string, minutes: number) => void
+  /** Vormerkung als Timestone festhalten. */
+  onCommit: (entityId: string) => void
   /** Vormerkung dieses Objekts verwerfen. */
   onCancel: (entityId: string) => void
 }) {
@@ -1233,8 +1255,7 @@ function DraftOverlay({
               color={meta.color}
               iconInvert={meta.iconInvert}
               emphasized={meta.emphasized}
-              // Uhrzeit im Label: Sie sagt, wofuer die Stelle vorgemerkt ist.
-              label={`${formatTime(timeOfDay)} · ${e.name}`}
+              label={e.name}
               selected={false}
               draggable={false}
               scale={view.scale}
@@ -1242,17 +1263,36 @@ function DraftOverlay({
               onClick={() => {}}
               onMove={() => {}}
             />
-            {/* Sitzt neben dem Doppel, damit die Vormerkung verworfen werden kann, ohne
-                die Figur erst zurueckschieben zu muessen. */}
-            <button
-              className="draft-overlay__cancel"
+            {/* Sitzt unter dem Doppel, wo weder Pin noch Name im Weg sind. */}
+            <div
+              className="draft-ask"
               style={{ left: to.x, top: to.y }}
-              title="Vorgemerkte Stelle verwerfen"
+              // Sonst zieht der Kartenhintergrund darunter eine Rechteck-Markierung auf,
+              // sobald man ins Feld fasst.
               onPointerDown={(ev) => ev.stopPropagation()}
-              onClick={() => onCancel(e.id)}
+              onKeyDown={(ev) => {
+                if (ev.key === 'Enter') onCommit(e.id)
+                if (ev.key === 'Escape') onCancel(e.id)
+              }}
             >
-              Abbrechen
-            </button>
+              <span className="draft-ask__label">ab</span>
+              <input
+                className="draft-ask__time"
+                type="time"
+                value={formatTime(draft.time)}
+                autoFocus
+                onChange={(ev) => {
+                  const minutes = parseTime(ev.target.value)
+                  if (minutes != null) onSetTime(e.id, minutes)
+                }}
+              />
+              <button className="draft-ask__ok" title="Timestone setzen" onClick={() => onCommit(e.id)}>
+                ✓
+              </button>
+              <button className="draft-ask__cancel" title="Verwerfen" onClick={() => onCancel(e.id)}>
+                ×
+              </button>
+            </div>
           </div>
         )
       })}
