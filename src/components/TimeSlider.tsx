@@ -1,3 +1,4 @@
+import { useRef } from 'react'
 import { useStore } from '../store/useStore'
 import { MINUTES_PER_DAY, formatTime } from '../utils/time'
 
@@ -10,6 +11,12 @@ export function TimeSlider() {
   const currentDay = useStore((s) => s.currentDay)
   const setTime = useStore((s) => s.setTimeOfDay)
   const setCurrentDay = useStore((s) => s.setCurrentDay)
+  /**
+   * Ein Tageswechsel je Zug. Nach dem Umschlagen steht der Regler am anderen Ende, waehrend
+   * der Finger noch am Anschlag liegt - schon ein Zittern wuerde sonst gleich den naechsten
+   * Tag aufschlagen. Loslassen gibt ihn wieder frei.
+   */
+  const wrapped = useRef(false)
 
   return (
     <div className="time-slider">
@@ -18,7 +25,7 @@ export function TimeSlider() {
         <button
           className="time-slider__daybtn"
           onClick={() => setCurrentDay(currentDay - 1)}
-          disabled={currentDay <= 0}
+          disabled={currentDay <= 1}
           title="Vorheriger Tag"
         >
           &minus;
@@ -38,13 +45,32 @@ export function TimeSlider() {
         <input
           className="time-slider__range"
           type="range"
-          min={0}
-          max={MINUTES_PER_DAY - 1}
+          // Je einen Schritt ueber den Tag hinaus: Wer bis ans Ende zieht, landet auf 0 Uhr
+          // des naechsten Tages, wer darueber hinaus nach links zieht, auf 23:59 des
+          // vorherigen (setTimeOfDay rechnet das um). Der Regler springt dabei ans andere
+          // Ende - genau das macht den Uebergang sichtbar.
+          min={-1}
+          max={MINUTES_PER_DAY}
           // Minutenweise: Mit groesseren Schritten waere das Tagesende (23:59) nicht
           // erreichbar, weil es auf keinem Vielfachen davon liegt.
           step={1}
           value={timeOfDay}
-          onChange={(e) => setTime(Number(e.target.value))}
+          onChange={(e) => {
+            const value = Number(e.target.value)
+            const wraps = value < 0 || value >= MINUTES_PER_DAY
+            if (wraps && wrapped.current) return
+            if (wraps) wrapped.current = true
+            setTime(value)
+          }}
+          onPointerUp={() => {
+            wrapped.current = false
+          }}
+          onKeyUp={() => {
+            wrapped.current = false
+          }}
+          onBlur={() => {
+            wrapped.current = false
+          }}
         />
         <span className="time-slider__clock">{formatTime(timeOfDay)}</span>
       </div>

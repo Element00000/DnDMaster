@@ -73,6 +73,7 @@ export function MapCanvas() {
   const moveEntity = useStore((s) => s.moveEntity)
   const moveTimestone = useStore((s) => s.moveTimestone)
   const updateTimestone = useStore((s) => s.updateTimestone)
+  const removeTimestone = useStore((s) => s.removeTimestone)
   const selectEntity = useStore((s) => s.selectEntity)
   const selectedIds = useStore((s) => s.selectedIds)
   const setSelectedIds = useStore((s) => s.setSelectedIds)
@@ -1110,6 +1111,8 @@ export function MapCanvas() {
               ? moveEntity(selectedEntity.id, dx, dy)
               : moveTimestone(selectedEntity.id, stopId, dx, dy)
           }
+          onEditStop={(stopId, patch) => updateTimestone(selectedEntity.id, stopId, patch)}
+          onRemoveStop={(stopId) => removeTimestone(selectedEntity.id, stopId)}
         />
       )}
 
@@ -1385,6 +1388,8 @@ function ScheduleOverlay({
   timeOfDay,
   onPickTime,
   onMoveStop,
+  onEditStop,
+  onRemoveStop,
 }: {
   entity: Entity
   layers: MapLayer[]
@@ -1396,6 +1401,10 @@ function ScheduleOverlay({
   onPickTime: (minutes: number) => void
   /** Ziehen an einer Station verschiebt sie auf der Karte (Delta in Weltkoordinaten). */
   onMoveStop: (stopId: string, dxWorld: number, dyWorld: number) => void
+  /** Uhrzeit oder Kalendertag einer Station nachtraeglich aendern. */
+  onEditStop: (stopId: string, patch: { time?: number; day?: number | null }) => void
+  /** Station loeschen. */
+  onRemoveStop: (stopId: string) => void
 }) {
   // Ziehen wird vom Klicken per Schwelle getrennt, wie bei den Pinnadeln auch. Die
   // Umrechnung in Weltkoordinaten haengt an der Ebene, deren Massstab beim Griff
@@ -1421,6 +1430,36 @@ function ScheduleOverlay({
   const snapRef = useRef<(stopId: string, apply?: boolean) => string | null>(() => null)
   /** Welche Station gerade wohin andocken wuerde - nur fuer die Anzeige waehrend des Zugs. */
   const [snap, setSnap] = useState<{ fromId: string; toId: string } | null>(null)
+  /**
+   * Station, deren Uhrzeit und Tag gerade bearbeitet werden. Ein Klick oeffnet die Felder
+   * an Ort und Stelle - dieselben wie beim Anlegen, nur dass hier sofort gilt, was man
+   * eintraegt.
+   */
+  const [editId, setEditId] = useState<string | null>(null)
+  const [dayPickerOpen, setDayPickerOpen] = useState(false)
+
+  // Klick daneben oder Escape schliesst die Felder wieder. Ein Klick auf eine andere
+  // Station laesst sie offen - dort uebernimmt gleich der Zeiger-Rueckruf und schaltet um.
+  useEffect(() => {
+    if (!editId) return
+    function close() {
+      setEditId(null)
+      setDayPickerOpen(false)
+    }
+    function onDown(e: PointerEvent) {
+      if ((e.target as HTMLElement | null)?.closest('.schedule-stop')) return
+      close()
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') close()
+    }
+    window.addEventListener('pointerdown', onDown)
+    window.addEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('pointerdown', onDown)
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [editId])
 
   /**
    * Bewegung und Loslassen haengen am Fenster, nicht am angeklickten Knopf: Beim
@@ -1448,9 +1487,17 @@ function ScheduleOverlay({
       drag.current = null
       setSnap(null)
       if (!d) return
-      // Ohne Bewegung war es ein Klick.
-      if (d.moved) snapRef.current(d.id, true)
-      else pickRef.current(d.time)
+      if (d.moved) {
+        snapRef.current(d.id, true)
+        return
+      }
+      // Ohne Bewegung war es ein Klick: Uhr auf diese Station stellen und ihre Felder
+      // aufschlagen. Die Basis-Platzierung hat keine, sie ist kein Timestone.
+      pickRef.current(d.time)
+      if (d.id !== '__base__') {
+        setEditId((cur) => (cur === d.id ? null : d.id))
+        setDayPickerOpen(false)
+      }
     }
     window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', onUp)
@@ -1563,7 +1610,10 @@ function ScheduleOverlay({
       {[...marks.entries()].map(([key, mark]) => (
         <div
           key={key}
-          className="schedule-stop"
+          // Die Station, an der gerade bearbeitet wird, nach vorn: Sonst uebermalten spaeter
+          // gezeichnete Nachbarstationen ihre Felder (jede Station hat durch ihr transform
+          // einen eigenen Stapelkontext, es zaehlt also die Reihenfolge im DOM).
+          className={`schedule-stop${mark.items.some((i) => i.stop.id === editId) ? ' is-editing' : ''}`}
           style={{ left: mark.left, top: mark.top }}
           // Zwei schnelle Klicks auf eine Station sind kein Doppelklick auf die Karte
           // darunter - sonst passt sich die Ansicht ungewollt ein.
@@ -1613,6 +1663,64 @@ function ScheduleOverlay({
               )
             })}
           </div>
+
+          {/* Nachtraeglich bearbeiten: dieselben Felder wie beim Anlegen, an derselben
+              Stelle. Was hier steht, gilt sofort - es gibt nichts zu bestaetigen, der
+              Punkt existiert ja schon. */}
+          {mark.items.map(({ stop: s }) =>
+            s.id !== editId ? null : (
+              <div
+                key={`edit-${s.id}`}
+                className="draft-ask schedule-stop__edit"
+                // Sonst zieht der Kartenhintergrund darunter eine Rechteck-Markierung auf.
+                onPointerDown={(ev) => ev.stopPropagation()}
+                onKeyDown={(ev) => {
+                  if (ev.key === 'Enter') setEditId(null)
+                }}
+              >
+                <span className="draft-ask__label">ab</span>
+                <input
+                  className="draft-ask__time"
+                  type="time"
+                  value={formatTime(s.time)}
+                  onChange={(ev) => {
+                    const minutes = parseTime(ev.target.value)
+                    if (minutes != null) onEditStop(s.id, { time: minutes })
+                  }}
+                />
+                <button
+                  className="draft-ask__day"
+                  title="Kalendertag waehlen"
+                  onClick={() => setDayPickerOpen((o) => !o)}
+                >
+                  {s.day == null ? 'Jeden Tag' : `Tag ${s.day}`}
+                </button>
+                <button
+                  className="draft-ask__remove"
+                  title="Timestone entfernen"
+                  onClick={() => {
+                    onRemoveStop(s.id)
+                    setEditId(null)
+                    setDayPickerOpen(false)
+                  }}
+                >
+                  ✕
+                </button>
+
+                {dayPickerOpen && (
+                  <DayPicker
+                    value={s.day}
+                    today={currentDay}
+                    onPick={(day) => {
+                      onEditStop(s.id, { day })
+                      setDayPickerOpen(false)
+                    }}
+                    onClose={() => setDayPickerOpen(false)}
+                  />
+                )}
+              </div>
+            ),
+          )}
         </div>
       ))}
     </div>

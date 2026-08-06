@@ -443,11 +443,34 @@ export const useStore = create<StoreState>()(
         lastUndoPushAt: 0,
         timeOfDay: 12 * 60,
         currentDay: 1,
-        // Vormerkungen haben ihre eigene Uhrzeit und bleiben davon unberuehrt.
+        /**
+         * Uhrzeit setzen. Werte ausserhalb des Tages laufen in den Nachbartag ueber: Hinter
+         * 23:59 kommt 0 Uhr des naechsten Tages, vor 0 Uhr 23:59 des vorherigen. Nur Tag 1
+         * hat keinen Vorgaenger - dort ist bei 0 Uhr Schluss.
+         *
+         * Vormerkungen haben ihre eigene Uhrzeit und bleiben davon unberuehrt.
+         */
         setTimeOfDay: (minutes) =>
-          set({ timeOfDay: Math.max(0, Math.min(MINUTES_PER_DAY - 1, Math.round(minutes))) }),
+          set((s) => {
+            let time = Math.round(minutes)
+            let day = s.currentDay
+            while (time >= MINUTES_PER_DAY) {
+              time -= MINUTES_PER_DAY
+              day += 1
+            }
+            while (time < 0) {
+              if (day <= 1) {
+                time = 0
+                break
+              }
+              time += MINUTES_PER_DAY
+              day -= 1
+            }
+            return { timeOfDay: time, currentDay: day }
+          }),
         // Der Kalendertag wechselt den ganzen Ablauf - Vormerkungen sind dann hinfaellig.
-        setCurrentDay: (day) => set({ currentDay: Math.max(0, Math.round(day)), draftPos: {} }),
+        // Tag 1 ist der erste; davor liegt nichts.
+        setCurrentDay: (day) => set({ currentDay: Math.max(1, Math.round(day)), draftPos: {} }),
 
         // ---------- Untere Leiste ----------
         bottomPanel: null,
@@ -955,17 +978,21 @@ export const useStore = create<StoreState>()(
             const takenAt = (d: number) =>
               new Set(entity ? scheduleForDay(entity.schedule, d).map((k) => k.time) : [])
             let time = s.timeOfDay
-            let day = s.currentDay
-            let taken = takenAt(day)
+            // Vorgabe ist der wiederkehrende Ablauf: Eine Station gilt an jedem Tag, bis man
+            // im Kalender einen bestimmten waehlt.
+            let day: number | null = null
+            let taken = takenAt(s.currentDay)
             // Ueber Mitternacht hinaus geht es am naechsten Kalendertag weiter - ein Punkt um
             // 23 Uhr fuehrt also auf 0 Uhr des Folgetags, nicht zurueck an den Tagesanfang.
+            // Damit wird die Station zwangslaeufig tagesgebunden: "am naechsten Tag" laesst
+            // sich ohne konkreten Tag nicht ausdruecken.
             // Hoechstens ein paar Tage weit suchen, sonst liefe die Schleife bei einem randvoll
             // belegten Ablauf endlos.
             for (let i = 0; i < 72 && taken.has(time); i++) {
               time += DRAFT_STEP
               if (time >= MINUTES_PER_DAY) {
                 time -= MINUTES_PER_DAY
-                day += 1
+                day = (day ?? s.currentDay) + 1
                 taken = takenAt(day)
               }
             }
@@ -1340,7 +1367,9 @@ export const useStore = create<StoreState>()(
           ...data,
           campaigns: data.campaigns.map(normalizeCampaign),
           timeOfDay: typeof state?.timeOfDay === 'number' ? state.timeOfDay : 12 * 60,
-          currentDay: typeof state?.currentDay === 'number' ? state.currentDay : 1,
+          // Tag 1 ist der erste; aeltere Staende konnten auf 0 stehen und liessen sich dann
+          // nicht mehr zurueckstellen.
+          currentDay: typeof state?.currentDay === 'number' ? Math.max(1, state.currentDay) : 1,
         }
       },
     },

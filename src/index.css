@@ -826,13 +826,13 @@ button {
   color: var(--ink-dim);
 }
 
-/* Ueber allem anderen auf der Karte - Stationen (12) und Zoom-Feld (20) eingeschlossen.
+/* Ueber allem anderen auf der Karte - Stationen (21) und Zoom-Feld (20) eingeschlossen.
    Das Doppel ist das, woran gerade gearbeitet wird, und der Kalender daran haengt in einem
    eigenen Stapelkontext: Er kann nie hoeher steigen als diese Ebene hier. */
 .draft-overlay {
   position: absolute;
   inset: 0;
-  z-index: 21;
+  z-index: 22;
   pointer-events: none;
 }
 
@@ -1027,6 +1027,36 @@ button {
   border-color: var(--gold);
   background: var(--accent-tint);
   color: var(--gold-soft);
+}
+
+/* Bearbeiten-Felder an einer bestehenden Station: haengen unter deren Beschriftung und
+   duerfen die Nachbarstationen ueberdecken. */
+.schedule-stop__edit {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  z-index: 3;
+  transform: translate(-50%, 6px);
+}
+
+.draft-ask__remove {
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ink-faint);
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.draft-ask__remove:hover {
+  background: var(--danger);
+  color: #fff;
 }
 
 .draft-ask__ok,
@@ -2883,10 +2913,13 @@ button {
 
 
 /* ---------- Stationen-Route auf der Karte ---------- */
+/* Ueber dem uebrigen Karteninhalt samt Zoom-Feld (20): An den Stationen laesst sich
+   bearbeiten, und der Kalender dort haengt in diesem Stapelkontext fest - er kann nie
+   hoeher steigen als diese Ebene. Das Doppel-Overlay liegt noch eins darueber. */
 .schedule-overlay {
   position: absolute;
   inset: 0;
-  z-index: 12;
+  z-index: 21;
   pointer-events: none;
 }
 
@@ -2920,6 +2953,10 @@ button {
   align-items: center;
   gap: 3px;
   pointer-events: none;
+}
+
+.schedule-stop.is-editing {
+  z-index: 4;
 }
 
 .schedule-stop__dots {
