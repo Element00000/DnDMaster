@@ -804,11 +804,23 @@ button {
    Form, gleiche Farbe, gleiches Portraet - aber unfertig: durchscheinend, mit
    gestricheltem Rand statt des dunklen Rahmens und ohne Schlagschatten, sodass es
    nicht auf der Karte "aufliegt". */
+/* Das Doppel nimmt Zeigerereignisse an: Es laesst sich anfassen und weiterschieben, solange
+   es nicht bestaetigt ist. Frueher war es bewusst durchlaessig - damals bediente man immer
+   das Original, heute ist das Doppel selbst das Werkzeug. */
 .map-pin.is-ghost {
-  pointer-events: none;
   opacity: 0.75;
   filter: none;
   z-index: 6;
+}
+
+/* Am Doppel gibt es nichts zu klicken, es wird nur geschoben - also die Greifhand statt
+   des Zeigefingers, den die uebrigen Pinnadeln zeigen. */
+.map-pin.is-ghost.is-draggable {
+  cursor: grab;
+}
+
+.map-pin.is-ghost.is-draggable:active {
+  cursor: grabbing;
 }
 
 .map-pin.is-ghost .map-pin__head {
