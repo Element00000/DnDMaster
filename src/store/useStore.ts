@@ -956,13 +956,19 @@ export const useStore = create<StoreState>()(
         commitDraft: (entityId, day = null) => {
           const draft = get().draftPos[entityId]
           if (!draft) return null
-          return get().addTimestone(entityId, {
+          const id = get().addTimestone(entityId, {
             time: draft.time,
             day,
             layerId: draft.layerId,
             x: draft.x,
             y: draft.y,
           })
+          // Die Uhr springt auf den eben gesetzten Punkt: Die Figur steht damit sichtbar da,
+          // wo man sie hingeschoben hat, statt an ihre vorige Station zurueckzuspringen. Der
+          // naechste Vorschlag setzt dort auf und ruecke wieder ein Stueck weiter - so
+          // entsteht eine Station nach der anderen, ohne die Uhr je von Hand anzufassen.
+          if (id) set({ timeOfDay: draft.time })
+          return id
         },
         clearDraftPos: (entityId) =>
           set((s) => {
