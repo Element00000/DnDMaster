@@ -156,45 +156,42 @@ export function MapCanvas() {
   /**
    * Ziehen eines Pins - was dabei verschoben wird, haengt davon ab, was man gerade tut:
    *
-   * - Aufnahme (Tagesablauf dieses Objekts offen): Die neue Stelle wird vorgemerkt, und die
-   *   Uhrzeit dazu waehlt man unmittelbar daneben auf der Karte. Ort und Zeitpunkt bleiben
-   *   so beieinander, statt sich auf Karte und untere Leiste zu verteilen.
-   * - Liegt die Uhrzeit genau auf einem Timestone, wird dieser bearbeitet.
-   * - Gilt sonst ein Timestone, wandert dieser mit: Seine Stelle ist die, die man sieht.
+   * - Aufnahme (Tagesablauf dieses Objekts offen): Es entsteht immer ein Doppel, und die
+   *   Uhrzeit dazu traegt man unmittelbar daneben ein. Die eingestellte Uhrzeit spielt dabei
+   *   keine Rolle - sie liefert nur den Vorschlag im Feld. Ort und Zeitpunkt bleiben so
+   *   beieinander, statt sich auf Karte und untere Leiste zu verteilen. Einen vorhandenen
+   *   Punkt verschiebt man an seiner nummerierten Station auf der Karte.
+   * - Ohne Aufnahme wandert der Timestone mit, der gerade gilt: Seine Stelle ist die, die
+   *   man sieht.
    * - Gilt keiner (0 Uhr, oder ohne Tagesablauf), gilt die Basis-Platzierung.
    */
   const moveEntityTimed = useCallback(
     (e: Entity, dxWorld: number, dyWorld: number) => {
-      const active = activeTimestone(e.schedule, timeOfDay, currentDay)
       const recording = bottomPanel === 'zeitleiste' && selectedIds.includes(e.id)
-      if (!recording && active) {
-        moveTimestone(e.id, active.id, dxWorld, dyWorld)
-        return
-      }
-      if (recording && active && active.time === timeOfDay) {
-        // Genau auf einem Punkt: Der wird bearbeitet, nicht ein zweiter danebengelegt.
-        moveTimestone(e.id, active.id, dxWorld, dyWorld)
-        return
-      }
-      if (recording) {
-        // Waehrend des Ziehens bleibt die Karte dieselbe; auf eine andere umgesetzt wird die
-        // Vormerkung erst beim Loslassen (siehe onReparentEntity), wo die Bildschirmstelle
-        // bekannt ist.
-        const here = placementAt(e, timeOfDay, currentDay)!
-        const from = draftPos[e.id] ?? here
-        // Gezogen wird die Nadel auf der Karte, auf der das Objekt gerade steht - die
-        // Vormerkung kann laengst auf einer anderen liegen. Deren Massstab ist ein anderer,
-        // und dieselbe Handbewegung bedeutet dort eine andere Strecke.
-        let factor = 1
-        if (from.layerId !== here.layerId) {
-          const a = layerScreenView(campaign.layers, layer.id, here.layerId, view)
-          const b = layerScreenView(campaign.layers, layer.id, from.layerId, view)
-          if (a && b && b.scale !== 0) factor = a.scale / b.scale
+      if (!recording) {
+        const active = activeTimestone(e.schedule, timeOfDay, currentDay)
+        if (active) {
+          moveTimestone(e.id, active.id, dxWorld, dyWorld)
+          return
         }
-        setDraftPos(e.id, from.x + dxWorld * factor, from.y + dyWorld * factor, from.layerId)
+        moveEntity(e.id, dxWorld, dyWorld)
         return
       }
-      moveEntity(e.id, dxWorld, dyWorld)
+      // Waehrend des Ziehens bleibt die Karte dieselbe; auf eine andere umgesetzt wird das
+      // Doppel erst beim Loslassen (siehe onReparentEntity), wo die Bildschirmstelle
+      // bekannt ist.
+      const here = placementAt(e, timeOfDay, currentDay)!
+      const from = draftPos[e.id] ?? here
+      // Gezogen wird die Nadel auf der Karte, auf der das Objekt gerade steht - das Doppel
+      // kann laengst auf einer anderen liegen. Deren Massstab ist ein anderer, und dieselbe
+      // Handbewegung bedeutet dort eine andere Strecke.
+      let factor = 1
+      if (from.layerId !== here.layerId) {
+        const a = layerScreenView(campaign.layers, layer.id, here.layerId, view)
+        const b = layerScreenView(campaign.layers, layer.id, from.layerId, view)
+        if (a && b && b.scale !== 0) factor = a.scale / b.scale
+      }
+      setDraftPos(e.id, from.x + dxWorld * factor, from.y + dyWorld * factor, from.layerId)
     },
     [
       timeOfDay,
@@ -494,9 +491,9 @@ export function MapCanvas() {
    * Loslassen nach dem Ziehen einer Pinnadel. Erst hier ist bekannt, ueber welcher Karte der
    * Zeiger steht - waehrend des Ziehens bewegt sich alles noch in den Koordinaten der
    * bisherigen Karte. Landet die Nadel auf einer anderen, wird genau das umgehaengt, was
-   * gerade gezogen wurde: der bearbeitete Timestone, die Vormerkung oder die
-   * Basis-Platzierung. Sonst behielte ein Punkt auf einer anderen Karte die Koordinaten der
-   * alten - er laege dann rechnerisch ausserhalb und verschwaende, sobald sie einklappt.
+   * gerade gezogen wurde: das Doppel, der geltende Timestone oder die Basis-Platzierung.
+   * Sonst behielte ein Punkt auf einer anderen Karte die Koordinaten der alten - er laege
+   * dann rechnerisch ausserhalb und verschwaende, sobald sie einklappt.
    */
   const onReparentEntity = useCallback(
     (entityId: string, clientX: number, clientY: number) => {
@@ -516,10 +513,10 @@ export function MapCanvas() {
         setDraftPos(entityId, result.x, result.y, result.layerId)
         return
       }
+      // Ohne Aufnahme wurde der Punkt gezogen, der gerade gilt (siehe moveEntityTimed) -
+      // nicht die Basis-Platzierung, die dabei gar nicht zu sehen ist.
       const active = activeTimestone(ent.schedule, timeOfDay, currentDay)
       if (active) {
-        // Nur der Punkt, der gerade genau gilt, wurde auch gezogen (siehe moveEntityTimed).
-        if (active.time !== timeOfDay) return
         if (result.layerId === (active.layerId ?? ent.placement.layerId)) return
         updateTimestone(entityId, active.id, { layerId: result.layerId, x: result.x, y: result.y })
         return

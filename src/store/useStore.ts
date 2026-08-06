@@ -929,9 +929,21 @@ export const useStore = create<StoreState>()(
         draftPos: {},
         setDraftPos: (entityId, x, y, layerId) =>
           set((s) => {
-            // Die Uhrzeit einer laufenden Vormerkung bleibt beim Weiterschieben stehen;
-            // eine neue startet bei der eingestellten Uhrzeit als Vorschlag.
-            const time = s.draftPos[entityId]?.time ?? s.timeOfDay
+            // Die Uhrzeit einer laufenden Vormerkung bleibt beim Weiterschieben stehen.
+            const running = s.draftPos[entityId]
+            if (running) {
+              return { draftPos: { ...s.draftPos, [entityId]: { ...running, x, y, layerId } } }
+            }
+            // Vorschlag fuer eine neue: die eingestellte Uhrzeit - aber nicht eine, auf der
+            // schon ein Punkt liegt. Sonst uebernaehme das Bestaetigen ungewollt den
+            // vorhandenen, und aus drei Stationen hintereinander wuerde immer wieder dieselbe.
+            // Wer einen Punkt bewusst ersetzen will, traegt seine Uhrzeit von Hand ein.
+            const entity = s.activeCampaign().entities.find((e) => e.id === entityId)
+            const taken = new Set((entity?.schedule ?? []).filter((k) => k.day == null).map((k) => k.time))
+            let time = s.timeOfDay
+            while (taken.has(time) && time < MINUTES_PER_DAY - 1) {
+              time = Math.min(MINUTES_PER_DAY - 1, time + 15)
+            }
             return { draftPos: { ...s.draftPos, [entityId]: { x, y, layerId, time } } }
           }),
         setDraftTime: (entityId, minutes) =>
