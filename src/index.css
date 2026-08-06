@@ -826,10 +826,13 @@ button {
   color: var(--ink-dim);
 }
 
+/* Ueber allem anderen auf der Karte - Stationen (12) und Zoom-Feld (20) eingeschlossen.
+   Das Doppel ist das, woran gerade gearbeitet wird, und der Kalender daran haengt in einem
+   eigenen Stapelkontext: Er kann nie hoeher steigen als diese Ebene hier. */
 .draft-overlay {
   position: absolute;
   inset: 0;
-  z-index: 6;
+  z-index: 21;
   pointer-events: none;
 }
 
@@ -870,11 +873,11 @@ button {
   color: var(--ink-faint);
 }
 
-/* Breit genug fuer "23:59" samt der kleinen Uhr, die der Browser selbst dazustellt -
-   knapper bemessen schneidet er die Minuten ab. */
+/* Genau so breit wie "23:59". Moeglich wird das, weil die kleine Uhr des Browsers
+   ausgeblendet ist (siehe unten) - mit ihr braeuchte das Feld fast die doppelte Breite. */
 .draft-ask__time {
   flex: none;
-  width: 104px;
+  width: 60px;
   padding: 2px 4px;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
@@ -889,11 +892,11 @@ button {
   border-color: var(--chip-color, var(--gold));
 }
 
-/* Die eigene Uhr des Browsers im Zeitfeld ist auf hellem Grund gezeichnet - hier wird sie
-   aufgehellt, sonst steht sie als dunkler Fleck im dunklen Feld. */
+/* Die kleine Uhr, die der Browser von sich aus ins Zeitfeld setzt, kostet mehr Platz als
+   die Uhrzeit selbst - und ihr Menue bietet nichts, was Tippen und Pfeiltasten nicht auch
+   koennen. Weg damit, dann passt das Feld genau um die vier Ziffern. */
 .draft-ask__time::-webkit-calendar-picker-indicator {
-  filter: invert(0.8);
-  cursor: pointer;
+  display: none;
 }
 
 /* Kalendertag: sieht aus wie ein Feld, oeffnet aber den kleinen Kalender. */
@@ -2964,6 +2967,12 @@ button {
 .schedule-stop__dot:active,
 .schedule-stop__label:active {
   cursor: grabbing;
+}
+
+/* Kalendertag vor der Uhrzeit - gedaempft, damit die Uhrzeit die Hauptangabe bleibt. */
+.schedule-stop__day {
+  margin-right: 5px;
+  color: var(--ink-faint);
 }
 
 /* Je Station eine Zeile, damit sich auch die Uhrzeit anfassen laesst. */

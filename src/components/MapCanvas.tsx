@@ -1561,7 +1561,14 @@ function ScheduleOverlay({
         </svg>
       )}
       {[...marks.entries()].map(([key, mark]) => (
-        <div key={key} className="schedule-stop" style={{ left: mark.left, top: mark.top }}>
+        <div
+          key={key}
+          className="schedule-stop"
+          style={{ left: mark.left, top: mark.top }}
+          // Zwei schnelle Klicks auf eine Station sind kein Doppelklick auf die Karte
+          // darunter - sonst passt sich die Ansicht ungewollt ein.
+          onDoubleClick={(e) => e.stopPropagation()}
+        >
           <div className="schedule-stop__dots">
             {mark.items.map(({ stop: s, no, scale }) => (
               <button
@@ -1596,6 +1603,10 @@ function ScheduleOverlay({
                   title={`Ziehen verschiebt · Klick stellt die Zeitleiste auf ${formatTime(s.time)}`}
                   onPointerDown={(e) => onStopDown(e, s.id, s.time, scale)}
                 >
+                  {/* Der Kalendertag steht vor der Uhrzeit. Punkte ohne eigenen Tag gehoeren
+                      zum wiederkehrenden Ablauf und zeigen nur die Uhrzeit - das
+                      Fehlen der Angabe ist hier die Aussage. */}
+                  {s.day != null && <span className="schedule-stop__day">Tag {s.day}</span>}
                   {s.id === '__base__' ? 'Start' : formatTime(s.time)}
                   {caption ? ` · ${caption}` : ''}
                 </button>
