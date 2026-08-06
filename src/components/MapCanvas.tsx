@@ -1511,8 +1511,14 @@ function ScheduleOverlay({
 
   if (!entity.placement) return null
 
-  // Nur was heute wirklich gilt: Standardplan plus die Ausnahmen des aktuellen Tages.
-  const keys = scheduleForDay(entity.schedule, currentDay)
+  // Der Tagesablauf des laufenden Tages und dazu alle Kalendertermine - auch die anderer
+  // Tage. Eine Reise ueber mehrere Tage ist ein zusammenhaengender Weg; zeigte die Route nur
+  // den sichtbaren Tag, waere sie unterwegs leer, obwohl die Figur genau dann unterwegs ist.
+  // Die Beschriftung nennt bei diesen Punkten ohnehin den Tag.
+  const keys = [
+    ...entity.schedule.filter((s) => s.day == null),
+    ...entity.schedule.filter((s) => s.day != null),
+  ].sort((a, b) => (a.day ?? currentDay) - (b.day ?? currentDay) || a.time - b.time)
   if (keys.length === 0) return null
 
   // Der Tag beginnt an der Basis-Platzierung - sie ist Station 1, auch wenn sie nicht in

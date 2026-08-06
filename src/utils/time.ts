@@ -46,24 +46,95 @@ export function scheduleForDay(schedule: Timestone[], day: number): Timestone[] 
     .sort((a, b) => a.time - b.time || (a.day == null ? 0 : 1) - (b.day == null ? 0 : 1))
 }
 
+/** Absoluter Zeitpunkt auf dem Kampagnenkalender, in Minuten. */
+function moment(day: number, minutes: number): number {
+  return day * MINUTES_PER_DAY + minutes
+}
+
 /**
- * Welcher Timestone gilt zur Uhrzeit "minutes" am Kalendertag "day"? Das ist der
- * zuletzt vergangene - ein Objekt bleibt also stehen, bis der naechste Timestone es
- * weiterschickt. Liegt vor der Uhrzeit keiner, liefert die Funktion undefined: Dann gilt
- * die Basis-Platzierung, die als fester Timestone um 0 Uhr zu verstehen ist.
+ * Der zuletzt vergangene Punkt des Standard-Tagesablaufs am laufenden Tag. Liegt vor der
+ * Uhrzeit keiner, ist es undefined - dann gilt die Basis-Platzierung.
+ */
+function lastRoutineToday(routine: Timestone[], minutes: number): Timestone | undefined {
+  let active: Timestone | undefined
+  for (const k of routine) {
+    if (k.time > minutes) break
+    active = k
+  }
+  return active
+}
+
+/**
+ * Die zuletzt vergangene Wiederholung des Tagesablaufs, absolut gerechnet - notfalls die
+ * von gestern Abend. Nur dort gebraucht, wo Kalendertermine im Spiel sind und ueber
+ * Mitternacht hinweg verglichen werden muss.
+ */
+function lastRoutineMoment(
+  routine: Timestone[],
+  minutes: number,
+  day: number,
+): { stone: Timestone; at: number } | undefined {
+  let best: { stone: Timestone; at: number } | undefined
+  for (const k of routine) {
+    const at = moment(k.time <= minutes ? day : day - 1, k.time)
+    if (!best || at > best.at) best = { stone: k, at }
+  }
+  return best
+}
+
+/**
+ * Welcher Timestone gilt zur Uhrzeit "minutes" am Kalendertag "day"? Ein Objekt bleibt
+ * stehen, bis der naechste Timestone es weiterschickt. Liegt keiner vor der Uhrzeit,
+ * liefert die Funktion undefined: Dann gilt die Basis-Platzierung.
+ *
+ * Zwei Sorten von Punkten, die verschieden gemeint sind - und die Unterscheidung trifft
+ * man schon beim Anlegen, indem man "Jeden Tag" oder einen Kalendertag waehlt:
+ *
+ * - Ohne Tag: der wiederkehrende Tagesablauf. Er laeuft als Schleife ueber 24 Stunden,
+ *   und um Mitternacht steht das Objekt wieder an seiner Basis-Platzierung. Fuer den
+ *   Schmied, der jeden Morgen in seiner Schmiede steht, ist genau das gemeint.
+ * - Mit Tag: ein Punkt auf dem durchlaufenden Kalender, etwa eine Reise. Solange noch
+ *   weitere folgen, setzen sie den Tagesablauf aus - sonst holte ihn die Schleife jede
+ *   Nacht an seinen Ausgangsort zurueck, mitten auf der Reise. Erst nach dem letzten
+ *   nimmt der Tagesablauf wieder das Ruder; hat das Objekt keinen, bleibt es schlicht,
+ *   wo es zuletzt war.
+ *
+ * Ohne Kalendertermine bleibt es bei der reinen Tagesschleife - fuer Objekte ohne Reisen
+ * aendert sich also nichts.
  */
 export function activeTimestone(
   schedule: Timestone[],
   minutes: number,
   day: number,
 ): Timestone | undefined {
-  const keys = scheduleForDay(schedule, day)
-  let active: Timestone | undefined
-  for (const k of keys) {
-    if (k.time > minutes) break
-    active = k
+  const routine = schedule.filter((s) => s.day == null).sort((a, b) => a.time - b.time)
+  const dated = schedule
+    .filter((s) => s.day != null)
+    .sort((a, b) => a.day! - b.day! || a.time - b.time)
+
+  if (dated.length === 0) return lastRoutineToday(routine, minutes)
+
+  const now = moment(day, minutes)
+  let last: Timestone | undefined
+  let later = false
+  for (const s of dated) {
+    if (moment(s.day!, s.time) > now) {
+      later = true
+      break
+    }
+    last = s
   }
-  return active
+
+  // Vor dem ersten Kalendertermin laeuft alles wie gewohnt.
+  if (!last) return lastRoutineToday(routine, minutes)
+  // Mitten in der Kette: Der Tagesablauf ist ausgesetzt.
+  if (later) return last
+
+  // Nach dem letzten Kalendertermin uebernimmt der Tagesablauf wieder - aber erst, wenn er
+  // seither ueberhaupt an der Reihe war.
+  const routineNow = lastRoutineMoment(routine, minutes, day)
+  if (routineNow && routineNow.at > moment(last.day!, last.time)) return routineNow.stone
+  return last
 }
 
 /**
