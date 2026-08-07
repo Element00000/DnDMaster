@@ -8,6 +8,7 @@ import {
   SKILLS,
   SKILLS_FIELD,
   entityDisplayMeta,
+  isDead,
   isHostile,
   parseSkills,
   serializeSkills,
@@ -45,6 +46,11 @@ export function DetailPanel() {
   // Initiative wird pro Kampf gewuerfelt/eingegeben, nicht am Charakter gespeichert -
   // daher nur fluechtiger Panel-Zustand.
   const [initiatives, setInitiatives] = useState<Record<string, number | null>>({})
+  // Wer bei diesem Kampf zusieht statt mitzukaempfen. Gilt wie die Initiative nur fuer den
+  // laufenden Kampf und wird nicht am Charakter gespeichert.
+  const [benched, setBenched] = useState<Set<string>>(new Set())
+  /** Ueber welcher Zone gerade etwas schwebt - nur zur Rueckmeldung waehrend des Ziehens. */
+  const [dropZone, setDropZone] = useState<'fight' | 'bench' | null>(null)
 
   const marker = campaign.entities.find((e) => e.id === selectedId) ?? null
 
@@ -59,10 +65,15 @@ export function DetailPanel() {
   const mapEntities = campaign.entities.filter(
     (e) => placementAt(e, timeOfDay, currentDay)?.layerId === mapLayerId,
   )
-  const enemies = mapEntities.filter(isHostile)
-  const sortedEnemies = [...enemies].sort(
+  // Im Kampfmodus stehen alle Charaktere der Karte in der Liste - wer nicht mitkaempft, wird
+  // per Ziehen nach unten herausgenommen. Tote sind immer draussen und lassen sich auch nicht
+  // zurueckholen.
+  const characters = mapEntities.filter((e) => e.type === 'nsc')
+  const outOfFight = (e: Entity) => benched.has(e.id) || isDead(e)
+  const fighters = [...characters.filter((e) => !outOfFight(e))].sort(
     (a, b) => (initiatives[b.id] ?? -Infinity) - (initiatives[a.id] ?? -Infinity),
   )
+  const bystanders = characters.filter(outOfFight)
   const groups = ENTITY_TYPES.map((m) => ({
     meta: m,
     items: mapEntities.filter((e) => e.type === m.type),
@@ -71,8 +82,41 @@ export function DetailPanel() {
   function rollOne(id: string) {
     setInitiatives((prev) => ({ ...prev, [id]: rollDie(20) }))
   }
+  /** Gewuerfelt wird nur fuer die, die auch mitkaempfen. */
   function rollAllInitiative() {
-    setInitiatives(Object.fromEntries(enemies.map((e) => [e.id, rollDie(20)])))
+    setInitiatives(Object.fromEntries(fighters.map((e) => [e.id, rollDie(20)])))
+  }
+
+  /** Charakter zwischen "kaempft mit" und "sieht zu" umhaengen. */
+  function setFighting(id: string, fighting: boolean) {
+    setBenched((prev) => {
+      const next = new Set(prev)
+      if (fighting) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  /**
+   * Ziel einer Zone: Beim Ablegen wandert der gezogene Charakter dorthin. preventDefault im
+   * Ueberfahren ist noetig, sonst lehnt der Browser das Ablegen ueberhaupt ab.
+   */
+  function dropTarget(zone: 'fight' | 'bench') {
+    return {
+      onDragOver: (e: React.DragEvent) => {
+        e.preventDefault()
+        setDropZone(zone)
+      },
+      onDragLeave: () => setDropZone((z) => (z === zone ? null : z)),
+      onDrop: (e: React.DragEvent) => {
+        e.preventDefault()
+        setDropZone(null)
+        const id = e.dataTransfer.getData('text/plain')
+        // Tote bleiben draussen - sie stehen nur noch der Vollstaendigkeit halber da.
+        const entity = characters.find((x) => x.id === id)
+        if (entity && !isDead(entity)) setFighting(id, zone === 'fight')
+      },
+    }
   }
 
   // Erneuter Klick auf das bereits ausgewaehlte Objekt in der Liste schliesst dessen
@@ -83,10 +127,10 @@ export function DetailPanel() {
 
   // Details erscheinen als Dropdown direkt unter dem angeklickten Objekt in der Liste - aber
   // nur wenn dieses Objekt tatsaechlich in der aktuell sichtbaren Liste steht (auf dieser
-  // Karte platziert bzw. im Kampfmodus ein Feind). Sonst (Objekt ohne Kartenposition oder ueber
-  // eine Verknuepfung auf einer anderen Karte ausgewaehlt) faellt die Anzeige unterhalb der
-  // Liste zurueck, wie zuvor.
-  const visibleIds = combatMode ? sortedEnemies.map((e) => e.id) : mapEntities.map((e) => e.id)
+  // Karte platziert bzw. im Kampfmodus ein Charakter). Sonst (Objekt ohne Kartenposition oder
+  // ueber eine Verknuepfung auf einer anderen Karte ausgewaehlt) faellt die Anzeige unterhalb
+  // der Liste zurueck, wie zuvor.
+  const visibleIds = combatMode ? fighters.map((e) => e.id) : mapEntities.map((e) => e.id)
   const showInline = !!selectedId && visibleIds.includes(selectedId)
   // Faellt die Anzeige unterhalb der Liste zurueck (statt Inline-Dropdown)? Nur dann muss
   // die Liste selbst Platz fuer den Detailbereich darunter lassen - sonst darf sie die ganze
@@ -105,12 +149,13 @@ export function DetailPanel() {
     // Aufklappen in der Liste ebenso wie beim Objekt einer anderen Karte, das weiter unten
     // seine eigene Zeile bekommt. So sieht die Anzeige ueberall gleich aus.
 
-    // Kampfmodus zeigt zu einem Feind ausschliesslich sein Kampfblatt - alles andere
+    // Kampfmodus zeigt zu einem Charakter ausschliesslich sein Kampfblatt - alles andere
     // (Rolle, Motivation, Beschreibung, Geheimnis, Verknuepfungen ...) waere am Tisch
     // waehrend eines Kampfes nur Ballast. Umgekehrt tauchen die Kampfwerte ausserhalb
-    // des Kampfmodus gar nicht auf.
-    const isFeind = isHostile(marker)
-    detailContent = combatMode && isFeind ? (
+    // des Kampfmodus gar nicht auf. Gilt fuer alle Charaktere, nicht nur die Gegner: Auch
+    // Verbuendete schlagen im Kampf zu.
+    const inCombat = marker.type === 'nsc'
+    detailContent = combatMode && inCombat ? (
       <div className="detail__panel" style={{ ['--chip-color' as string]: meta.color }}>
         <div className="detail__body">
           {/* Im Kampf nur zur Wiedererkennung - gesetzt wird das Bild in der normalen Ansicht. */}
@@ -240,7 +285,9 @@ export function DetailPanel() {
           </>
         )}
 
-        {isFeind && (
+        {/* Gegner-eigene Angaben bleiben den Gegnern vorbehalten - anders als das Kampfblatt,
+            das im Kampfmodus jeder Charakter bekommt. */}
+        {isHostile(marker) && (
           <FeindFields
             entity={marker}
             readOnly={readOnly}
@@ -332,12 +379,12 @@ export function DetailPanel() {
       <div className="detail__objects-head">
         <h2 className="detail__objects-title">
           {mapLayer.name}
-          <span className="sidebar__count">{combatMode ? enemies.length : mapEntities.length}</span>
+          <span className="sidebar__count">{combatMode ? fighters.length : mapEntities.length}</span>
         </h2>
         <button
           className={`btn btn--sm${combatMode ? ' btn--active' : ''}`}
           onClick={() => setCombatMode((v) => !v)}
-          title="Kampfmodus: nur Feinde, mit Initiative und Kampfwerten"
+          title="Kampfmodus: alle Charaktere mit Initiative und Kampfwerten"
         >
           ⚔ Kampfmodus
         </button>
@@ -345,28 +392,71 @@ export function DetailPanel() {
 
       {combatMode ? (
         <>
-          {enemies.length > 0 && (
+          {fighters.length > 0 && (
             <button className="chipbtn detail__objects-rollall" onClick={rollAllInitiative}>
               🎲 Alle Initiativen wuerfeln
             </button>
           )}
-          {sortedEnemies.length === 0 ? (
-            <p className="sidebar__empty">Keine Feinde auf dieser Karte.</p>
+          {characters.length === 0 ? (
+            <p className="sidebar__empty">Keine Charaktere auf dieser Karte.</p>
           ) : (
-            <ul className="marker-list">
-              {sortedEnemies.map((e) => (
-                <EnemyRow
-                  key={e.id}
-                  entity={e}
-                  selected={e.id === selectedId}
-                  initiative={initiatives[e.id] ?? null}
-                  onSelect={onRowSelect}
-                  onInitiativeChange={(v) => setInitiatives((prev) => ({ ...prev, [e.id]: v }))}
-                  onRoll={() => rollOne(e.id)}
-                  dropdown={e.id === selectedId ? detailContent : null}
-                />
-              ))}
-            </ul>
+            <>
+              <ul
+                className={`marker-list${dropZone === 'fight' ? ' is-droptarget' : ''}`}
+                {...dropTarget('fight')}
+              >
+                {fighters.map((e) => (
+                  <EnemyRow
+                    key={e.id}
+                    entity={e}
+                    selected={e.id === selectedId}
+                    initiative={initiatives[e.id] ?? null}
+                    onSelect={onRowSelect}
+                    onInitiativeChange={(v) => setInitiatives((prev) => ({ ...prev, [e.id]: v }))}
+                    onRoll={() => rollOne(e.id)}
+                    dropdown={e.id === selectedId ? detailContent : null}
+                  />
+                ))}
+                {fighters.length === 0 && (
+                  <li className="combat__hint">Niemand kaempft mit. Zieh jemanden hier herauf.</li>
+                )}
+              </ul>
+
+              {/* Ablage fuer alle, die zusehen: Sie stehen weiter auf der Karte, zaehlen aber
+                  nicht zur Initiative. Beim Ziehen faellt auf, wohin man ablegen kann. */}
+              <div
+                className={`combat__bench${dropZone === 'bench' ? ' is-droptarget' : ''}`}
+                {...dropTarget('bench')}
+              >
+                <div className="combat__bench-title">Nicht im Kampf</div>
+                {bystanders.length === 0 ? (
+                  <p className="combat__hint">
+                    Charaktere hierher ziehen, die nicht mitkaempfen.
+                  </p>
+                ) : (
+                  <ul className="marker-list">
+                    {bystanders.map((e) => {
+                      const meta = entityDisplayMeta(e)
+                      const dead = isDead(e)
+                      return (
+                        <li key={e.id}>
+                          <div
+                            className={`marker-list__item combat__bystander${dead ? ' is-dead' : ''}`}
+                            style={{ ['--chip-color' as string]: meta.color }}
+                            draggable={!dead}
+                            onDragStart={(ev) => ev.dataTransfer.setData('text/plain', e.id)}
+                            title={dead ? 'Tot - kaempft nicht mehr mit' : 'Nach oben ziehen, um mitzukaempfen'}
+                          >
+                            <EntityIcon entity={e} className="marker-list__icon" />
+                            <span className="marker-list__name">{e.name}</span>
+                          </div>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                )}
+              </div>
+            </>
           )}
         </>
       ) : mapEntities.length === 0 ? (
@@ -1135,12 +1225,16 @@ function EnemyRow({
       <div
         className={`marker-list__item enemyrow${selected ? ' is-selected' : ''}`}
         style={{ ['--chip-color' as string]: meta.color }}
+        // Ziehbar, um den Charakter aus dem Kampf zu nehmen. Die Eingabefelder darin fangen
+        // das Ziehen selbst ab, sonst liesse sich die Initiative nicht mehr markieren.
+        draggable
+        onDragStart={(e) => e.dataTransfer.setData('text/plain', entity.id)}
       >
         <div className="enemyrow__name" role="button" tabIndex={0} {...handlers}>
           <EntityIcon entity={entity} className="marker-list__icon" />
           <RowName entity={entity} onSelect={onSelect} />
         </div>
-        <span className="enemyrow__init">
+        <span className="enemyrow__init" draggable={false} onDragStart={(e) => e.stopPropagation()}>
           <input
             type="number"
             className="enemyrow__init-input"
