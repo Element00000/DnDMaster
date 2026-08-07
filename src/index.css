@@ -583,6 +583,12 @@ button {
 .map-canvas {
   position: absolute;
   inset: 0;
+  /* Eigener Stapelkontext: Ohne ihn steigen die z-index-Werte im Karteninneren (Stationen,
+     Doppel, Zoom-Feld) in den Kontext dahinter auf und messen sich dort mit der unteren
+     Leiste und der schwebenden Knopfleiste - Stationen lagen so ueber der Leiste und fingen
+     deren Klicks ab. So bleibt alles Kartenzubehoer unter der Leiste, ohne dass man die
+     Werte im Inneren aufeinander abstimmen muesste. */
+  isolation: isolate;
   overflow: hidden;
   touch-action: none;
   user-select: none;
