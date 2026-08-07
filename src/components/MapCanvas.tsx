@@ -34,6 +34,12 @@ interface View {
 const MIN_SCALE = 0.02
 const MAX_SCALE = 4000
 const DRAG_THRESHOLD = 4
+
+/**
+ * So lange muss die linke Taste stillhalten, bis sich ein Auswahlrahmen aufziehen laesst.
+ * Lang genug, um nicht jedem Ziehen zuvorzukommen, kurz genug, um nicht zu warten.
+ */
+const MARQUEE_HOLD_MS = 280
 /** Ab dieser Bildschirmgroesse (kuerzere Seite, px) wird eine eingebettete Karte aufgedeckt. */
 const REVEAL_THRESHOLD = 160
 /** Minimale Kantenlaenge einer Einbettung, in Weltkoordinaten der Eltern-Ebene. */
@@ -370,6 +376,39 @@ export function MapCanvas() {
   // Linke Maustaste auf leerer Flaeche: Rechteck-Markierung.
   const marquee = useRef<{ startX: number; startY: number; moved: boolean } | null>(null)
   const [marqueeRect, setMarqueeRect] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
+  /**
+   * Das Aufziehen beginnt erst nach kurzem Halten. Sonst kaeme es jedem Ziehen zuvor -
+   * Karten und Objekte liessen sich nicht mehr verschieben, weil schon der erste Millimeter
+   * einen Rahmen aufspannte. Der Zeiger wechselt beim Scharfschalten auf ein Kreuz, damit
+   * man sieht, dass jetzt markiert und nicht geschoben wird.
+   */
+  const holdTimer = useRef<number | null>(null)
+  /** Wo die Taste heruntergedrueckt wurde - um Halten von Ziehen zu unterscheiden. */
+  const press = useRef<{ startX: number; startY: number } | null>(null)
+  const [marqueeArmed, setMarqueeArmed] = useState(false)
+
+  const cancelHold = useCallback(() => {
+    if (holdTimer.current !== null) {
+      window.clearTimeout(holdTimer.current)
+      holdTimer.current = null
+    }
+  }, [])
+
+  /** Rahmen scharfschalten - von der Wurzelkarte wie von einer eingebetteten Karte aus. */
+  const startMarquee = useCallback((clientX: number, clientY: number, pointerId: number) => {
+    const el = containerRef.current
+    if (!el) return
+    // Die Zeigererfassung uebernehmen: Hat eine eingebettete Karte sie sich geholt, geht sie
+    // damit an die Wurzel ueber und alle weiteren Bewegungen kommen hier an.
+    try {
+      el.setPointerCapture(pointerId)
+    } catch {
+      // Zeiger schon losgelassen - dann gibt es nichts scharfzuschalten.
+      return
+    }
+    marquee.current = { startX: clientX, startY: clientY, moved: false }
+    setMarqueeArmed(true)
+  }, [])
   const [panning, setPanning] = useState(false)
   const painting = useRef(false)
 
@@ -566,14 +605,21 @@ export function MapCanvas() {
         return
       }
       if (e.button === 0) {
-        // Linke Maustaste auf leerer Flaeche: Rechteck-Markierung aufziehen.
+        // Linke Maustaste: kurz halten, dann laesst sich ein Rechteck aufziehen. Der Klick
+        // selbst (Auswaehlen, Platzieren) laeuft weiterhin ueber pointerup.
         // preventDefault, damit der Browser dabei nicht Text/Elemente blau markiert.
         e.preventDefault()
         el.setPointerCapture(e.pointerId)
-        marquee.current = { startX: e.clientX, startY: e.clientY, moved: false }
+        const { clientX, clientY, pointerId } = e
+        press.current = { startX: clientX, startY: clientY }
+        cancelHold()
+        holdTimer.current = window.setTimeout(() => {
+          holdTimer.current = null
+          startMarquee(clientX, clientY, pointerId)
+        }, MARQUEE_HOLD_MS)
       }
     },
-    [view.tx, view.ty, fogEditing, paintReveal, stopViewAnimation],
+    [view.tx, view.ty, fogEditing, paintReveal, stopViewAnimation, cancelHold, startMarquee],
   )
 
   const onPointerMove = useCallback(
@@ -589,6 +635,12 @@ export function MapCanvas() {
         if (!d.moved && Math.hypot(dx, dy) > DRAG_THRESHOLD) d.moved = true
         if (d.moved) setView((v) => ({ ...v, tx: d.origTx + dx, ty: d.origTy + dy }))
         return
+      }
+      // Bewegt man sich, bevor der Rahmen scharf ist, war es kein Halten - dann bleibt es
+      // beim gewohnten Ziehen und der Rahmen kommt gar nicht erst.
+      const p = press.current
+      if (p && holdTimer.current !== null) {
+        if (Math.hypot(e.clientX - p.startX, e.clientY - p.startY) > DRAG_THRESHOLD) cancelHold()
       }
       const m = marquee.current
       if (m) {
@@ -612,13 +664,20 @@ export function MapCanvas() {
         }
       }
     },
-    [paintReveal],
+    [paintReveal, cancelHold],
   )
 
   const onPointerUp = useCallback(
     (e: React.PointerEvent) => {
       const el = containerRef.current
       if (el) el.releasePointerCapture(e.pointerId)
+      cancelHold()
+      // Ob die linke Taste ueberhaupt hier gedrueckt wurde: Frueher liess sich das am
+      // Rechteck-Zustand ablesen, den es jetzt erst nach dem Halten gibt. Ein gewoehnlicher
+      // Klick (auswaehlen, platzieren) haengt aber weiterhin daran.
+      const wasLeftPress = press.current !== null
+      press.current = null
+      setMarqueeArmed(false)
       if (painting.current) {
         painting.current = false
         return
@@ -653,7 +712,9 @@ export function MapCanvas() {
         return
       }
       setMarqueeRect(null)
-      if (!m) return // Klick kam nicht von der linken Maustaste (z.B. Fog-Pinsel).
+      // Wurde der Rahmen scharfgeschaltet, aber nicht aufgezogen, war es ein langer Druck
+      // ohne Absicht - dann soll er auch nicht wie ein Klick wirken.
+      if (m || !wasLeftPress) return
 
       if (!el) return
       const rect = el.getBoundingClientRect()
@@ -929,6 +990,7 @@ export function MapCanvas() {
       data-placing={placingActive ? 'true' : undefined}
       data-fog={fogEditing ? 'true' : undefined}
       data-panning={panning ? 'true' : undefined}
+      data-marquee={marqueeArmed ? 'true' : undefined}
       onWheel={onWheel}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
@@ -1166,6 +1228,7 @@ export function MapCanvas() {
           }}
           onEntityDragEnd={onReparentEntity}
           setEmbedRect={setEmbedRect}
+          onMarquee={startMarquee}
         />
       ))}
 
@@ -1980,6 +2043,7 @@ function EmbeddedMap({
   onEntityMove,
   onEntityDragEnd,
   setEmbedRect,
+  onMarquee,
 }: {
   embLayer: MapLayer
   /** Bildschirm-Transformation der Eltern-Ebene (Weltkoordinaten der Eltern-Ebene -> Bildschirm). */
@@ -2012,6 +2076,8 @@ function EmbeddedMap({
   /** Nach dem Ziehen eines Objekt-Pins: prueft, ob es auf eine andere Karte gehoert. */
   onEntityDragEnd: (id: string, clientX: number, clientY: number) => void
   setEmbedRect: (id: string, x: number, y: number, width: number, height: number) => void
+  /** Kurzes Halten auf der Karte: Auswahlrahmen der Wurzelkarte scharfschalten. */
+  onMarquee: (clientX: number, clientY: number, pointerId: number) => void
 }) {
   const image = useAsset(embLayer.imageUrl)
   // Direkt aus dem Store, statt durch die (beliebig tiefe) Rekursion gereicht zu werden.
@@ -2043,13 +2109,36 @@ function EmbeddedMap({
   }
 
   const dragRef = useRef<{ startX: number; startY: number; startEx: number; startEy: number; moved: boolean } | null>(null)
+  /**
+   * Auch hier gilt: Kurzes Halten schaltet den Auswahlrahmen scharf, statt die Karte zu
+   * verschieben. Genau an dieser Stelle stiessen die beiden bisher zusammen - eine Karte
+   * bedeckt die Objekte, die man markieren will.
+   */
+  const holdRef = useRef<number | null>(null)
+
+  function clearHold() {
+    if (holdRef.current !== null) {
+      window.clearTimeout(holdRef.current)
+      holdRef.current = null
+    }
+  }
 
   function onBgPointerDown(e: React.PointerEvent) {
     if (!interactive || tool === 'add' || e.button !== 0) return
     e.stopPropagation()
     e.preventDefault()
-    ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+    const el = e.currentTarget as HTMLElement
+    el.setPointerCapture(e.pointerId)
     dragRef.current = { startX: e.clientX, startY: e.clientY, startEx: embed.x, startEy: embed.y, moved: false }
+    const { clientX, clientY, pointerId } = e
+    clearHold()
+    holdRef.current = window.setTimeout(() => {
+      holdRef.current = null
+      // Die Karte gibt das Ziehen auf und ueberlaesst der Wurzelkarte den Rahmen. Ohne das
+      // Zuruecksetzen von dragRef wuerde das Loslassen sie noch auswaehlen.
+      dragRef.current = null
+      onMarquee(clientX, clientY, pointerId)
+    }, MARQUEE_HOLD_MS)
   }
   function onBgPointerMove(e: React.PointerEvent) {
     const d = dragRef.current
@@ -2057,12 +2146,19 @@ function EmbeddedMap({
     e.stopPropagation()
     const dx = (e.clientX - d.startX) / parentView.scale
     const dy = (e.clientY - d.startY) / parentView.scale
-    if (!d.moved && Math.hypot(e.clientX - d.startX, e.clientY - d.startY) > DRAG_THRESHOLD) d.moved = true
+    if (!d.moved && Math.hypot(e.clientX - d.startX, e.clientY - d.startY) > DRAG_THRESHOLD) {
+      d.moved = true
+      // Bewegung vor dem Scharfschalten heisst: verschieben, nicht markieren.
+      clearHold()
+    }
     if (d.moved) setEmbedRect(embLayer.id, d.startEx + dx, d.startEy + dy, embed.width, embed.height)
   }
   function onBgPointerUp(e: React.PointerEvent) {
     const d = dragRef.current
     dragRef.current = null
+    clearHold()
+    // Kein d heisst: Der Rahmen hat uebernommen (oder es gab nie ein Ziehen). Dann hier
+    // nichts tun - insbesondere die Karte nicht auswaehlen.
     if (!d) return
     e.stopPropagation()
     if ((e.currentTarget as HTMLElement).hasPointerCapture?.(e.pointerId)) {
@@ -2246,6 +2342,7 @@ function EmbeddedMap({
           onEntityMove={onEntityMove}
           onEntityDragEnd={onEntityDragEnd}
           setEmbedRect={setEmbedRect}
+          onMarquee={onMarquee}
         />
       ))}
 

@@ -5752,3 +5752,11 @@ button {
   display: flex;
   gap: 6px;
 }
+
+/* Auswahlrahmen scharf: Das Kreuz zeigt, dass jetzt markiert und nicht geschoben wird.
+   Gilt fuer alles darin - sonst behielten Pinnadeln und eingebettete Karten ihren eigenen
+   Zeiger, obwohl sie in diesem Moment gar nicht mehr angefasst werden koennen. */
+.map-canvas[data-marquee='true'],
+.map-canvas[data-marquee='true'] * {
+  cursor: crosshair !important;
+}
