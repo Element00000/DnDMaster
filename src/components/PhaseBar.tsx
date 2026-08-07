@@ -24,7 +24,8 @@ export function PhaseBar() {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
-  const phases = campaign.phases
+  // Notfalls leer: Ein Datenstand ohne Phasen darf die Leiste nicht mitreissen.
+  const phases = campaign.phases ?? []
   const active = phaseAt(phases, currentDay) ?? phases[phases.length - 1]
   const last = phases[phases.length - 1]
 

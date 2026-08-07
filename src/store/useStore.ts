@@ -1505,7 +1505,10 @@ export const useStore = create<StoreState>()(
     },
     {
       name: 'dnd-weltkarte',
-      version: 10,
+      // Bei jeder Erweiterung des Datenmodells hochzaehlen: Nur bei abweichender Version
+      // laeuft migrate, und nur dort werden fehlende Felder ergaenzt. Version 11 bringt die
+      // Phasen - ohne sie stuenden gespeicherte Kampagnen ganz ohne Phase da.
+      version: 11,
       // Nur Daten persistieren, keinen fluechtigen UI-Zustand. Uhrzeit und Kampagnentag
       // gehoeren dazu: Sie sind der Spielstand der laufenden Sitzung, kein Fensterzustand -
       // nach einem Neuladen soll die Runde dort weitergehen, wo sie stand.

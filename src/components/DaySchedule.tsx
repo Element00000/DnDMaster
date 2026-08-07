@@ -137,7 +137,7 @@ export function DaySchedule({ entities }: { entities: Entity[] }) {
           // Nur der Ablauf dieser Phase: Der einer frueheren gehoert zu einem anderen Kapitel
           // und wird nur auf Nachfrage uebernommen.
           keys: entities[0].schedule
-            .filter((k) => k.day == null && (k.phaseId ?? campaign.phases[0].id) === phase?.id)
+            .filter((k) => k.day == null && (k.phaseId ?? campaign.phases?.[0]?.id) === phase?.id)
             .sort((a, b) => a.time - b.time),
         },
         ...(showException

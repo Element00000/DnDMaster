@@ -28,7 +28,9 @@ export function scheduleOfPhase(
 }
 
 function ofPhase(schedule: Timestone[], day: number, ctx?: PhaseContext): Timestone[] {
-  if (!ctx || ctx.phases.length === 0) return schedule
+  // Ohne Phasen gilt der ganze Ablauf - so verhaelt sich eine Kampagne, die nie geteilt
+  // wurde, genau wie vorher.
+  if (!ctx?.phases?.length) return schedule
   const phase = phaseAt(ctx.phases, day)
   if (!phase) return []
   const firstId = ctx.phases[0].id

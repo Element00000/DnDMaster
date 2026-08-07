@@ -146,8 +146,8 @@ function ObjectSchedule({ entities }: { entities: Entity[] }) {
   // bekommt ihn hier auf Nachfrage: einmal je Figur, und nur wenn in dieser Phase noch
   // nichts steht, was man ueberschreiben wuerde.
   const phase = phaseAt(campaign.phases, currentDay)
-  const previous = phase ? campaign.phases[campaign.phases.findIndex((p) => p.id === phase.id) - 1] : undefined
-  const firstPhaseId = campaign.phases[0]?.id
+  const previous = phase ? campaign.phases?.[campaign.phases.findIndex((p) => p.id === phase.id) - 1] : undefined
+  const firstPhaseId = campaign.phases?.[0]?.id
   const candidate =
     previous && phase
       ? (placed.find(

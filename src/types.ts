@@ -205,9 +205,15 @@ export function isDead(entity: Entity, day?: number): boolean {
   return day === undefined || day >= died
 }
 
-/** Die Phase, zu der ein Kalendertag gehoert - oder undefined jenseits der letzten. */
-export function phaseAt(phases: Phase[], day: number): Phase | undefined {
-  return phases.find((p) => day >= p.startDay && (p.endDay === null || day <= p.endDay))
+/**
+ * Die Phase, zu der ein Kalendertag gehoert - oder undefined jenseits der letzten.
+ *
+ * Nimmt eine fehlende Liste hin: Ein Datenstand ohne Phasen (aelteres Backup, unterbrochene
+ * Migration) soll sich normal bedienen lassen, statt beim ersten Zugriff die Anzeige
+ * abzureissen.
+ */
+export function phaseAt(phases: Phase[] | undefined, day: number): Phase | undefined {
+  return phases?.find((p) => day >= p.startDay && (p.endDay === null || day <= p.endDay))
 }
 
 /** Gehoert ein Punkt zu dieser Phase? Tagesgebundene ueber ihren Tag, taegliche ueber phaseId. */
