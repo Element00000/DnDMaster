@@ -63,7 +63,7 @@ export function DetailPanel() {
   // Uhrzeit auf eine andere Karte, gehoert es auch in deren Uebersicht - und nicht mehr in
   // die der Karte, auf der sein Tag beginnt.
   const mapEntities = campaign.entities.filter(
-    (e) => placementAt(e, timeOfDay, currentDay)?.layerId === mapLayerId,
+    (e) => placementAt(e, timeOfDay, currentDay, campaign)?.layerId === mapLayerId,
   )
   // Im Kampfmodus stehen alle Charaktere der Karte in der Liste - wer nicht mitkaempft, wird
   // per Ziehen nach unten herausgenommen. Tote sind immer draussen und lassen sich auch nicht

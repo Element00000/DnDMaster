@@ -13,13 +13,14 @@ import type {
   EventData,
   EmbeddedPlacement,
   MapLayer,
+  Phase,
   Placement,
   RelationType,
   Timestone,
   Session,
   UndoEntry,
 } from '../types'
-import { emptyDecision, emptyEvent, isDead } from '../types'
+import { emptyDecision, emptyEvent, isDead, phaseAt, phaseStart } from '../types'
 import { uid } from '../utils/id'
 import { MINUTES_PER_DAY, activeTimestone, placementAt, scheduleForDay } from '../utils/time'
 
@@ -48,6 +49,7 @@ function makeCampaign(name: string): Campaign {
     entities: [],
     sessions: [],
     music: [],
+    phases: [makePhase('Phase 1', 1)],
   }
 }
 
@@ -208,6 +210,29 @@ interface StoreState extends AppData {
    */
   setMoment: (day: number, minutes: number) => void
   setCurrentDay: (day: number) => void
+
+  // ---------- Phasen (Kapitel der Kampagne) ----------
+  /** Die Phase, in der der aktuelle Kalendertag liegt. */
+  activePhase: () => Phase
+  /**
+   * Ein Tag jenseits der laufenden Phase, den der Nutzer aufrufen wollte - die Anzeige fragt
+   * daraufhin nach, ob die naechste Phase betreten werden soll. null = keine Frage offen.
+   */
+  pendingPhaseDay: number | null
+  askEnterNextPhase: (day: number | null) => void
+  /** Letzten Tag einer Phase festlegen; null hebt das Ende wieder auf. */
+  setPhaseEnd: (phaseId: string, endDay: number | null) => void
+  renamePhase: (phaseId: string, name: string) => void
+  /**
+   * Die naechste Phase anlegen und betreten. Haelt fest, wo jede Figur am Ende der
+   * bisherigen stand - das ist ihre Ausgangsposition im neuen Kapitel.
+   */
+  enterNextPhase: () => void
+  /**
+   * Den taeglichen Ablauf eines Objekts aus der Vorphase in die laufende uebernehmen.
+   * Liefert die Zahl der uebernommenen Punkte.
+   */
+  adoptRoutine: (entityId: string) => number
 
   // Untere, hochfahrende Leiste (Zeitleiste / Handlungsbaum / Beziehungen)
   /** Geoeffnete Ansicht; null = Leiste zu. */
@@ -460,7 +485,7 @@ export const useStore = create<StoreState>()(
          * bei 0 Uhr Schluss.
          */
         setMoment: (day, minutes) =>
-          set(() => {
+          set((s) => {
             let time = Math.round(minutes)
             // Math.floor rundet auch bei negativen Werten nach unten - genau das ergibt den
             // Uebertrag in den vorherigen Tag.
@@ -468,11 +493,109 @@ export const useStore = create<StoreState>()(
             time -= carry * MINUTES_PER_DAY
             const target = Math.round(day) + carry
             if (target < 1) return { timeOfDay: 0, currentDay: 1 }
+
+            // Die laufende Phase ist eine Wand: Hinter ihrem letzten Tag geht es erst
+            // weiter, wenn die naechste angelegt ist. Der Regler bleibt an der Grenze
+            // stehen und die Anzeige fragt nach - mitten im Ziehen waere ein Dialog eine
+            // Zumutung, hier merkt man nur den Anschlag.
+            const phases = s.activeCampaign().phases
+            const last = phases[phases.length - 1]
+            if (last?.endDay != null && target > last.endDay) {
+              return { timeOfDay: MINUTES_PER_DAY - 1, currentDay: last.endDay, pendingPhaseDay: target }
+            }
             return { timeOfDay: time, currentDay: target }
           }),
         // Der Kalendertag wechselt den ganzen Ablauf - Vormerkungen sind dann hinfaellig.
         // Tag 1 ist der erste; davor liegt nichts.
-        setCurrentDay: (day) => set({ currentDay: Math.max(1, Math.round(day)), draftPos: {} }),
+        setCurrentDay: (day) =>
+          set((s) => {
+            const target = Math.max(1, Math.round(day))
+            const phases = s.activeCampaign().phases
+            const last = phases[phases.length - 1]
+            if (last?.endDay != null && target > last.endDay) {
+              return { pendingPhaseDay: target, draftPos: {} }
+            }
+            return { currentDay: target, draftPos: {} }
+          }),
+
+        // ---------- Phasen ----------
+        activePhase: () => {
+          const c = get().activeCampaign()
+          return phaseAt(c.phases, get().currentDay) ?? c.phases[c.phases.length - 1]
+        },
+
+        pendingPhaseDay: null,
+        askEnterNextPhase: (day) => set({ pendingPhaseDay: day }),
+
+        setPhaseEnd: (phaseId, endDay) =>
+          patchActive((c) => ({
+            ...c,
+            phases: c.phases.map((p) =>
+              p.id !== phaseId
+                ? p
+                : // Nie vor den eigenen Anfang: Eine Phase umfasst mindestens ihren ersten Tag.
+                  { ...p, endDay: endDay === null ? null : Math.max(p.startDay, Math.round(endDay)) },
+            ),
+          })),
+
+        renamePhase: (phaseId, name) =>
+          patchActive((c) => ({
+            ...c,
+            phases: c.phases.map((p) => (p.id === phaseId ? { ...p, name: name.trim() || p.name } : p)),
+          })),
+
+        enterNextPhase: () => {
+          const s = get()
+          const c = s.activeCampaign()
+          const last = c.phases[c.phases.length - 1]
+          if (!last || last.endDay == null) return
+          const startDay = last.endDay + 1
+          // Wo jede Figur am Ende der bisherigen Phase stand, dort beginnt sie die neue.
+          // Bewusst jetzt festgehalten und nicht spaeter ausgerechnet: Die neue Phase soll
+          // ihren eigenen Anfang haben, den man frei verschieben kann.
+          const starts: Record<string, Placement> = {}
+          for (const e of c.entities) {
+            const at = placementAt(e, MINUTES_PER_DAY - 1, last.endDay, c)
+            if (at) starts[e.id] = { layerId: at.layerId, x: at.x, y: at.y }
+          }
+          const next: Phase = {
+            id: uid('ph-'),
+            name: `Phase ${c.phases.length + 1}`,
+            startDay,
+            endDay: null,
+            starts,
+          }
+          patchActive((cc) => ({ ...cc, phases: [...cc.phases, next] }))
+          set((st) => ({
+            currentDay: Math.max(startDay, st.pendingPhaseDay ?? startDay),
+            pendingPhaseDay: null,
+            draftPos: {},
+          }))
+        },
+
+        adoptRoutine: (entityId) => {
+          const s = get()
+          const c = s.activeCampaign()
+          const phase = s.activePhase()
+          const index = c.phases.findIndex((p) => p.id === phase.id)
+          const previous = c.phases[index - 1]
+          if (!previous) return 0
+          const entity = c.entities.find((e) => e.id === entityId)
+          if (!entity) return 0
+          const firstId = c.phases[0].id
+          const source = entity.schedule.filter(
+            (k) => k.day == null && (k.phaseId ?? firstId) === previous.id,
+          )
+          if (source.length === 0) return 0
+          const copies = source.map((k) => ({ ...k, id: uid('key-'), phaseId: phase.id }))
+          patchActive((cc) => ({
+            ...cc,
+            entities: cc.entities.map((e) =>
+              e.id === entityId ? { ...e, schedule: [...e.schedule, ...copies] } : e,
+            ),
+          }))
+          return copies.length
+        },
 
         // ---------- Untere Leiste ----------
         bottomPanel: null,
@@ -656,7 +779,7 @@ export const useStore = create<StoreState>()(
           const s = get()
           const entity = s.activeCampaign().entities.find((e) => e.id === entityId)
           if (!entity) return
-          const at = placementAt(entity, s.timeOfDay, s.currentDay)
+          const at = placementAt(entity, s.timeOfDay, s.currentDay, s.activeCampaign())
           if (at) s.goToLayer(at.layerId)
         },
 
@@ -824,17 +947,22 @@ export const useStore = create<StoreState>()(
           // Platzierung. Ohne das saesse sie fortan an ihrem Ausgangsort, denn ihr
           // Tagesablauf gilt ab jetzt nicht mehr (siehe isDead) - und die Basis-Platzierung
           // ist der Ort, an dem ihr Tag begonnen hat, nicht der, an dem er endete.
-          const freeze =
-            key === 'status' && value === 'tot' && entity && !isDead(entity)
-              ? placementAt(entity, s.timeOfDay, s.currentDay)
-              : null
+          const dying = key === 'status' && value === 'tot' && entity && !isDead(entity)
+          const freeze = dying ? placementAt(entity, s.timeOfDay, s.currentDay, s.activeCampaign()) : null
           patchActive((c) => ({
             ...c,
             entities: c.entities.map((e) =>
               e.id === id
                 ? {
                     ...e,
-                    fields: { ...e.fields, [key]: value },
+                    fields: {
+                      ...e.fields,
+                      [key]: value,
+                      // Der Sterbetag wird mitgeschrieben: Ohne ihn waere die Figur auch in
+                      // Phasen tot, die vor ihrem Tod liegen, und ein frueheres Kapitel
+                      // liesse sich nicht mehr ansehen.
+                      ...(dying ? { totAmTag: String(s.currentDay) } : {}),
+                    },
                     placement: freeze ?? e.placement,
                   }
                 : e,
@@ -905,52 +1033,91 @@ export const useStore = create<StoreState>()(
             ),
           })),
 
-        setPlacement: (id, placement) =>
-          patchActive((c) => ({
-            ...c,
-            entities: c.entities.map((e) => (e.id === id ? { ...e, placement } : e)),
-          })),
+        setPlacement: (id, placement) => {
+          const day = get().currentDay
+          patchActive((c) => {
+            // In einer spaeteren Phase ist die Ausgangsposition der Phase der Anfang, nicht
+            // die Platzierung des Objekts. Was man dort verschiebt, gilt nur fuer dieses
+            // Kapitel - die frueheren bleiben, wie sie waren.
+            const phase = phaseAt(c.phases, day)
+            if (phase && phase.starts[id] && placement) {
+              return {
+                ...c,
+                phases: c.phases.map((p) =>
+                  p.id === phase.id ? { ...p, starts: { ...p.starts, [id]: placement } } : p,
+                ),
+              }
+            }
+            return { ...c, entities: c.entities.map((e) => (e.id === id ? { ...e, placement } : e)) }
+          })
+        },
 
-        moveEntity: (id, dxWorld, dyWorld) =>
-          patchActive((c) => ({
-            ...c,
-            entities: c.entities.map((e) =>
-              e.id === id && e.placement
-                ? {
-                    ...e,
-                    placement: {
-                      ...e.placement,
-                      x: e.placement.x + dxWorld,
-                      y: e.placement.y + dyWorld,
-                    },
-                  }
-                : e,
-            ),
-          })),
+        moveEntity: (id, dxWorld, dyWorld) => {
+          const day = get().currentDay
+          patchActive((c) => {
+            const phase = phaseAt(c.phases, day)
+            const start = phase?.starts[id]
+            if (phase && start) {
+              return {
+                ...c,
+                phases: c.phases.map((p) =>
+                  p.id === phase.id
+                    ? { ...p, starts: { ...p.starts, [id]: { ...start, x: start.x + dxWorld, y: start.y + dyWorld } } }
+                    : p,
+                ),
+              }
+            }
+            return {
+              ...c,
+              entities: c.entities.map((e) =>
+                e.id === id && e.placement
+                  ? {
+                      ...e,
+                      placement: {
+                        ...e.placement,
+                        x: e.placement.x + dxWorld,
+                        y: e.placement.y + dyWorld,
+                      },
+                    }
+                  : e,
+              ),
+            }
+          })
+        },
 
         // ---------- Tagesablauf als Timestones ----------
         addTimestone: (entityId, init) => {
           const s = get()
           const entity = s.activeCampaign().entities.find((e) => e.id === entityId)
           if (!entity?.placement) return null
+          const campaign = s.activeCampaign()
           const time = init?.time ?? s.timeOfDay
           const day = init?.day ?? null
+          const phase = s.activePhase()
+          // Ein Punkt des taeglichen Ablaufs gehoert zu der Phase, in der er entsteht - sonst
+          // liefe er durch die ganze Kampagne. Tagesgebundene brauchen die Angabe nicht: Ihr
+          // Tag sagt schon, in welche Phase sie fallen.
+          const phaseId = day == null ? phase.id : undefined
           // Zur selben Uhrzeit auf derselben Ebene gibt es nur einen Punkt - ein zweiter
           // waere nie erreichbar. Ein erneutes Setzen aktualisiert also den vorhandenen.
-          const existing = entity.schedule.find((k) => k.time === time && k.day === day)
+          const existing = entity.schedule.find(
+            (k) => k.time === time && k.day === day && (day != null || (k.phaseId ?? campaign.phases[0].id) === phase.id),
+          )
           // Ohne Angabe haelt der Punkt fest, wo das Objekt zu dieser Zeit ohnehin steht.
           // Karte und Koordinaten stammen immer aus derselben Quelle - sonst laege der Punkt
           // bei den Koordinaten der einen auf der anderen Karte.
-          const current = activeTimestone(entity.schedule, time, s.currentDay)
+          const current = activeTimestone(entity.schedule, time, s.currentDay, campaign)
+          const base = phaseStart(entity, phase) ?? entity.placement
           const from =
             init?.x != null && init?.y != null
-              ? { layerId: init.layerId ?? entity.placement.layerId, x: init.x, y: init.y }
+              ? { layerId: init.layerId ?? base.layerId, x: init.x, y: init.y }
               : current
-                ? { layerId: current.layerId ?? entity.placement.layerId, x: current.x, y: current.y }
-                : entity.placement
+                ? { layerId: current.layerId ?? base.layerId, x: current.x, y: current.y }
+                : base
           const key: Timestone = {
             id: existing?.id ?? uid('key-'),
             time,
+            phaseId,
             layerId: from.layerId,
             x: from.x,
             y: from.y,
@@ -995,7 +1162,7 @@ export const useStore = create<StoreState>()(
             // Wer einen Punkt bewusst ersetzen will, traegt seine Uhrzeit von Hand ein.
             const entity = s.activeCampaign().entities.find((e) => e.id === entityId)
             const takenAt = (d: number) =>
-              new Set(entity ? scheduleForDay(entity.schedule, d).map((k) => k.time) : [])
+              new Set(entity ? scheduleForDay(entity.schedule, d, s.activeCampaign()).map((k) => k.time) : [])
             let time = s.timeOfDay
             // Vorgabe ist der wiederkehrende Ablauf: Eine Station gilt an jedem Tag, bis man
             // im Kalender einen bestimmten waehlt.
@@ -1377,6 +1544,7 @@ export const useStore = create<StoreState>()(
             entities,
             sessions: [],
             music: [],
+            phases: [makePhase('Phase 1', 1)],
           }
           data = { campaigns: [campaign], activeCampaignId: campaign.id }
         }
@@ -1418,6 +1586,7 @@ function normalizeTimestone(s: Partial<Timestone> & { timeStart?: number }): Tim
     // Aeltere Punkte lagen immer auf der Karte der Basis-Platzierung und haben darum keine
     // eigene Angabe; sie bleibt offen und wird bei der Anzeige von dort ergaenzt.
     layerId: s.layerId,
+    phaseId: s.phaseId,
     x: s.x ?? 0,
     y: s.y ?? 0,
     // "Start" wurde eine Zeit lang mitgespeichert und blieb dadurch auch stehen, wenn der
@@ -1470,7 +1639,23 @@ function normalizeCampaign(c: Campaign): Campaign {
     entities: (c.entities ?? []).map(normalizeEntity),
     sessions: c.sessions ?? [],
     music: c.music ?? [],
+    // Eine Kampagne hat immer mindestens eine Phase. Aeltere Staende kannten keine - ihr
+    // ganzer Inhalt gehoert dann in die erste, die ohne Ende laeuft und damit alles umfasst.
+    phases: c.phases && c.phases.length > 0 ? c.phases.map(normalizePhase) : [makePhase('Phase 1', 1)],
   }
+}
+
+function normalizePhase(p: Phase): Phase {
+  return {
+    ...p,
+    startDay: p.startDay ?? 1,
+    endDay: p.endDay ?? null,
+    starts: p.starts ?? {},
+  }
+}
+
+function makePhase(name: string, startDay: number): Phase {
+  return { id: uid('ph-'), name, startDay, endDay: null, starts: {} }
 }
 
 /** Die decision-Struktur einer Entitaet in der aktiven Kampagne patchen. */

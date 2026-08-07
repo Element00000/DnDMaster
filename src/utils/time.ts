@@ -1,7 +1,39 @@
 // Hilfsfunktionen fuer die Tageszeit (Minuten seit Mitternacht, 0..1439).
 
-import type { Entity, Timestone } from '../types'
-import { effectivePlacement, isDead } from '../types'
+import type { Entity, Phase, Timestone } from '../types'
+import { effectivePlacement, inPhase, isDead, phaseAt } from '../types'
+
+/**
+ * Die Phasen einer Kampagne, wie sie die Bewegungslogik braucht. Als eigener Typ, damit die
+ * Aufrufer nur das durchreichen muessen, was hier wirklich zaehlt.
+ */
+export interface PhaseContext {
+  phases: Phase[]
+}
+
+/**
+ * Nur die Punkte, die in der Phase des Tages gelten. Eine Phase ist ein Schnitt: Was in
+ * einer frueheren Phase eingetragen wurde, wirkt nicht in eine spaetere hinein - weder ein
+ * Reiseweg noch der taegliche Ablauf. Uebernommen wird allein der Standort, und der steckt
+ * in der Ausgangsposition der Phase.
+ *
+ * Ohne Phasenangabe bleibt alles, wie es war - dann gilt der ganze Ablauf.
+ */
+export function scheduleOfPhase(
+  schedule: Timestone[],
+  day: number,
+  ctx?: PhaseContext,
+): Timestone[] {
+  return ofPhase(schedule, day, ctx)
+}
+
+function ofPhase(schedule: Timestone[], day: number, ctx?: PhaseContext): Timestone[] {
+  if (!ctx || ctx.phases.length === 0) return schedule
+  const phase = phaseAt(ctx.phases, day)
+  if (!phase) return []
+  const firstId = ctx.phases[0].id
+  return schedule.filter((s) => inPhase(s, phase, firstId))
+}
 
 export const MINUTES_PER_DAY = 24 * 60
 
@@ -39,8 +71,8 @@ export function inWindow(now: number, start: number | null, end: number | null):
  * der Standard-Tagesablauf plus die Ausnahmen dieses Tages. Fallen beide auf dieselbe
  * Uhrzeit, steht die Ausnahme hinten und gewinnt damit in activeTimestone.
  */
-export function scheduleForDay(schedule: Timestone[], day: number): Timestone[] {
-  return schedule
+export function scheduleForDay(schedule: Timestone[], day: number, ctx?: PhaseContext): Timestone[] {
+  return ofPhase(schedule, day, ctx)
     .filter((s) => s.day == null || s.day === day)
     .slice()
     .sort((a, b) => a.time - b.time || (a.day == null ? 0 : 1) - (b.day == null ? 0 : 1))
@@ -106,11 +138,11 @@ export function activeTimestone(
   schedule: Timestone[],
   minutes: number,
   day: number,
+  ctx?: PhaseContext,
 ): Timestone | undefined {
-  const routine = schedule.filter((s) => s.day == null).sort((a, b) => a.time - b.time)
-  const dated = schedule
-    .filter((s) => s.day != null)
-    .sort((a, b) => a.day! - b.day! || a.time - b.time)
+  const own = ofPhase(schedule, day, ctx)
+  const routine = own.filter((s) => s.day == null).sort((a, b) => a.time - b.time)
+  const dated = own.filter((s) => s.day != null).sort((a, b) => a.day! - b.day! || a.time - b.time)
 
   if (dated.length === 0) return lastRoutineToday(routine, minutes)
 
@@ -145,11 +177,15 @@ export function placementAt(
   entity: Entity,
   minutes: number,
   day: number,
+  ctx?: PhaseContext,
 ): { layerId: string; x: number; y: number } | null {
+  const phase = ctx ? phaseAt(ctx.phases, day) : undefined
   // Tote gehen nicht mehr weiter: Ihr Tagesablauf ist gestrichen, sie bleiben an der Stelle
-  // stehen, die beim Sterben zu ihrer Platzierung wurde.
-  if (isDead(entity)) return effectivePlacement(entity, undefined)
-  return effectivePlacement(entity, activeTimestone(entity.schedule, minutes, day))
+  // stehen, die beim Sterben zu ihrer Platzierung wurde. Bewusst ohne die Ausgangsposition
+  // der Phase - die waere beim Anlegen der Phase festgehalten worden und wuesste vom Tod
+  // nichts, wenn er erst danach eintrat.
+  if (isDead(entity, day)) return effectivePlacement(entity, undefined)
+  return effectivePlacement(entity, activeTimestone(entity.schedule, minutes, day, ctx), phase)
 }
 
 /**

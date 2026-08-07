@@ -93,6 +93,12 @@ export interface Timestone {
   /** Uhrzeit in Minuten seit Mitternacht, ab der diese Position gilt. */
   time: number
   /**
+   * Nur fuer Punkte des taeglichen Ablaufs (day === null): zu welcher Phase sie gehoeren.
+   * Tagesgebundene Punkte brauchen die Angabe nicht - ihr Tag sagt es schon. Fehlt sie
+   * (aeltere Daten), gehoert der Punkt zur ersten Phase.
+   */
+  phaseId?: string
+  /**
    * Karte, auf der diese Stelle liegt - x und y gelten in deren Koordinaten. Fehlt die
    * Angabe (aeltere Daten), gilt die Karte der Basis-Platzierung; so lagen alle
    * Timestones frueher.
@@ -176,11 +182,49 @@ export function isHostile(entity: Entity): boolean {
 }
 
 /**
- * Ist die Figur tot? Dann steht sie still: Ihr Tagesablauf gilt nicht mehr, sie bleibt an
- * der Stelle, an der sie gestorben ist (siehe setEntityField im Store).
+ * An welchem Kalendertag die Figur gestorben ist, oder null, wenn sie lebt. Der Tag wird
+ * beim Umschalten des Zustands festgehalten - ohne ihn waere eine Figur auch in Phasen tot,
+ * die vor ihrem Tod liegen, und man koennte kein Kapitel mehr ansehen, in dem sie noch lebte.
  */
-export function isDead(entity: Entity): boolean {
-  return entity.type === 'nsc' && entity.fields.status === 'tot'
+export function deathDay(entity: Entity): number | null {
+  if (entity.type !== 'nsc' || entity.fields.status !== 'tot') return null
+  const day = Number(entity.fields.totAmTag)
+  return Number.isFinite(day) && day > 0 ? day : 1
+}
+
+/**
+ * Ist die Figur (an diesem Tag) tot? Dann steht sie still: Ihr Tagesablauf gilt nicht mehr,
+ * sie bleibt an der Stelle, an der sie gestorben ist - auch in allen spaeteren Phasen.
+ *
+ * Ohne Tagesangabe zaehlt nur, ob sie ueberhaupt als tot eingetragen ist; das brauchen die
+ * Stellen, die den Zustand selbst anzeigen oder aendern.
+ */
+export function isDead(entity: Entity, day?: number): boolean {
+  const died = deathDay(entity)
+  if (died === null) return false
+  return day === undefined || day >= died
+}
+
+/** Die Phase, zu der ein Kalendertag gehoert - oder undefined jenseits der letzten. */
+export function phaseAt(phases: Phase[], day: number): Phase | undefined {
+  return phases.find((p) => day >= p.startDay && (p.endDay === null || day <= p.endDay))
+}
+
+/** Gehoert ein Punkt zu dieser Phase? Tagesgebundene ueber ihren Tag, taegliche ueber phaseId. */
+export function inPhase(stone: Timestone, phase: Phase, firstPhaseId: string): boolean {
+  if (stone.day != null) {
+    return stone.day >= phase.startDay && (phase.endDay === null || stone.day <= phase.endDay)
+  }
+  return (stone.phaseId ?? firstPhaseId) === phase.id
+}
+
+/**
+ * Wo ein Objekt in eine Phase startet: die eigens festgehaltene Ausgangsposition, sonst
+ * seine Platzierung. Die erste Phase haelt bewusst keine fest - dort ist die Platzierung
+ * selbst der Anfang.
+ */
+export function phaseStart(entity: Entity, phase: Phase | undefined): Placement | null {
+  return phase?.starts[entity.id] ?? entity.placement
 }
 
 /** Ist das ein Spieler-Charakter? */
@@ -196,8 +240,8 @@ export function isPlayer(entity: Entity): boolean {
  * - Tote nicht: Sie gehen nirgendwo mehr hin. Ihr bisheriger Ablauf bleibt gespeichert und
  *   gilt wieder, falls sich das Ganze als Irrtum herausstellt.
  */
-export function canSchedule(entity: Entity): boolean {
-  return !isPlayer(entity) && !isDead(entity)
+export function canSchedule(entity: Entity, day?: number): boolean {
+  return !isPlayer(entity) && !isDead(entity, day)
 }
 
 /**
@@ -205,8 +249,12 @@ export function canSchedule(entity: Entity): boolean {
  * jeder Anzeige neu aus der Position bestimmt, nie gespeichert - sonst behielte ein
  * verschobener Timestone die Kennzeichnung "Start", obwohl er laengst woanders liegt.
  */
-export function isAtBase(entity: Entity, key: { x: number; y: number; layerId?: string }): boolean {
-  const p = entity.placement
+export function isAtBase(
+  entity: Entity,
+  key: { x: number; y: number; layerId?: string },
+  phase?: Phase,
+): boolean {
+  const p = phaseStart(entity, phase)
   if (!p) return false
   // Dieselbe Stelle auf einer anderen Karte ist eine andere Stelle.
   if ((key.layerId ?? p.layerId) !== p.layerId) return false
@@ -225,8 +273,9 @@ export function isAtBase(entity: Entity, key: { x: number; y: number; layerId?: 
 export function effectivePlacement(
   entity: Entity,
   active: Timestone | undefined,
+  phase?: Phase,
 ): { layerId: string; x: number; y: number } | null {
-  const p = entity.placement
+  const p = phaseStart(entity, phase)
   if (!p) return null
   if (!active) return { layerId: p.layerId, x: p.x, y: p.y }
   return { layerId: active.layerId ?? p.layerId, x: active.x, y: active.y }
@@ -285,6 +334,30 @@ export interface MusicEntry {
   url: string
 }
 
+/**
+ * Ein Abschnitt der Kampagne - ein Kapitel. Phasen liegen luecken- und ueberschneidungsfrei
+ * hintereinander auf dem einen, durchlaufenden Kalender: Endet Phase 1 an Tag 12, beginnt
+ * Phase 2 an Tag 13. Der Tag eines Punktes sagt damit schon, zu welcher Phase er gehoert -
+ * eine eigene Kennzeichnung braucht nur der taegliche Ablauf, der ja an keinem Tag haengt.
+ *
+ * Was eine Phase von der naechsten trennt: Bewegungen werden nicht uebernommen (der
+ * Tagesablauf nur auf Nachfrage), wohl aber der Standort - er steht in "starts".
+ */
+export interface Phase {
+  id: string
+  name: string
+  /** Erster Kalendertag der Phase. */
+  startDay: number
+  /** Letzter Tag; null = die Phase laeuft noch ohne festgelegtes Ende. */
+  endDay: number | null
+  /**
+   * Ausgangsposition je Objekt-Id, festgehalten beim Anlegen der Phase: Wo das Objekt am
+   * Ende der Vorphase stand, dort beginnt es diese. Fehlt der Eintrag (erste Phase, oder
+   * Objekt erst spaeter angelegt), gilt die Platzierung des Objekts selbst.
+   */
+  starts: Record<string, Placement>
+}
+
 export interface Campaign {
   id: string
   name: string
@@ -295,6 +368,8 @@ export interface Campaign {
   entities: Entity[]
   sessions: Session[]
   music: MusicEntry[]
+  /** Kapitel der Kampagne, nach startDay sortiert. Enthaelt immer mindestens eine Phase. */
+  phases: Phase[]
 }
 
 export interface AppData {

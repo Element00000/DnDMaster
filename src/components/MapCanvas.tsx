@@ -3,12 +3,14 @@ import { useStore } from '../store/useStore'
 import type { DraftPos } from '../store/useStore'
 import { canSchedule, entityDisplayMeta, isDead } from '../types'
 import type { Entity, MapLayer } from '../types'
+import type { PhaseContext } from '../utils/time'
 import {
   activeTimestone,
   dayNightOverlay,
   formatTime,
   parseTime,
   placementAt,
+  scheduleOfPhase,
   scheduleForDay,
 } from '../utils/time'
 import { useAsset } from '../useAsset'
@@ -137,7 +139,7 @@ export function MapCanvas() {
   // beginnt. Schickt ein Timestone es auf eine andere Karte, zeichnet ab dann diese es.
   const pins = entities.filter(
     (e) =>
-      placementAt(e, timeOfDay, currentDay)?.layerId === layer.id &&
+      placementAt(e, timeOfDay, currentDay, campaign)?.layerId === layer.id &&
       (!tableMode || e.visibility === 'spieler'),
   )
 
@@ -150,7 +152,7 @@ export function MapCanvas() {
   // Doppel daneben (siehe DraftOverlay), damit man sieht, dass noch nichts gespeichert ist.
   const effectivePos = useCallback(
     (e: Entity): { x: number; y: number } => {
-      const p = placementAt(e, timeOfDay, currentDay)
+      const p = placementAt(e, timeOfDay, currentDay, campaign)
       return p ? { x: p.x, y: p.y } : { x: e.placement!.x, y: e.placement!.y }
     },
     [timeOfDay, currentDay],
@@ -173,7 +175,7 @@ export function MapCanvas() {
       // Spieler-Charaktere haben keinen Tagesablauf; sie werden immer nur verschoben.
       const recording = bottomPanel === 'zeitleiste' && selectedIds.includes(e.id) && canSchedule(e)
       if (!recording) {
-        const active = activeTimestone(e.schedule, timeOfDay, currentDay)
+        const active = activeTimestone(e.schedule, timeOfDay, currentDay, campaign)
         if (active) {
           moveTimestone(e.id, active.id, dxWorld, dyWorld)
           return
@@ -184,7 +186,7 @@ export function MapCanvas() {
       // Waehrend des Ziehens bleibt die Karte dieselbe; auf eine andere umgesetzt wird das
       // Doppel erst beim Loslassen (siehe onReparentEntity), wo die Bildschirmstelle
       // bekannt ist.
-      const here = placementAt(e, timeOfDay, currentDay)!
+      const here = placementAt(e, timeOfDay, currentDay, campaign)!
       const from = draftPos[e.id] ?? here
       // Gezogen wird die Nadel auf der Karte, auf der das Objekt gerade steht - das Doppel
       // kann laengst auf einer anderen liegen. Deren Massstab ist ein anderer, und dieselbe
@@ -519,7 +521,7 @@ export function MapCanvas() {
       }
       // Ohne Aufnahme wurde der Punkt gezogen, der gerade gilt (siehe moveEntityTimed) -
       // nicht die Basis-Platzierung, die dabei gar nicht zu sehen ist.
-      const active = activeTimestone(ent.schedule, timeOfDay, currentDay)
+      const active = activeTimestone(ent.schedule, timeOfDay, currentDay, campaign)
       if (active) {
         if (result.layerId === (active.layerId ?? ent.placement.layerId)) return
         updateTimestone(entityId, active.id, { layerId: result.layerId, x: result.x, y: result.y })
@@ -852,7 +854,7 @@ export function MapCanvas() {
         // hier keine Bedeutung und laegen sonst zufaellig in Reichweite.
         const stops = [
           { layerId: e.placement.layerId, x: e.placement.x, y: e.placement.y },
-          ...scheduleForDay(e.schedule, st.currentDay).map((s) => ({
+          ...scheduleForDay(e.schedule, st.currentDay, c).map((s) => ({
             layerId: s.layerId ?? e.placement!.layerId,
             x: s.x,
             y: s.y,
@@ -1084,7 +1086,7 @@ export function MapCanvas() {
         rootLayerId={layer.id}
         view={view}
         currentDay={currentDay}
-        placementOf={(e) => placementAt(e, timeOfDay, currentDay)}
+        placementOf={(e) => placementAt(e, timeOfDay, currentDay, campaign)}
         onSetTime={setDraftTime}
         onSetDay={setDraftDay}
         onMove={(id, dxWorld, dyWorld) => {
@@ -1104,6 +1106,7 @@ export function MapCanvas() {
           rootLayerId={layer.id}
           view={view}
           currentDay={currentDay}
+          phaseCtx={campaign}
           timeOfDay={timeOfDay}
           onPickTime={(minutes, day) => setMoment(day ?? currentDay, minutes)}
           // Station 1 ist die Basis-Platzierung des Objekts, alle anderen sind Timestones.
@@ -1387,6 +1390,7 @@ function ScheduleOverlay({
   rootLayerId,
   view,
   currentDay,
+  phaseCtx,
   timeOfDay,
   onPickTime,
   onMoveStop,
@@ -1398,6 +1402,7 @@ function ScheduleOverlay({
   rootLayerId: string
   view: View
   currentDay: number
+  phaseCtx: PhaseContext
   timeOfDay: number
   /** Klick auf eine Station stellt die Zeitleiste auf deren Uhrzeit - und Tag, wenn sie einen hat. */
   onPickTime: (minutes: number, day: number | null) => void
@@ -1520,10 +1525,12 @@ function ScheduleOverlay({
   // Tage. Eine Reise ueber mehrere Tage ist ein zusammenhaengender Weg; zeigte die Route nur
   // den sichtbaren Tag, waere sie unterwegs leer, obwohl die Figur genau dann unterwegs ist.
   // Die Beschriftung nennt bei diesen Punkten ohnehin den Tag.
-  const keys = [
-    ...entity.schedule.filter((s) => s.day == null),
-    ...entity.schedule.filter((s) => s.day != null),
-  ].sort((a, b) => (a.day ?? currentDay) - (b.day ?? currentDay) || a.time - b.time)
+  // Nur die Punkte der laufenden Phase: Was in einem frueheren Kapitel eingetragen wurde,
+  // gehoert nicht auf diese Karte.
+  const own = scheduleOfPhase(entity.schedule, currentDay, phaseCtx)
+  const keys = [...own.filter((s) => s.day == null), ...own.filter((s) => s.day != null)].sort(
+    (a, b) => (a.day ?? currentDay) - (b.day ?? currentDay) || a.time - b.time,
+  )
   if (keys.length === 0) return null
 
   // Der Tag beginnt an der Basis-Platzierung - sie ist Station 1, auch wenn sie nicht in
@@ -1545,7 +1552,7 @@ function ScheduleOverlay({
   }))
 
   const meta = entityDisplayMeta(entity)
-  const active = activeTimestone(entity.schedule, timeOfDay, currentDay)
+  const active = activeTimestone(entity.schedule, timeOfDay, currentDay, phaseCtx)
 
   /**
    * Welche Stationen gelten am sichtbaren Tag? Nur sie bilden den Weg: volle Farbe,
@@ -1558,7 +1565,7 @@ function ScheduleOverlay({
   const activeIds = new Set<string>()
   {
     const marks = new Set<number>([0])
-    for (const s of scheduleForDay(entity.schedule, currentDay)) marks.add(s.time)
+    for (const s of scheduleForDay(entity.schedule, currentDay, phaseCtx)) marks.add(s.time)
     for (const t of marks) {
       activeIds.add(activeTimestone(entity.schedule, t, currentDay)?.id ?? '__base__')
     }
@@ -2009,6 +2016,7 @@ function EmbeddedMap({
   const image = useAsset(embLayer.imageUrl)
   // Direkt aus dem Store, statt durch die (beliebig tiefe) Rekursion gereicht zu werden.
   const currentDay = useStore((s) => s.currentDay)
+  const campaign = useStore((s) => s.activeCampaign())
   const embed = embLayer.embed!
   const selected = selectedEmbedId === embLayer.id
   const x = embed.x * parentView.scale + parentView.tx
@@ -2149,7 +2157,7 @@ function EmbeddedMap({
   // Wie auf der Wurzelebene: Es zaehlt die Karte, auf der das Objekt gerade steht.
   const embPins = entities.filter(
     (e) =>
-      placementAt(e, timeOfDay, currentDay)?.layerId === embLayer.id &&
+      placementAt(e, timeOfDay, currentDay, campaign)?.layerId === embLayer.id &&
       (!tableMode || e.visibility === 'spieler'),
   )
   const nestedEmbeds = layers.filter(
@@ -2157,7 +2165,7 @@ function EmbeddedMap({
   )
 
   function embEffectivePos(e: Entity): { x: number; y: number } {
-    const p = placementAt(e, timeOfDay, currentDay)
+    const p = placementAt(e, timeOfDay, currentDay, campaign)
     return p ? { x: p.x, y: p.y } : { x: e.placement!.x, y: e.placement!.y }
   }
 

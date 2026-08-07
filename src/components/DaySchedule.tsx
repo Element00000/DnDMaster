@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from 'react'
-import { entityDisplayMeta, isAtBase } from '../types'
+import { entityDisplayMeta, isAtBase, phaseAt } from '../types'
 import type { Entity, Timestone } from '../types'
+import type { PhaseContext } from '../utils/time'
 import { useStore } from '../store/useStore'
 import {
   MINUTES_PER_DAY,
@@ -42,18 +43,19 @@ function activeParts(
   entity: Entity,
   day: number,
   keyId: string | null,
+  ctx: PhaseContext,
   from: number,
   to: number,
 ): { from: number; to: number; active: boolean }[] {
   // Der geltende Punkt kann nur an den Uhrzeiten wechseln, an denen heute einer liegt.
   const marks = new Set<number>([from, to])
-  for (const s of scheduleForDay(entity.schedule, day)) {
+  for (const s of scheduleForDay(entity.schedule, day, ctx)) {
     if (s.time > from && s.time < to) marks.add(s.time)
   }
   const points = [...marks].sort((a, b) => a - b)
   const parts: { from: number; to: number; active: boolean }[] = []
   for (let i = 0; i < points.length - 1; i++) {
-    const active = (activeTimestone(entity.schedule, points[i], day)?.id ?? null) === keyId
+    const active = (activeTimestone(entity.schedule, points[i], day, ctx)?.id ?? null) === keyId
     const last = parts[parts.length - 1]
     // Gleichartige Abschnitte zusammenfassen, damit keine Fugen sichtbar werden.
     if (last && last.active === active) last.to = points[i + 1]
@@ -67,8 +69,8 @@ function activeParts(
  * die durch diesen Tag hindurchlaeuft. An diesem Tag steht kein eigener Punkt, die Figur ist
  * aber trotzdem unterwegs; ohne diesen Balken saehe die Spur leer aus.
  */
-function carryIn(entity: Entity, day: number): Timestone | undefined {
-  const at0 = activeTimestone(entity.schedule, 0, day)
+function carryIn(entity: Entity, day: number, ctx: PhaseContext): Timestone | undefined {
+  const at0 = activeTimestone(entity.schedule, 0, day, ctx)
   return at0 && at0.day != null && at0.day !== day ? at0 : undefined
 }
 
@@ -98,6 +100,9 @@ interface Lane {
 export function DaySchedule({ entities }: { entities: Entity[] }) {
   const timeOfDay = useStore((s) => s.timeOfDay)
   const currentDay = useStore((s) => s.currentDay)
+  const campaign = useStore((s) => s.activeCampaign())
+  // Die Phase des angezeigten Tages: Sie bestimmt, welche Punkte gelten und wo "Start" liegt.
+  const phase = phaseAt(campaign.phases, currentDay)
   const tableMode = useStore((s) => s.tableMode)
   const setTimeOfDay = useStore((s) => s.setTimeOfDay)
   const addTimestone = useStore((s) => s.addTimestone)
@@ -117,7 +122,7 @@ export function DaySchedule({ entities }: { entities: Entity[] }) {
   // Sind fuer diesen Tag Ausnahmen hinterlegt - oder laeuft eine Reise durch ihn hindurch -,
   // muss die Spur natuerlich zu sehen sein.
   const hasExceptions = entities.some(
-    (e) => e.schedule.some((k) => k.day === currentDay) || carryIn(e, currentDay),
+    (e) => e.schedule.some((k) => k.day === currentDay) || carryIn(e, currentDay, campaign),
   )
   const showException = single && (exceptionOpen || hasExceptions)
 
@@ -129,7 +134,11 @@ export function DaySchedule({ entities }: { entities: Entity[] }) {
           entity: entities[0],
           label: 'Jeden Tag',
           day: null,
-          keys: entities[0].schedule.filter((k) => k.day == null).sort((a, b) => a.time - b.time),
+          // Nur der Ablauf dieser Phase: Der einer frueheren gehoert zu einem anderen Kapitel
+          // und wird nur auf Nachfrage uebernommen.
+          keys: entities[0].schedule
+            .filter((k) => k.day == null && (k.phaseId ?? campaign.phases[0].id) === phase?.id)
+            .sort((a, b) => a.time - b.time),
         },
         ...(showException
           ? [
@@ -146,7 +155,7 @@ export function DaySchedule({ entities }: { entities: Entity[] }) {
         entity: e,
         label: e.name,
         day: null,
-        keys: scheduleForDay(e.schedule, currentDay),
+        keys: scheduleForDay(e.schedule, currentDay, campaign),
       }))
 
   /** Uhrzeit an einer Zeigerposition - gemessen an der Skala, die alle Spuren teilen. */
@@ -271,7 +280,7 @@ export function DaySchedule({ entities }: { entities: Entity[] }) {
     // Kalendertermine stehen bei einem Objekt in der Ausnahmespur, bei mehreren in der
     // Spur des jeweiligen Objekts. Dorthin gehoert auch eine Reise, die von einem frueheren
     // Tag herueberlaeuft.
-    const carry = !single || lane.day != null ? carryIn(lane.entity, currentDay) : undefined
+    const carry = !single || lane.day != null ? carryIn(lane.entity, currentDay, campaign) : undefined
     return (
       <div className="daytrack__row" key={`${lane.entity.id}-${lane.day ?? 'std'}`}>
         <span
@@ -293,7 +302,7 @@ export function DaySchedule({ entities }: { entities: Entity[] }) {
               zurueckweicht, sobald man dort einen echten Timestone setzt. */}
           {showBase && (
             <>
-              {activeParts(lane.entity, currentDay, null, 0, lane.keys[0]?.time ?? MINUTES_PER_DAY).map(
+              {activeParts(lane.entity, currentDay, null, campaign, 0, lane.keys[0]?.time ?? MINUTES_PER_DAY).map(
                 (p) => (
                   <div
                     key={`base-${p.from}`}
@@ -320,6 +329,7 @@ export function DaySchedule({ entities }: { entities: Entity[] }) {
               lane.entity,
               currentDay,
               carry.id,
+              campaign,
               0,
               lane.keys[0]?.time ?? MINUTES_PER_DAY,
             ).map((p) => (
@@ -335,12 +345,12 @@ export function DaySchedule({ entities }: { entities: Entity[] }) {
               aber nur dort ausgefuellt, wo er auch wirklich gilt. Blass heisst: Hier hat ihn
               ein anderer Punkt abgeloest. */}
           {lane.keys.flatMap((k, i) =>
-            activeParts(lane.entity, currentDay, k.id, k.time, timestoneEndsAt(lane.keys, i)).map(
+            activeParts(lane.entity, currentDay, k.id, campaign, k.time, timestoneEndsAt(lane.keys, i)).map(
               (p) => (
                 <div
                   key={`span-${k.id}-${p.from}`}
                   className={`daykey__span${k.day != null ? ' is-exception' : ''}${
-                    isAtBase(lane.entity, k) ? ' is-athome' : ''
+                    isAtBase(lane.entity, k, phase) ? ' is-athome' : ''
                   }${p.active ? '' : ' is-inactive'}`}
                   style={{
                     left: pct(p.from),
@@ -361,7 +371,7 @@ export function DaySchedule({ entities }: { entities: Entity[] }) {
                 key={k.id}
                 className={`daykey${selectedId === k.id ? ' is-selected' : ''}${
                   k.day != null ? ' daykey--exception' : ''
-                }${isAtBase(lane.entity, k) ? ' is-athome' : ''}`}
+                }${isAtBase(lane.entity, k, phase) ? ' is-athome' : ''}`}
                 style={{ left: pct(k.time), ['--chip-color' as string]: meta.color }}
                 title={`${formatTime(k.time)}${caption ? ` · ${caption}` : ''}`}
                 onPointerDown={(e) => onKeyPointerDown(e, lane.entity.id, k)}

@@ -5552,3 +5552,191 @@ button {
 ::-webkit-scrollbar-track {
   background: transparent;
 }
+
+/* ---------- Phasen (Kapitel der Kampagne) ---------- */
+.phasebar {
+  position: relative;
+  flex: none;
+}
+
+.phasebar__btn {
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--panel-2);
+  color: var(--gold-soft);
+  font-family: inherit;
+  font-size: 12.5px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.phasebar__btn:hover {
+  border-color: var(--gold);
+}
+
+.phasebar__menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 40;
+  width: 260px;
+  padding: 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: rgba(13, 15, 20, 0.98);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.55);
+}
+
+.phasebar__list {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.phasebar__item {
+  width: 100%;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 5px 7px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink-dim);
+  font-family: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.phasebar__item:hover {
+  background: var(--panel-2);
+  color: var(--ink);
+}
+
+.phasebar__item.is-active {
+  border-color: var(--gold);
+  background: var(--accent-tint);
+  color: var(--gold-soft);
+}
+
+.phasebar__days {
+  flex: none;
+  font-size: 10.5px;
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.phasebar__edit {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.phasebar__field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11.5px;
+  color: var(--ink-faint);
+}
+
+.phasebar__field > span {
+  flex: none;
+  width: 82px;
+}
+
+/* Die Abfrage beim Kapitelwechsel: bewusst als Fenster ueber allem, damit sie nicht
+   uebersehen wird - ein Phasenwechsel laesst sich nicht beilaeufig rueckgaengig machen. */
+.phaseask {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(6, 8, 12, 0.6);
+  backdrop-filter: blur(2px);
+}
+
+.phaseask__box {
+  width: min(440px, 100%);
+  padding: 18px 20px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--panel);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.6);
+}
+
+.phaseask__title {
+  margin: 0 0 10px;
+  font-family: var(--font-display);
+  font-size: 16px;
+  color: var(--gold-soft);
+}
+
+.phaseask__text {
+  margin: 0 0 8px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-dim);
+}
+
+.phaseask__text--dim {
+  color: var(--ink-faint);
+  font-size: 12px;
+}
+
+.phaseask__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+/* Letzter Tag einer Phase: Strich an der Unterkante als Kapitelgrenze. */
+.daypicker__day.is-phase-end {
+  border-bottom: 2px solid var(--gold);
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+/* Tage hinter der letzten Phase - dorthin fuehrt erst der Kapitelwechsel. */
+.daypicker__day.is-beyond {
+  opacity: 0.4;
+}
+
+/* Nachfrage beim Kapitelwechsel: Tagesablauf der Vorphase uebernehmen? */
+.adopt {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--gold);
+  border-radius: var(--radius-sm);
+  background: var(--accent-tint);
+}
+
+.adopt__text {
+  flex: 1;
+  min-width: 220px;
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--ink-dim);
+}
+
+.adopt__actions {
+  display: flex;
+  gap: 6px;
+}

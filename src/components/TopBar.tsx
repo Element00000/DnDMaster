@@ -3,6 +3,7 @@ import { useStore } from '../store/useStore'
 import { SearchBar } from './SearchBar'
 import { TimeSlider } from './TimeSlider'
 import { LayerBar } from './LayerBar'
+import { PhaseBar } from './PhaseBar'
 import { downloadJson, readJsonFile, slugify, todayStamp } from '../utils/backup'
 import { backupHint, markBackup } from '../utils/backupReminder'
 import { inlineAsset, internAsset, mapCampaignAssets } from '../utils/assets'
@@ -198,6 +199,8 @@ export function TopBar() {
       {/* Absolut zentriert statt im Flussvom: So sitzt der Zeitregler mittig in der Leiste,
           unabhaengig davon, wie breit seine Nachbarn gerade sind. */}
       <TimeSlider />
+
+      <PhaseBar />
 
       <div className="topbar__meta">{entityCount} Objekte</div>
 

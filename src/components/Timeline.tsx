@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { canSchedule, entityDisplayMeta, entityMeta, isDead } from '../types'
+import { canSchedule, entityDisplayMeta, entityMeta, isDead, phaseAt } from '../types'
 import type { Entity } from '../types'
 import { useStore } from '../store/useStore'
 import { formatTime } from '../utils/time'
@@ -92,6 +92,11 @@ export function Timeline() {
 function ObjectSchedule({ entities }: { entities: Entity[] }) {
   const setPlacingEntity = useStore((s) => s.setPlacingEntity)
   const selectEntity = useStore((s) => s.selectEntity)
+  const campaign = useStore((s) => s.activeCampaign())
+  const currentDay = useStore((s) => s.currentDay)
+  const adoptRoutine = useStore((s) => s.adoptRoutine)
+  /** Wen man in dieser Sitzung schon gefragt hat - egal wie die Antwort ausfiel. */
+  const [asked, setAsked] = useState<Set<string>>(new Set())
 
   // Spieler-Charaktere und Tote haben keinen Tagesablauf (siehe canSchedule).
   const excluded = entities.filter((e) => !canSchedule(e))
@@ -136,8 +141,51 @@ function ObjectSchedule({ entities }: { entities: Entity[] }) {
     )
   }
 
+  // Beim Kapitelwechsel wird der Tagesablauf bewusst nicht mitgenommen - viele Figuren
+  // haben in einem neuen Abschnitt schlicht einen anderen Alltag. Wer seinen behalten soll,
+  // bekommt ihn hier auf Nachfrage: einmal je Figur, und nur wenn in dieser Phase noch
+  // nichts steht, was man ueberschreiben wuerde.
+  const phase = phaseAt(campaign.phases, currentDay)
+  const previous = phase ? campaign.phases[campaign.phases.findIndex((p) => p.id === phase.id) - 1] : undefined
+  const firstPhaseId = campaign.phases[0]?.id
+  const candidate =
+    previous && phase
+      ? (placed.find(
+          (e) =>
+            !asked.has(e.id) &&
+            !e.schedule.some((k) => k.day == null && (k.phaseId ?? firstPhaseId) === phase.id) &&
+            e.schedule.some((k) => k.day == null && (k.phaseId ?? firstPhaseId) === previous.id),
+        ) ?? null)
+      : null
+
   return (
     <div className="timeline__schedule">
+      {candidate && previous && (
+        <div className="adopt">
+          <p className="adopt__text">
+            In <strong>{previous.name}</strong> hatte <strong>{candidate.name}</strong> einen
+            taeglichen Ablauf. Fuer diese Phase uebernehmen?
+          </p>
+          <div className="adopt__actions">
+            <button
+              className="btn btn--sm"
+              onClick={() => setAsked((s) => new Set(s).add(candidate.id))}
+            >
+              Nein, neu anlegen
+            </button>
+            <button
+              className="btn btn--sm btn--primary"
+              onClick={() => {
+                adoptRoutine(candidate.id)
+                setAsked((s) => new Set(s).add(candidate.id))
+              }}
+            >
+              Uebernehmen
+            </button>
+          </div>
+        </div>
+      )}
+
       <ul className="timeline__subjects">
         {placed.map((e) => {
           const meta = entityDisplayMeta(e)

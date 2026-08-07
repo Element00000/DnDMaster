@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+import { phaseAt } from '../types'
+import { useStore } from '../store/useStore'
 
 /** Tage je Zeile und Zeilen je Blatt - ein Blatt fasst also vier Wochen. */
 const COLS = 7
@@ -27,6 +29,7 @@ export function DayPicker({
   onPick: (day: number | null) => void
   onClose: () => void
 }) {
+  const phases = useStore((s) => s.activeCampaign().phases)
   const ref = useRef<HTMLDivElement>(null)
   // Das Blatt, auf dem der gewaehlte Tag liegt (bei "jeden Tag" das des aktuellen).
   const [start, setStart] = useState(() => {
@@ -79,18 +82,30 @@ export function DayPicker({
       </div>
 
       <div className="daypicker__grid">
-        {days.map((d) => (
-          <button
-            key={d}
-            className={`daypicker__day${d === value ? ' is-selected' : ''}${
-              d === today ? ' is-today' : ''
-            }`}
-            onClick={() => onPick(d)}
-            title={d === today ? `Tag ${d} — aktueller Kampagnentag` : `Tag ${d}`}
-          >
-            {d}
-          </button>
-        ))}
+        {days.map((d) => {
+          // Der letzte Tag einer Phase bekommt einen Strich an der Unterkante: So sieht man
+          // im Kalender, wo ein Kapitel endet und das naechste beginnt.
+          const phase = phaseAt(phases, d)
+          const ends = phase?.endDay === d
+          return (
+            <button
+              key={d}
+              className={`daypicker__day${d === value ? ' is-selected' : ''}${
+                d === today ? ' is-today' : ''
+              }${ends ? ' is-phase-end' : ''}${phase ? '' : ' is-beyond'}`}
+              onClick={() => onPick(d)}
+              title={
+                phase
+                  ? `Tag ${d} · ${phase.name}${ends ? ' (letzter Tag der Phase)' : ''}${
+                      d === today ? ' · aktueller Kampagnentag' : ''
+                    }`
+                  : `Tag ${d} — liegt hinter der letzten Phase`
+              }
+            >
+              {d}
+            </button>
+          )
+        })}
       </div>
     </div>
   )
