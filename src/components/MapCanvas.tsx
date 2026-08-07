@@ -82,7 +82,7 @@ export function MapCanvas() {
   const setTool = useStore((s) => s.setTool)
   const timeOfDay = useStore((s) => s.timeOfDay)
   const currentDay = useStore((s) => s.currentDay)
-  const setTimeOfDay = useStore((s) => s.setTimeOfDay)
+  const setMoment = useStore((s) => s.setMoment)
   const draftPos = useStore((s) => s.draftPos)
   const setDraftPos = useStore((s) => s.setDraftPos)
   const clearDraftPos = useStore((s) => s.clearDraftPos)
@@ -1105,7 +1105,7 @@ export function MapCanvas() {
           view={view}
           currentDay={currentDay}
           timeOfDay={timeOfDay}
-          onPickTime={setTimeOfDay}
+          onPickTime={(minutes, day) => setMoment(day ?? currentDay, minutes)}
           // Station 1 ist die Basis-Platzierung des Objekts, alle anderen sind Timestones.
           onMoveStop={(stopId, dx, dy) =>
             stopId === '__base__'
@@ -1399,8 +1399,8 @@ function ScheduleOverlay({
   view: View
   currentDay: number
   timeOfDay: number
-  /** Klick auf eine Station stellt die Zeitleiste auf deren Uhrzeit. */
-  onPickTime: (minutes: number) => void
+  /** Klick auf eine Station stellt die Zeitleiste auf deren Uhrzeit - und Tag, wenn sie einen hat. */
+  onPickTime: (minutes: number, day: number | null) => void
   /** Ziehen an einer Station verschiebt sie auf der Karte (Delta in Weltkoordinaten). */
   onMoveStop: (stopId: string, dxWorld: number, dyWorld: number) => void
   /** Uhrzeit oder Kalendertag einer Station nachtraeglich aendern. */
@@ -1414,6 +1414,8 @@ function ScheduleOverlay({
   const drag = useRef<{
     id: string
     time: number
+    /** Kalendertag der Station; null = gilt jeden Tag. */
+    day: number | null
     lastX: number
     lastY: number
     moved: boolean
@@ -1494,8 +1496,9 @@ function ScheduleOverlay({
         return
       }
       // Ohne Bewegung war es ein Klick: Uhr auf diese Station stellen und ihre Felder
-      // aufschlagen. Die Basis-Platzierung hat keine, sie ist kein Timestone.
-      pickRef.current(d.time)
+      // aufschlagen. Bei einer Station eines anderen Tages springt der Kalender mit - sonst
+      // bliebe sie blass, obwohl man gerade zu ihr wollte.
+      pickRef.current(d.time, d.day)
       if (d.id !== '__base__') {
         setEditId((cur) => (cur === d.id ? null : d.id))
         setDayPickerOpen(false)
@@ -1544,14 +1547,46 @@ function ScheduleOverlay({
   const meta = entityDisplayMeta(entity)
   const active = activeTimestone(entity.schedule, timeOfDay, currentDay)
 
-  // Jede Station mit der Umrechnung ihrer eigenen Karte auf den Bildschirm. Die Nummer
-  // stammt aus der vollen Reihenfolge, damit sie stimmt, auch wenn eine Karte gerade nicht
-  // gezeichnet wird und ihre Station wegfaellt.
+  /**
+   * Welche Stationen gelten am sichtbaren Tag? Nur sie bilden den Weg: volle Farbe,
+   * fortlaufende Nummer, verbunden durch die gestrichelte Linie. Alle anderen - etwa eine
+   * Ausnahme, die erst an Tag 3 greift - bleiben blass daneben stehen, damit man sie findet,
+   * ohne dass sie einen Weg vortaeuschen, den die Figur heute gar nicht geht.
+   *
+   * Geprueft wird an den Uhrzeiten, an denen heute ueberhaupt ein Wechsel moeglich ist.
+   */
+  const activeIds = new Set<string>()
+  {
+    const marks = new Set<number>([0])
+    for (const s of scheduleForDay(entity.schedule, currentDay)) marks.add(s.time)
+    for (const t of marks) {
+      activeIds.add(activeTimestone(entity.schedule, t, currentDay)?.id ?? '__base__')
+    }
+  }
+  // Ist die Figur heute unterwegs, gehoert die ganze Kette dazu - auch die Stationen, die
+  // erst in den naechsten Tagen kommen. Der Tagesablauf ruht ohnehin bis zur letzten von
+  // ihnen (siehe activeTimestone), sie sind also wirklich ihr weiterer Weg.
+  const travelling = stops.some((s) => s.day != null && activeIds.has(s.id))
+  const applies = (s: (typeof stops)[number]) => activeIds.has(s.id) || (travelling && s.day != null)
+
+  // Jede Station mit der Umrechnung ihrer eigenen Karte auf den Bildschirm. Die Nummer laeuft
+  // nur ueber die geltenden Stationen und stammt aus der vollen Reihenfolge - sie stimmt also
+  // auch, wenn eine Karte gerade nicht gezeichnet wird und ihre Station wegfaellt.
+  let no = 0
   const placed = stops
-    .map((s, i) => {
+    .map((s) => {
+      const on = applies(s)
+      if (on) no += 1
       const sv = layerScreenView(layers, rootLayerId, s.layerId, view)
       return sv
-        ? { stop: s, no: i + 1, x: s.x * sv.scale + sv.tx, y: s.y * sv.scale + sv.ty, scale: sv.scale }
+        ? {
+            stop: s,
+            no: on ? no : null,
+            on,
+            x: s.x * sv.scale + sv.tx,
+            y: s.y * sv.scale + sv.ty,
+            scale: sv.scale,
+          }
         : null
     })
     .filter((p): p is NonNullable<typeof p> => p !== null)
@@ -1563,22 +1598,32 @@ function ScheduleOverlay({
   // gehoert dabei nicht zusammen, daher steht die Karte mit im Schluessel.
   const marks = new Map<
     string,
-    { left: number; top: number; items: { stop: (typeof stops)[number]; no: number; scale: number }[] }
+    {
+      left: number
+      top: number
+      items: { stop: (typeof stops)[number]; no: number | null; on: boolean; scale: number }[]
+    }
   >()
   for (const p of placed) {
     const key = `${p.stop.layerId}:${Math.round(p.stop.x)}:${Math.round(p.stop.y)}`
     const mark = marks.get(key) ?? { left: p.x, top: p.y, items: [] }
-    mark.items.push({ stop: p.stop, no: p.no, scale: p.scale })
+    mark.items.push({ stop: p.stop, no: p.no, on: p.on, scale: p.scale })
     marks.set(key, mark)
   }
 
   /** Ziehen an Nummer oder Uhrzeit verschiebt den Timestone; ein Klick stellt die Zeit. */
-  function onStopDown(e: React.PointerEvent, stopId: string, time: number, scale: number) {
+  function onStopDown(
+    e: React.PointerEvent,
+    stopId: string,
+    time: number,
+    scale: number,
+    day: number | null,
+  ) {
     if (e.button !== 0) return
     // Sonst zieht der Kartenhintergrund darunter eine Rechteck-Markierung auf.
     e.stopPropagation()
     e.preventDefault()
-    drag.current = { id: stopId, time, lastX: e.clientX, lastY: e.clientY, moved: false, scale }
+    drag.current = { id: stopId, time, day, lastX: e.clientX, lastY: e.clientY, moved: false, scale }
   }
 
   /**
@@ -1610,9 +1655,17 @@ function ScheduleOverlay({
 
   return (
     <div className="schedule-overlay" style={{ ['--chip-color' as string]: meta.color }}>
-      {placed.length > 1 && (
+      {/* Die Linie verbindet nur, was heute wirklich zum Weg gehoert. Punkte anderer Tage
+          bleiben unverbunden stehen - eine Linie dorthin wuerde einen Weg behaupten, den die
+          Figur an diesem Tag gar nicht geht. */}
+      {placed.filter((p) => p.on).length > 1 && (
         <svg className="schedule-overlay__lines">
-          <polyline points={placed.map((p) => `${p.x},${p.y}`).join(' ')} />
+          <polyline
+            points={placed
+              .filter((p) => p.on)
+              .map((p) => `${p.x},${p.y}`)
+              .join(' ')}
+          />
         </svg>
       )}
       {[...marks.entries()].map(([key, mark]) => (
@@ -1628,7 +1681,7 @@ function ScheduleOverlay({
           onDoubleClick={(e) => e.stopPropagation()}
         >
           <div className="schedule-stop__dots">
-            {mark.items.map(({ stop: s, no, scale }) => (
+            {mark.items.map(({ stop: s, no, on, scale }) => (
               <button
                 key={s.id}
                 className={`schedule-stop__dot${
@@ -1637,9 +1690,13 @@ function ScheduleOverlay({
                   s.id === snap?.fromId ? ' is-snapping' : ''
                 }${s.day != null ? ' is-exception' : ''}${
                   s.id === '__base__' ? ' is-base' : ''
-                }`}
-                title={`Ziehen verschiebt · Klick stellt die Zeitleiste auf ${formatTime(s.time)}`}
-                onPointerDown={(e) => onStopDown(e, s.id, s.time, scale)}
+                }${on ? '' : ' is-idle'}`}
+                title={
+                  on
+                    ? `Ziehen verschiebt · Klick stellt die Zeitleiste auf ${formatTime(s.time)}`
+                    : `Gilt an Tag ${s.day} · Klick springt dorthin`
+                }
+                onPointerDown={(e) => onStopDown(e, s.id, s.time, scale, s.day)}
               >
                 {no}
               </button>
@@ -1649,7 +1706,7 @@ function ScheduleOverlay({
           {/* Je Station eine eigene Zeile: So laesst sich auch die Uhrzeit anfassen, und
               bei mehreren Stationen an einer Stelle bleiben sie auseinanderzuhalten. */}
           <div className="schedule-stop__labels">
-            {mark.items.map(({ stop: s, scale }) => {
+            {mark.items.map(({ stop: s, on, scale }) => {
               // "Start" steht nur an Station 1, der eigentlichen Startposition. Spaetere
               // Timestones, die dorthin zurueckfuehren, zeigen ihre Uhrzeit - dass sie
               // wieder am Start stehen, sagt schon ihre Lage auf derselben Marke.
@@ -1657,9 +1714,13 @@ function ScheduleOverlay({
               return (
                 <button
                   key={s.id}
-                  className="schedule-stop__label"
-                  title={`Ziehen verschiebt · Klick stellt die Zeitleiste auf ${formatTime(s.time)}`}
-                  onPointerDown={(e) => onStopDown(e, s.id, s.time, scale)}
+                  className={`schedule-stop__label${on ? '' : ' is-idle'}`}
+                  title={
+                    on
+                      ? `Ziehen verschiebt · Klick stellt die Zeitleiste auf ${formatTime(s.time)}`
+                      : `Gilt an Tag ${s.day} · Klick springt dorthin`
+                  }
+                  onPointerDown={(e) => onStopDown(e, s.id, s.time, scale, s.day)}
                 >
                   {/* Der Kalendertag steht vor der Uhrzeit. Punkte ohne eigenen Tag gehoeren
                       zum wiederkehrenden Ablauf und zeigen nur die Uhrzeit - das

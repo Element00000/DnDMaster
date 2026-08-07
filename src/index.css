@@ -3065,6 +3065,29 @@ button {
   cursor: grabbing;
 }
 
+/* Stationen, die an diesem Tag nicht gelten - etwa eine Ausnahme fuer Tag 3, waehrend man
+   Tag 1 ansieht. Sie bleiben sichtbar, damit man sie findet, treten aber deutlich zurueck:
+   ohne Nummer (die zaehlt nur den heutigen Weg), kleiner, und ohne Linie dorthin. */
+.schedule-stop__dot.is-idle {
+  width: 12px;
+  height: 12px;
+  border-width: 1.5px;
+  border-color: var(--ink-faint);
+  background: rgba(13, 15, 20, 0.7);
+  opacity: 0.6;
+}
+
+.schedule-stop__label.is-idle {
+  background: rgba(13, 15, 20, 0.6);
+  color: var(--ink-faint);
+  opacity: 0.75;
+}
+
+.schedule-stop__dot.is-idle:hover,
+.schedule-stop__label.is-idle:hover {
+  opacity: 1;
+}
+
 /* Kalendertag vor der Uhrzeit - gedaempft, damit die Uhrzeit die Hauptangabe bleibt. */
 .schedule-stop__day {
   margin-right: 5px;
