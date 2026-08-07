@@ -2,7 +2,13 @@ import { useCallback, useRef, useState } from 'react'
 import { entityDisplayMeta, isAtBase } from '../types'
 import type { Entity, Timestone } from '../types'
 import { useStore } from '../store/useStore'
-import { MINUTES_PER_DAY, formatTime, timestoneEndsAt, scheduleForDay } from '../utils/time'
+import {
+  MINUTES_PER_DAY,
+  activeTimestone,
+  formatTime,
+  timestoneEndsAt,
+  scheduleForDay,
+} from '../utils/time'
 
 /** Raster, auf das Ziehen und Klicken im Zeitstrahl einrastet (Minuten). */
 const SNAP = 15
@@ -19,6 +25,51 @@ function pct(minutes: number): string {
 function clampTime(minutes: number): number {
   const snapped = Math.round(minutes / SNAP) * SNAP
   return Math.max(0, Math.min(MINUTES_PER_DAY - 1, snapped))
+}
+
+/**
+ * Zerlegt den Balken eines Timestones in die Abschnitte, in denen er wirklich gilt, und
+ * die, in denen ihn ein anderer abloest.
+ *
+ * Noetig, weil ein Balken nicht einfach bis zum naechsten Punkt seiner eigenen Spur laeuft:
+ * Ein Kalendertermin setzt den Tagesablauf aus, und nach dem letzten Kalendertermin holt
+ * der Tagesablauf die Figur zurueck (siehe activeTimestone). Wer nur den eigenen Balken
+ * zeichnet, behauptet also eine Geltung, die es gar nicht gibt.
+ *
+ * "keyId = null" steht fuer die Basis-Platzierung, die keinen eigenen Timestone hat.
+ */
+function activeParts(
+  entity: Entity,
+  day: number,
+  keyId: string | null,
+  from: number,
+  to: number,
+): { from: number; to: number; active: boolean }[] {
+  // Der geltende Punkt kann nur an den Uhrzeiten wechseln, an denen heute einer liegt.
+  const marks = new Set<number>([from, to])
+  for (const s of scheduleForDay(entity.schedule, day)) {
+    if (s.time > from && s.time < to) marks.add(s.time)
+  }
+  const points = [...marks].sort((a, b) => a - b)
+  const parts: { from: number; to: number; active: boolean }[] = []
+  for (let i = 0; i < points.length - 1; i++) {
+    const active = (activeTimestone(entity.schedule, points[i], day)?.id ?? null) === keyId
+    const last = parts[parts.length - 1]
+    // Gleichartige Abschnitte zusammenfassen, damit keine Fugen sichtbar werden.
+    if (last && last.active === active) last.to = points[i + 1]
+    else parts.push({ from: points[i], to: points[i + 1], active })
+  }
+  return parts
+}
+
+/**
+ * Der Kalendertermin eines frueheren Tages, der heute um 0 Uhr noch gilt - also eine Reise,
+ * die durch diesen Tag hindurchlaeuft. An diesem Tag steht kein eigener Punkt, die Figur ist
+ * aber trotzdem unterwegs; ohne diesen Balken saehe die Spur leer aus.
+ */
+function carryIn(entity: Entity, day: number): Timestone | undefined {
+  const at0 = activeTimestone(entity.schedule, 0, day)
+  return at0 && at0.day != null && at0.day !== day ? at0 : undefined
 }
 
 /** Welche Timestones gehoeren in eine Spur? */
@@ -63,8 +114,11 @@ export function DaySchedule({ entities }: { entities: Entity[] }) {
   const single = entities.length === 1
   const selected = entities.flatMap((e) => e.schedule).find((k) => k.id === selectedId) ?? null
   const selectedOwner = entities.find((e) => e.schedule.some((k) => k.id === selectedId)) ?? null
-  const hasExceptions = entities.some((e) => e.schedule.some((k) => k.day === currentDay))
-  // Sind fuer diesen Tag schon Ausnahmen hinterlegt, muss die Spur natuerlich zu sehen sein.
+  // Sind fuer diesen Tag Ausnahmen hinterlegt - oder laeuft eine Reise durch ihn hindurch -,
+  // muss die Spur natuerlich zu sehen sein.
+  const hasExceptions = entities.some(
+    (e) => e.schedule.some((k) => k.day === currentDay) || carryIn(e, currentDay),
+  )
   const showException = single && (exceptionOpen || hasExceptions)
 
   // Bei einem Objekt trennen die Spuren Standardplan und Ausnahme, bei mehreren steht
@@ -214,6 +268,10 @@ export function DaySchedule({ entities }: { entities: Entity[] }) {
     const meta = entityDisplayMeta(lane.entity)
     const isBaseLane = lane.day == null
     const showBase = isBaseLane && !lane.keys.some((k) => k.time === 0)
+    // Kalendertermine stehen bei einem Objekt in der Ausnahmespur, bei mehreren in der
+    // Spur des jeweiligen Objekts. Dorthin gehoert auch eine Reise, die von einem frueheren
+    // Tag herueberlaeuft.
+    const carry = !single || lane.day != null ? carryIn(lane.entity, currentDay) : undefined
     return (
       <div className="daytrack__row" key={`${lane.entity.id}-${lane.day ?? 'std'}`}>
         <span
@@ -235,10 +293,15 @@ export function DaySchedule({ entities }: { entities: Entity[] }) {
               zurueckweicht, sobald man dort einen echten Timestone setzt. */}
           {showBase && (
             <>
-              <div
-                className="daykey__span is-athome"
-                style={{ left: 0, width: pct(lane.keys[0]?.time ?? MINUTES_PER_DAY) }}
-              />
+              {activeParts(lane.entity, currentDay, null, 0, lane.keys[0]?.time ?? MINUTES_PER_DAY).map(
+                (p) => (
+                  <div
+                    key={`base-${p.from}`}
+                    className={`daykey__span is-athome${p.active ? '' : ' is-inactive'}`}
+                    style={{ left: pct(p.from), width: pct(p.to - p.from) }}
+                  />
+                ),
+              )}
               <span
                 className="daykey daykey--base is-athome"
                 style={{ left: 0 }}
@@ -249,20 +312,45 @@ export function DaySchedule({ entities }: { entities: Entity[] }) {
             </>
           )}
 
-          {/* Der Abschnitt, den ein Timestone abdeckt: von ihm bis zum naechsten. */}
-          {lane.keys.map((k, i) => (
-            <div
-              key={`span-${k.id}`}
-              className={`daykey__span${k.day != null ? ' is-exception' : ''}${
-                isAtBase(lane.entity, k) ? ' is-athome' : ''
-              }`}
-              style={{
-                left: pct(k.time),
-                width: pct(timestoneEndsAt(lane.keys, i) - k.time),
-                ['--chip-color' as string]: meta.color,
-              }}
-            />
-          ))}
+          {/* Eine Reise, die schon gestern begonnen hat, laeuft hier ab 0 Uhr weiter - bis zum
+              ersten eigenen Punkt des Tages, sonst durch den ganzen Tag. Ohne Raute: Der
+              Punkt selbst liegt an einem anderen Tag und ist hier nicht zu bearbeiten. */}
+          {carry &&
+            activeParts(
+              lane.entity,
+              currentDay,
+              carry.id,
+              0,
+              lane.keys[0]?.time ?? MINUTES_PER_DAY,
+            ).map((p) => (
+              <div
+                key={`carry-${p.from}`}
+                className={`daykey__span is-exception${p.active ? '' : ' is-inactive'}`}
+                style={{ left: pct(p.from), width: pct(p.to - p.from) }}
+                title={`Unterwegs seit Tag ${carry.day}, ${formatTime(carry.time)}`}
+              />
+            ))}
+
+          {/* Der Abschnitt, den ein Timestone abdeckt: von ihm bis zum naechsten seiner Spur -
+              aber nur dort ausgefuellt, wo er auch wirklich gilt. Blass heisst: Hier hat ihn
+              ein anderer Punkt abgeloest. */}
+          {lane.keys.flatMap((k, i) =>
+            activeParts(lane.entity, currentDay, k.id, k.time, timestoneEndsAt(lane.keys, i)).map(
+              (p) => (
+                <div
+                  key={`span-${k.id}-${p.from}`}
+                  className={`daykey__span${k.day != null ? ' is-exception' : ''}${
+                    isAtBase(lane.entity, k) ? ' is-athome' : ''
+                  }${p.active ? '' : ' is-inactive'}`}
+                  style={{
+                    left: pct(p.from),
+                    width: pct(p.to - p.from),
+                    ['--chip-color' as string]: meta.color,
+                  }}
+                />
+              ),
+            ),
+          )}
 
           {lane.keys.map((k) => {
             // Kein abgeleitetes "Start": Dass ein Timestone auf der Startposition liegt,

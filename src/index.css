@@ -2755,6 +2755,18 @@ button {
   background: rgba(255, 255, 255, 0.05);
 }
 
+/* Abgeloest: Der Punkt reicht zwar bis hierher, gilt aber nicht mehr - ein Kalendertermin
+   hat den Tagesablauf ausgesetzt, oder der Tagesablauf hat die Figur zurueckgeholt. Nur
+   angedeutet, damit die Spur zusammenhaengend bleibt, ohne Geltung zu behaupten.
+   Steht bewusst hinter allen anderen Balken-Regeln, damit es sie ueberschreibt. */
+.daykey__span.is-inactive {
+  background: repeating-linear-gradient(
+    -45deg,
+    rgba(255, 255, 255, 0.07) 0 4px,
+    transparent 4px 9px
+  );
+}
+
 /* Der Timestone selbst - eine Raute auf der Zeitachse, wie in Animationswerkzeugen. */
 .daykey {
   position: absolute;
