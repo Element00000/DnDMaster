@@ -1,6 +1,7 @@
 import { useCallback, useRef } from 'react'
 import { useStore } from '../store/useStore'
 import { MINUTES_PER_DAY, formatTime } from '../utils/time'
+import { PhaseBar } from './PhaseBar'
 
 /**
  * Breite des Reglerknopfes. Der Browser laesst ihn an beiden Enden ganz im Feld stehen, die
@@ -114,6 +115,11 @@ export function TimeSlider() {
         />
         <span className="time-slider__clock">{formatTime(timeOfDay)}</span>
       </div>
+
+      {/* Haengt am rechten Rand des Reglers, statt in der Leiste mitzulaufen: So bleibt der
+          Regler mittig (siehe .time-slider), und die Phase steht trotzdem gleich daneben -
+          beides gehoert zum selben Gedanken, naemlich wo in der Kampagne man gerade ist. */}
+      <PhaseBar />
     </div>
   )
 }

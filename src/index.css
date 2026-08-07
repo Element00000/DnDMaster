@@ -5559,6 +5559,18 @@ button {
   flex: none;
 }
 
+/* Haengt rechts am Zeitregler, statt in dessen Reihe mitzuzaehlen: Der Regler soll mittig in
+   der Leiste bleiben (er ist dort absolut zentriert), und ein weiteres Element im Fluss
+   wuerde ihn nach links druecken. Der Abstand ist bewusst groesser als die Abstaende
+   innerhalb des Reglers - die Phase gehoert daneben, nicht dazu. */
+.time-slider .phasebar {
+  position: absolute;
+  left: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  margin-left: 28px;
+}
+
 .phasebar__btn {
   padding: 5px 10px;
   border: 1px solid var(--border);

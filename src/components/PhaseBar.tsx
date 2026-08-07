@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { phaseAt } from '../types'
 import { useStore } from '../store/useStore'
 
@@ -21,6 +22,7 @@ export function PhaseBar() {
   const pendingPhaseDay = useStore((s) => s.pendingPhaseDay)
   const askEnterNextPhase = useStore((s) => s.askEnterNextPhase)
 
+  const tableMode = useStore((s) => s.tableMode)
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
@@ -37,6 +39,9 @@ export function PhaseBar() {
     window.addEventListener('pointerdown', onDown)
     return () => window.removeEventListener('pointerdown', onDown)
   }, [open])
+
+  // Am Spieltisch haben Kapitel nichts zu suchen - dort wird gespielt, nicht geplant.
+  if (tableMode) return null
 
   return (
     <div className="phasebar" ref={ref}>
@@ -107,7 +112,10 @@ export function PhaseBar() {
         </div>
       )}
 
-      {pendingPhaseDay !== null && last && (
+      {/* Als Portal an document.body: Der Zeitregler, in dem die Leiste haengt, ist per
+          transform verschoben - darin waere ein "position: fixed" nicht mehr am Fenster
+          ausgerichtet, sondern an ihm, und das Fenster saesse irgendwo in der Leiste. */}
+      {pendingPhaseDay !== null && last && createPortal(
         <div className="phaseask">
           <div className="phaseask__box">
             <h3 className="phaseask__title">Naechste Phase betreten?</h3>
@@ -129,7 +137,8 @@ export function PhaseBar() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   )
