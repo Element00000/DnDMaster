@@ -784,8 +784,8 @@ button {
   line-height: 1;
 }
 
-/* Spieler-Charaktere: Icon weiss statt in Originalfarbe, um sie von anderen Charakteren
-   abzuheben. Der Filter faerbt jedes Icon (auch mehrfarbige Emoji) rein weiss ein. */
+/* Tote: Icon weiss statt in Originalfarbe - auf der schwarzen Nadel waere es sonst nicht zu
+   erkennen. Der Filter faerbt jedes Icon (auch mehrfarbige Emoji) rein weiss ein. */
 .map-pin.is-icon-invert .map-pin__icon {
   filter: brightness(0) invert(1);
 }
@@ -2642,7 +2642,7 @@ button {
   font-size: 13px;
 }
 
-/* Weisses statt farbiges Icon (Spieler-Charaktere, siehe entityDisplayMeta). */
+/* Weisses statt farbiges Icon (Tote, siehe entityDisplayMeta). */
 .timeline__event-head .is-icon-invert {
   filter: brightness(0) invert(1);
 }
@@ -4831,7 +4831,7 @@ button {
   font-size: 18px;
 }
 
-/* Weisses statt farbiges Icon (Spieler-Charaktere, siehe entityDisplayMeta). */
+/* Weisses statt farbiges Icon (Tote, siehe entityDisplayMeta). */
 .graph__node-icon.is-icon-invert {
   filter: brightness(0) invert(1);
 }

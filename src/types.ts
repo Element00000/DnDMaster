@@ -26,7 +26,7 @@ export interface EntityTypeMeta {
   plural: string
   icon: string
   color: string
-  /** Icon soll weiss statt in der Standardfarbe dargestellt werden (z.B. Spieler-Charaktere). */
+  /** Icon soll weiss statt in der Standardfarbe dargestellt werden (Tote, siehe entityDisplayMeta). */
   iconInvert?: boolean
   /** Hervorgehoben: bekommt auf der Karte eine groessere Pinnadel (Spieler, Bosse). */
   emphasized?: boolean
@@ -139,8 +139,9 @@ export interface Entity {
 
 /**
  * Farbe fuer die Anzeige (Karte etc.), inkl. Ueberschreibung fuer Charaktere:
- * Freund gruen, Feind rot, Boss dunkelrot, neutral grau, Spieler dunkelgruen mit weissem
- * Icon. Das Icon selbst bleibt sonst immer das Charakter-Icon.
+ * Freund gruen, Feind rot, Boss dunkelrot, neutral grau, Spieler dunkelgruen. Das Icon selbst
+ * bleibt immer das Charakter-Icon - nur bei Toten wird es weiss, weil es auf ihrer schwarzen
+ * Nadel sonst nicht zu erkennen waere.
  */
 export function entityDisplayMeta(entity: Entity): EntityTypeMeta {
   const meta = entityMeta(entity.type)
@@ -153,7 +154,7 @@ export function entityDisplayMeta(entity: Entity): EntityTypeMeta {
     if (entity.fields.gesinnung === 'boss') return { ...meta, color: '#9b1b30', emphasized: true }
     if (entity.fields.gesinnung === 'neutral') return { ...meta, color: '#8a93a8' }
     if (entity.fields.gesinnung === 'spieler') {
-      return { ...meta, color: '#1f5c38', iconInvert: true, emphasized: true }
+      return { ...meta, color: '#1f5c38', emphasized: true }
     }
   }
   return meta
