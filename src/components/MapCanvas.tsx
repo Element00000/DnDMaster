@@ -2642,7 +2642,7 @@ function EmbeddedMap({
           screenY={y + h / 2}
           icon="🗺"
           color="#c9a227"
-          iconAlert={hostileInside}
+          alert={hostileInside}
           label={embLayer.name}
           selected={false}
           draggable={interactive && tool !== 'add'}
@@ -2667,7 +2667,7 @@ function EmbeddedMap({
             screenY={y + h / 2 + ghostShift.dy}
             icon="🗺"
             color="#c9a227"
-            iconAlert={hostileInside}
+            alert={hostileInside}
             label={embLayer.name}
             selected={false}
             draggable={false}

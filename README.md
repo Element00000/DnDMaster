@@ -19,7 +19,7 @@ npm run build    # Produktions-Build nach dist/
 - Marker per Drag verschiebbar; anklicken öffnet das Detailpanel rechts
 - **Kopieren/Einfügen (Strg+C / Strg+V)**: markierte Objekte oder eine angeklickte Karte. Eine kopierte Karte nimmt ihren Inhalt mit (Objekte und Unterkarten samt deren Objekten). Eingefügt wird an der Mausposition, in die Karte, die dort liegt
 - **Duplizieren per Alt+Ziehen**: Alt halten und ein Objekt oder eine eingebettete Karte ziehen – das Original bleibt sichtbar liegen, ein blasses Doppel zeigt, wo die Kopie landet. Der Zeiger kündigt es an, solange Alt gehalten wird
-- **Warnung an eingeklappten Karten**: Stehen Gegner auf einer Karte (oder einer ihrer Unterkarten), färbt sich das Kartensymbol in ihrer Pinnadel rot – am Spieltisch nur für bereits entdeckte Gegner
+- **Warnung an eingeklappten Karten**: Stehen Gegner auf einer Karte (oder einer ihrer Unterkarten), bekommt ihre Pinnadel einen roten Rand – am Spieltisch nur für bereits entdeckte Gegner
 - Eigenes Kartenbild oben hochladbar (**PNG, JPG, WebP** – kein SVG nötig); sonst Platzhalterkarte
 - Persistenz über LocalStorage
 

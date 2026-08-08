@@ -790,16 +790,6 @@ button {
   filter: brightness(0) invert(1);
 }
 
-/* Warnung an einer Kartenpinnadel: Auf dieser Karte stehen Gegner. Der Kopf behaelt sein
-   Gold, damit die Nadel als Karte erkennbar bleibt - nur das Symbol darin wird rot.
-
-   Ein Emoji bringt seine eigenen Farben mit und laesst sich nicht ueber "color" faerben,
-   deshalb derselbe Weg wie beim weissen Icon darueber: Der Filter macht daraus erst eine
-   weisse Silhouette und faerbt die dann ein. Der Ton ist nicht auf den Hexwert genau, aber
-   ein deutliches Rot. */
-.map-pin.is-icon-alert .map-pin__icon {
-  filter: brightness(0) invert(1) sepia(1) saturate(24) hue-rotate(-32deg) brightness(0.92);
-}
 
 /* Portraet im Pin: rund im tropfenfoermigen Kopf, gegen dessen Drehung zurueckgedreht.
    Der farbige Kopf bleibt als Rahmen sichtbar und zeigt weiterhin die Gesinnung an. */
@@ -1191,6 +1181,13 @@ button {
 
 .map-pin.is-map-link.is-selected .map-pin__head {
   box-shadow: 0 0 0 3px rgba(224, 193, 90, 0.7), inset 0 0 0 1px #fffff0;
+}
+
+/* Warnung: Auf dieser Karte stehen Gegner. Statt des elfenbeinernen Randes ein roter - der
+   Kopf behaelt sein Gold, damit die Nadel als Karte lesbar bleibt. Muss nach der Regel
+   darueber stehen, die den Rand sonst setzt. */
+.map-pin.is-map-link.is-alert .map-pin__head {
+  border-color: #c0392b;
 }
 
 /* ---------- Zoom-Steuerung ---------- */
