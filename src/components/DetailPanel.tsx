@@ -256,8 +256,9 @@ export function DetailPanel() {
           />
         </label>
 
-        {/* Geheimnisse: nur DM - und nicht bei Spieler-Charakteren (siehe oben) */}
-        {!tableMode && !player && (
+        {/* Geheimnisse: nur DM - nicht bei Spieler-Charakteren (siehe oben) und nicht bei
+            einer Beschreibung, die nur ihren Vorlesetext traegt. */}
+        {!tableMode && !player && !isReadAloud && (
           <label className="field">
             <span className="field__label field__label--secret">Geheimnis (nur DM)</span>
             <textarea
