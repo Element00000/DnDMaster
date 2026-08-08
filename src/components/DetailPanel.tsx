@@ -143,7 +143,9 @@ export function DetailPanel() {
     const meta = entityDisplayMeta(marker)
     const fields = FIELD_SCHEMA[marker.type]
 
-    const portrait = <EntityImageField entity={marker} readOnly={readOnly} />
+    // Eine Beschreibung ist reiner Vorlesetext - sie bekommt kein Bild.
+    const isReadAloud = marker.type === 'beschreibung'
+    const portrait = isReadAloud ? null : <EntityImageField entity={marker} readOnly={readOnly} />
 
     // Keine Kopfzeile: Name und Schliessen stecken in der Objektzeile darueber - beim
     // Aufklappen in der Liste ebenso wie beim Objekt einer anderen Karte, das weiter unten
@@ -155,7 +157,6 @@ export function DetailPanel() {
     // des Kampfmodus gar nicht auf. Gilt fuer alle Charaktere, nicht nur die Gegner: Auch
     // Verbuendete schlagen im Kampf zu.
     const inCombat = marker.type === 'nsc'
-    const isReadAloud = marker.type === 'beschreibung'
     detailContent = combatMode && inCombat ? (
       <div className="detail__panel" style={{ ['--chip-color' as string]: meta.color }}>
         <div className="detail__body">
