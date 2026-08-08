@@ -35,15 +35,22 @@ interface Props {
   /**
    * Nach einem Ziehen (nicht bei einem reinen Klick): Bildschirmkoordinaten des Loslassens.
    *
-   * "drag" traegt nach, was der Aufrufer selbst nicht wissen kann: ob die Alt-Taste gehalten
-   * wurde (dann ist Duplizieren gemeint) und wie weit der Pin insgesamt gewandert ist - damit
-   * sich das Original genau um diese Strecke zuruecksetzen laesst.
+   * "drag" traegt nach, was der Aufrufer selbst nicht wissen kann: ob mit Alt gezogen wurde
+   * (dann ist Duplizieren gemeint) und wie weit der Zeiger insgesamt gewandert ist.
    */
   onDragEnd?: (
     clientX: number,
     clientY: number,
     drag: { alt: boolean; totalDx: number; totalDy: number },
   ) => void
+  /**
+   * Ziehen mit gehaltener Alt-Taste: Das Objekt selbst bleibt liegen, gemeldet wird nur, wie
+   * weit die Kopie inzwischen vom Original entfernt waere. null beendet die Vorschau.
+   *
+   * Ohne diese Meldung (Aufrufer reicht sie nicht durch) verhaelt sich Alt wie normales
+   * Ziehen.
+   */
+  onGhostMove?: (offset: { dx: number; dy: number } | null) => void
 }
 
 /**
@@ -69,6 +76,7 @@ export function MapPin({
   onDoubleClick,
   onMove,
   onDragEnd,
+  onGhostMove,
 }: Props) {
   const state = useRef<{
     lastX: number
@@ -77,6 +85,12 @@ export function MapPin({
     /** Summe aller Schritte in Weltkoordinaten - siehe onDragEnd. */
     totalDx: number
     totalDy: number
+    /**
+     * Mit Alt begonnen: Das Objekt bleibt liegen, gezogen wird nur eine Vorschau. Die
+     * Entscheidung faellt beim Aufsetzen und gilt fuer das ganze Ziehen - sonst spraenge das
+     * Objekt hin und her, je nachdem wann man die Taste drueckt oder loslaesst.
+     */
+    duplicating: boolean
   } | null>(null)
   const image = useAsset(imageRef)
 
@@ -84,7 +98,14 @@ export function MapPin({
     if (e.button !== 0) return
     e.stopPropagation()
     ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
-    state.current = { lastX: e.clientX, lastY: e.clientY, moved: false, totalDx: 0, totalDy: 0 }
+    state.current = {
+      lastX: e.clientX,
+      lastY: e.clientY,
+      moved: false,
+      totalDx: 0,
+      totalDy: 0,
+      duplicating: e.altKey && !!onGhostMove,
+    }
   }
 
   function onPointerMove(e: React.PointerEvent) {
@@ -98,7 +119,8 @@ export function MapPin({
       s.lastY = e.clientY
       s.totalDx += dx / scale
       s.totalDy += dy / scale
-      onMove(dx / scale, dy / scale)
+      if (s.duplicating) onGhostMove?.({ dx: s.totalDx, dy: s.totalDy })
+      else onMove(dx / scale, dy / scale)
     }
   }
 
@@ -109,14 +131,22 @@ export function MapPin({
     if ((e.currentTarget as HTMLElement).hasPointerCapture?.(e.pointerId)) {
       ;(e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId)
     }
+    if (s?.duplicating) onGhostMove?.(null)
     if (!s || !s.moved) onClick(e)
-    else onDragEnd?.(e.clientX, e.clientY, { alt: e.altKey, totalDx: s.totalDx, totalDy: s.totalDy })
+    else {
+      onDragEnd?.(e.clientX, e.clientY, {
+        alt: s.duplicating,
+        totalDx: s.totalDx,
+        totalDy: s.totalDy,
+      })
+    }
   }
 
   // Bei verlorener Zeigererfassung (z.B. wenn der Pin waehrend des Ziehens durch eine
   // andere Darstellung ersetzt wird) den Ziehzustand zuruecksetzen statt ihn haengen zu
   // lassen - sonst wuerde ein spaeterer reiner Hover faelschlich als Weiterziehen gewertet.
   function onPointerCancelOrLost() {
+    if (state.current?.duplicating) onGhostMove?.(null)
     state.current = null
   }
 

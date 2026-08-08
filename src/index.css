@@ -663,6 +663,17 @@ button {
   cursor: grabbing;
 }
 
+/* Vorschau beim Verdoppeln (Alt+Ziehen): Wo die Kopie landet, waehrend das Original liegen
+   bleibt. Nur ein Rahmen - der Karteninhalt wuerde die Karte darunter verdecken. */
+.embedded-map__ghost {
+  position: absolute;
+  border: 2px dashed var(--accent-soft);
+  border-radius: 4px;
+  background: var(--accent-tint);
+  pointer-events: none;
+  z-index: 5;
+}
+
 .embedded-map__placeholder {
   width: 100%;
   height: 100%;

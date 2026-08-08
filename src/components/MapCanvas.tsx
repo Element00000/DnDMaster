@@ -400,6 +400,13 @@ export function MapCanvas() {
     return () => window.removeEventListener('pointermove', onPointerMove)
   }, [])
 
+  /**
+   * Laufendes Alt+Ziehen: Welche Objekte verdoppelt werden und wie weit die Kopie inzwischen
+   * vom Original entfernt waere. Die Originale bleiben dabei unberuehrt liegen - gezeigt wird
+   * nur ein blasses Doppel, damit man beides zugleich sieht.
+   */
+  const [ghostDrag, setGhostDrag] = useState<{ ids: string[]; dx: number; dy: number } | null>(null)
+
   // Haelt der Nutzer Alt, wird aus Ziehen Verdoppeln - das zeigt der Zeiger an, damit man es
   // vor dem Ziehen weiss und nicht erst danach sieht.
   const [altHeld, setAltHeld] = useState(false)
@@ -570,11 +577,11 @@ export function MapCanvas() {
   )
 
   /**
-   * Alt+Ziehen an Objekten: Am Zielort entsteht eine Kopie, das Original kehrt an seinen
-   * Platz zurueck. Gezogen wurde also nur, um die Kopie abzulegen.
+   * Alt+Ziehen an Objekten: Am Zielort entsteht die Kopie. Das Original wurde dabei nie
+   * angefasst - gezogen wurde nur das Doppel, das die Vorschau anzeigt.
    */
   const duplicateEntitiesAt = useCallback(
-    async (ids: string[], clientX: number, clientY: number, back: { totalDx: number; totalDy: number }) => {
+    async (ids: string[], clientX: number, clientY: number, drag: { totalDx: number; totalDy: number }) => {
       const t = dropTargetAt(clientX, clientY)
       if (!t) return
       const camp = useStore.getState().activeCampaign()
@@ -583,38 +590,46 @@ export function MapCanvas() {
         .filter((e): e is Entity => !!e)
       if (chosen.length === 0) return
       const placed = chosen.filter((e) => e.placement)
+      // Auf derselben Karte landet die Kopie genau dort, wo das Doppel zuletzt stand: um die
+      // gezogene Strecke neben dem Original. Auf einer anderen Karte gibt es keinen
+      // gemeinsamen Massstab - dort kommt die Gruppe unter den Zeiger.
+      const sameLayer = placed.length > 0 && placed.every((e) => e.placement!.layerId === t.layerId)
       const cx = placed.reduce((s, e) => s + e.placement!.x, 0) / (placed.length || 1)
       const cy = placed.reduce((s, e) => s + e.placement!.y, 0) / (placed.length || 1)
-      // Zurueckgesetzt wird mit derselben Funktion wie beim Ziehen, nur mit umgekehrtem
-      // Vorzeichen - so trifft es genau das, was auch bewegt wurde: den geltenden Timestone
-      // oder die Basis-Platzierung.
-      chosen.forEach((e) => moveEntityTimed(e, -back.totalDx, -back.totalDy))
-      // Auf derselben Karte behaelt die Kopie exakt die Stelle, an der losgelassen wurde;
-      // auf einer anderen gibt es keine gemeinsamen Koordinaten - dann unter den Zeiger.
-      const sameLayer = placed.length > 0 && placed.every((e) => e.placement!.layerId === t.layerId)
       const { layers, entities: copies } = await instantiate(
         { layers: [], entities: chosen },
-        { layerId: t.layerId, dx: sameLayer ? 0 : t.x - cx, dy: sameLayer ? 0 : t.y - cy },
+        {
+          layerId: t.layerId,
+          dx: sameLayer ? drag.totalDx : t.x - cx,
+          dy: sameLayer ? drag.totalDy : t.y - cy,
+        },
       )
       addCopies(layers, copies)
       setSelectedIds(copies.map((c) => c.id))
       showFlash(copies.length === 1 ? `"${copies[0].name}" verdoppelt` : `${copies.length} Objekte verdoppelt`)
     },
-    [dropTargetAt, moveEntityTimed, addCopies, setSelectedIds, showFlash],
+    [dropTargetAt, addCopies, setSelectedIds, showFlash],
   )
 
   /**
    * Alt+Ziehen an einer eingebetteten Karte: Die Kopie bekommt die Stelle, an der
-   * losgelassen wurde, das Original seine alte zurueck. Wie beim Kopieren per Tastatur nimmt
-   * die Karte ihren Inhalt mit - ihre Objekte und ihre Unterkarten samt deren Objekten.
+   * losgelassen wurde; das Original blieb waehrenddessen unberuehrt liegen. Wie beim
+   * Kopieren per Tastatur nimmt die Karte ihren Inhalt mit - ihre Objekte und ihre
+   * Unterkarten samt deren Objekten.
    */
   const duplicateLayerAt = useCallback(
-    async (layerId: string, startEx: number, startEy: number) => {
+    async (layerId: string, x: number, y: number) => {
       const camp = useStore.getState().activeCampaign()
       const source = camp.layers.find((l) => l.id === layerId)
       if (!source?.embed) return
-      const dropped = { ...source.embed }
-      setEmbedRect(layerId, startEx, startEy, dropped.width, dropped.height)
+      const parent = camp.layers.find((l) => l.id === source.embed!.parentLayerId)
+      if (!parent) return
+      // In die Elternkarte hinein klemmen, wie beim Einfuegen per Tastatur.
+      const dropped = {
+        ...source.embed,
+        x: clamp(x, 0, Math.max(0, parent.width - source.embed.width)),
+        y: clamp(y, 0, Math.max(0, parent.height - source.embed.height)),
+      }
       const ids = collectWithDescendants(camp.layers, layerId)
       const inside = camp.layers.filter((l) => l.id !== layerId && ids.has(l.id))
       const content = camp.entities.filter((e) => e.placement && ids.has(e.placement.layerId))
@@ -627,7 +642,7 @@ export function MapCanvas() {
       setSelectedEmbedId(layers[0].id)
       showFlash(`Karte "${layers[0].name}" verdoppelt`)
     },
-    [setEmbedRect, addCopies, showFlash],
+    [addCopies, showFlash],
   )
 
   const onWheel = useCallback((e: React.WheelEvent) => {
@@ -1398,11 +1413,28 @@ export function MapCanvas() {
                   moveEntityTimed(e, dxWorld, dyWorld)
                 }
               }}
+              // Alt+Ziehen: Das Objekt bleibt liegen, ein Doppel wandert mit dem Zeiger.
+              // Waehrend einer Tagesablauf-Aufnahme nicht - dort zieht man ohnehin schon ein
+              // Doppel, das noch gar nicht gespeichert ist.
+              onGhostMove={
+                draftPos[e.id]
+                  ? undefined
+                  : (offset) =>
+                      setGhostDrag(
+                        offset
+                          ? {
+                              ids:
+                                selectedIds.length > 1 && selectedIds.includes(e.id)
+                                  ? selectedIds
+                                  : [e.id],
+                              ...offset,
+                            }
+                          : null,
+                      )
+              }
               onDragEnd={(clientX, clientY, drag) => {
                 const many = selectedIds.length > 1 && selectedIds.includes(e.id)
-                // Alt gehalten heisst: duplizieren. Waehrend einer Aufnahme aber nicht - dort
-                // zieht man ein Doppel, das noch gar nicht gespeichert ist.
-                if (drag.alt && !draftPos[e.id]) {
+                if (drag.alt) {
                   void duplicateEntitiesAt(many ? selectedIds : [e.id], clientX, clientY, drag)
                   return
                 }
@@ -1417,6 +1449,39 @@ export function MapCanvas() {
           )
         })}
       </div>
+
+      {/* Laufendes Alt+Ziehen: die kuenftige Kopie, waehrend das Original liegen bleibt. */}
+      {ghostDrag && (
+        <div className="draft-overlay">
+          {ghostDrag.ids.map((id) => {
+            const e = entities.find((x) => x.id === id)
+            const pos = e && placementAt(e, timeOfDay, currentDay, campaign)
+            if (!e || !pos) return null
+            const lv = layerScreenView(campaign.layers, layer.id, pos.layerId, view)
+            if (!lv) return null
+            const meta = entityDisplayMeta(e)
+            return (
+              <MapPin
+                key={id}
+                ghost
+                screenX={(pos.x + ghostDrag.dx) * lv.scale + lv.tx}
+                screenY={(pos.y + ghostDrag.dy) * lv.scale + lv.ty}
+                icon={meta.icon}
+                imageRef={e.thumbUrl ?? e.imageUrl}
+                color={meta.color}
+                iconInvert={meta.iconInvert}
+                emphasized={meta.emphasized}
+                label={e.name}
+                selected={false}
+                draggable={false}
+                scale={lv.scale}
+                onClick={() => {}}
+                onMove={() => {}}
+              />
+            )
+          })}
+        </div>
+      )}
 
       {/* Vorgemerkte Positionen als Doppel neben dem Original. */}
       <DraftOverlay
@@ -1493,7 +1558,8 @@ export function MapCanvas() {
           }}
           onZoomTo={(_sx, _sy, _sw, _sh, id) => setViewLayerId(id)}
           onReparent={onReparentEmbed}
-          onDuplicate={(id, startEx, startEy) => void duplicateLayerAt(id, startEx, startEy)}
+          onDuplicate={(id, x, y) => void duplicateLayerAt(id, x, y)}
+          onEntityGhostMove={(id, offset) => setGhostDrag(offset ? { ids: [id], ...offset } : null)}
           onEntityClick={(id, ev) => {
             setMapSelected(false)
             setSelectedEmbedId(null)
@@ -2324,6 +2390,7 @@ function EmbeddedMap({
   onZoomTo,
   onReparent,
   onDuplicate,
+  onEntityGhostMove,
   onEntityClick,
   onEntityDoubleClick,
   onEntityMove,
@@ -2355,8 +2422,13 @@ function EmbeddedMap({
   onZoomTo: (sx: number, sy: number, sw: number, sh: number, id: string) => void
   /** Nach dem Ziehen: prueft, ob die Karte auf eine andere (Vorfahren-)Karte umgehaengt werden soll. */
   onReparent: (draggedId: string, clientX: number, clientY: number) => void
-  /** Mit Alt gezogen: Kopie an der Zielstelle, Original zurueck auf startEx/startEy. */
-  onDuplicate: (draggedId: string, startEx: number, startEy: number) => void
+  /**
+   * Mit Alt gezogen: Kopie an dieser Stelle (Weltkoordinaten der Eltern-Karte). Das Original
+   * wurde dabei nie bewegt - gezogen wurde nur der Vorschau-Rahmen.
+   */
+  onDuplicate: (draggedId: string, x: number, y: number) => void
+  /** Alt+Ziehen eines Objekt-Pins auf dieser Karte: Vorschau zeigen bzw. beenden. */
+  onEntityGhostMove: (id: string, offset: { dx: number; dy: number } | null) => void
   onEntityClick: (id: string, ev: { ctrlKey: boolean; metaKey: boolean; shiftKey: boolean }) => void
   /** Doppelklick auf ein Objekt (oeffnet seinen Tagesablauf). */
   onEntityDoubleClick: (id: string) => void
@@ -2401,7 +2473,17 @@ function EmbeddedMap({
     }
   }
 
-  const dragRef = useRef<{ startX: number; startY: number; startEx: number; startEy: number; moved: boolean } | null>(null)
+  const dragRef = useRef<{
+    startX: number
+    startY: number
+    startEx: number
+    startEy: number
+    moved: boolean
+    /** Mit Alt begonnen: Die Karte bleibt liegen, gezogen wird nur der Vorschau-Rahmen. */
+    duplicating: boolean
+  } | null>(null)
+  /** Verschiebung des Vorschau-Rahmens in Bildschirmpunkten; null = kein Alt+Ziehen. */
+  const [ghostShift, setGhostShift] = useState<{ dx: number; dy: number } | null>(null)
   /**
    * Auch hier gilt: Kurzes Halten schaltet den Auswahlrahmen scharf, statt die Karte zu
    * verschieben. Genau an dieser Stelle stiessen die beiden bisher zusammen - eine Karte
@@ -2422,7 +2504,14 @@ function EmbeddedMap({
     e.preventDefault()
     const el = e.currentTarget as HTMLElement
     el.setPointerCapture(e.pointerId)
-    dragRef.current = { startX: e.clientX, startY: e.clientY, startEx: embed.x, startEy: embed.y, moved: false }
+    dragRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      startEx: embed.x,
+      startEy: embed.y,
+      moved: false,
+      duplicating: e.altKey,
+    }
     const { clientX, clientY, pointerId } = e
     clearHold()
     holdRef.current = window.setTimeout(() => {
@@ -2444,12 +2533,16 @@ function EmbeddedMap({
       // Bewegung vor dem Scharfschalten heisst: verschieben, nicht markieren.
       clearHold()
     }
-    if (d.moved) setEmbedRect(embLayer.id, d.startEx + dx, d.startEy + dy, embed.width, embed.height)
+    if (!d.moved) return
+    // Beim Verdoppeln bleibt die Karte, wo sie ist - nur der Vorschau-Rahmen wandert.
+    if (d.duplicating) setGhostShift({ dx: e.clientX - d.startX, dy: e.clientY - d.startY })
+    else setEmbedRect(embLayer.id, d.startEx + dx, d.startEy + dy, embed.width, embed.height)
   }
   function onBgPointerUp(e: React.PointerEvent) {
     const d = dragRef.current
     dragRef.current = null
     clearHold()
+    setGhostShift(null)
     // Kein d heisst: Der Rahmen hat uebernommen (oder es gab nie ein Ziehen). Dann hier
     // nichts tun - insbesondere die Karte nicht auswaehlen.
     if (!d) return
@@ -2458,8 +2551,13 @@ function EmbeddedMap({
       ;(e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId)
     }
     if (!d.moved) onSelect(embLayer.id)
-    else if (e.altKey) onDuplicate(embLayer.id, d.startEx, d.startEy)
-    else onReparent(embLayer.id, e.clientX, e.clientY)
+    else if (d.duplicating) {
+      onDuplicate(
+        embLayer.id,
+        d.startEx + (e.clientX - d.startX) / parentView.scale,
+        d.startEy + (e.clientY - d.startY) / parentView.scale,
+      )
+    } else onReparent(embLayer.id, e.clientX, e.clientY)
   }
 
   const resizeRef = useRef<{
@@ -2522,20 +2620,46 @@ function EmbeddedMap({
 
   if (!revealed) {
     return (
-      <MapPin
-        screenX={x + w / 2}
-        screenY={y + h / 2}
-        icon="🗺"
-        color="#c9a227"
-        label={embLayer.name}
-        selected={false}
-        draggable={interactive && tool !== 'add'}
-        scale={parentView.scale}
-        isMapLink
-        onClick={() => onZoomTo(x, y, w, h, embLayer.id)}
-        onMove={(dxWorld, dyWorld) => setEmbedRect(embLayer.id, embed.x + dxWorld, embed.y + dyWorld, embed.width, embed.height)}
-        onDragEnd={(clientX, clientY) => onReparent(embLayer.id, clientX, clientY)}
-      />
+      <>
+        <MapPin
+          screenX={x + w / 2}
+          screenY={y + h / 2}
+          icon="🗺"
+          color="#c9a227"
+          label={embLayer.name}
+          selected={false}
+          draggable={interactive && tool !== 'add'}
+          scale={parentView.scale}
+          isMapLink
+          onClick={() => onZoomTo(x, y, w, h, embLayer.id)}
+          onMove={(dxWorld, dyWorld) => setEmbedRect(embLayer.id, embed.x + dxWorld, embed.y + dyWorld, embed.width, embed.height)}
+          onGhostMove={(offset) =>
+            setGhostShift(
+              offset ? { dx: offset.dx * parentView.scale, dy: offset.dy * parentView.scale } : null,
+            )
+          }
+          onDragEnd={(clientX, clientY, drag) => {
+            if (drag.alt) onDuplicate(embLayer.id, embed.x + drag.totalDx, embed.y + drag.totalDy)
+            else onReparent(embLayer.id, clientX, clientY)
+          }}
+        />
+        {ghostShift && (
+          <MapPin
+            ghost
+            screenX={x + w / 2 + ghostShift.dx}
+            screenY={y + h / 2 + ghostShift.dy}
+            icon="🗺"
+            color="#c9a227"
+            label={embLayer.name}
+            selected={false}
+            draggable={false}
+            scale={parentView.scale}
+            isMapLink
+            onClick={() => {}}
+            onMove={() => {}}
+          />
+        )}
+      </>
     )
   }
 
@@ -2585,6 +2709,14 @@ function EmbeddedMap({
         <div className="embedded-map__label">{embLayer.name}</div>
       </div>
 
+      {/* Alt+Ziehen: Die Karte bleibt liegen, der Rahmen zeigt, wo die Kopie landet. */}
+      {ghostShift && (
+        <div
+          className="embedded-map__ghost"
+          style={{ left: x + ghostShift.dx, top: y + ghostShift.dy, width: w, height: h }}
+        />
+      )}
+
       {embPins.map((e) => {
         const meta = entityDisplayMeta(e)
         const pos = embEffectivePos(e)
@@ -2606,6 +2738,7 @@ function EmbeddedMap({
             onClick={(ev) => onEntityClick(e.id, ev)}
             onDoubleClick={() => onEntityDoubleClick(e.id)}
             onMove={(dxSub, dySub) => onEntityMove(e.id, dxSub, dySub)}
+            onGhostMove={(offset) => onEntityGhostMove(e.id, offset)}
             onDragEnd={(clientX, clientY, drag) => onEntityDragEnd(e.id, clientX, clientY, drag)}
           />
         )
@@ -2632,6 +2765,7 @@ function EmbeddedMap({
           onZoomTo={onZoomTo}
           onReparent={onReparent}
           onDuplicate={onDuplicate}
+          onEntityGhostMove={onEntityGhostMove}
           onEntityClick={onEntityClick}
           onEntityDoubleClick={onEntityDoubleClick}
           onEntityMove={onEntityMove}
