@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from '../store/useStore'
 import { useActiveCampaign, useActiveLayer } from '../store/useActive'
 import type { DraftPos } from '../store/useStore'
-import { canSchedule, entityDisplayMeta, isDead } from '../types'
+import { HOSTILE_COLOR, canSchedule, entityDisplayMeta, isDead, isHostile } from '../types'
 import type { Entity, MapLayer } from '../types'
 import type { PhaseContext } from '../utils/time'
 import {
@@ -2619,13 +2619,29 @@ function EmbeddedMap({
   }
 
   if (!revealed) {
+    /**
+     * Lauern hier Gegner? Dann warnt schon die Pinnadel - eingeklappt sieht man sonst nicht,
+     * was einen auf der Karte erwartet. Zaehlt auch, was auf ihren Unterkarten steht: Die
+     * Nadel vertritt die Karte samt allem, was darin steckt.
+     *
+     * Tote zaehlen nicht mehr, und am Spieltisch nur, was die Gruppe schon entdeckt hat -
+     * sonst verriete die Farbe einen Hinterhalt, bevor er stattfindet.
+     */
+    const inside = collectWithDescendants(layers, embLayer.id)
+    const hostileInside = entities.some(
+      (e) =>
+        isHostile(e) &&
+        !isDead(e, currentDay) &&
+        (!tableMode || e.visibility === 'spieler') &&
+        inside.has(placementAt(e, timeOfDay, currentDay, campaign)?.layerId ?? ''),
+    )
     return (
       <>
         <MapPin
           screenX={x + w / 2}
           screenY={y + h / 2}
           icon="🗺"
-          color="#c9a227"
+          color={hostileInside ? HOSTILE_COLOR : '#c9a227'}
           label={embLayer.name}
           selected={false}
           draggable={interactive && tool !== 'add'}
@@ -2649,7 +2665,7 @@ function EmbeddedMap({
             screenX={x + w / 2 + ghostShift.dx}
             screenY={y + h / 2 + ghostShift.dy}
             icon="🗺"
-            color="#c9a227"
+            color={hostileInside ? HOSTILE_COLOR : '#c9a227'}
             label={embLayer.name}
             selected={false}
             draggable={false}
