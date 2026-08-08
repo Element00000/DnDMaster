@@ -20,6 +20,7 @@ import { MapPin } from './MapPin'
 import { DayPicker } from './DayPicker'
 import { fileToScaledDataUrl } from '../utils/image'
 import { deleteAsset, putAsset } from '../utils/assets'
+import { getClipboard, instantiate, setClipboard } from '../utils/copyPaste'
 
 interface View {
   scale: number
@@ -109,6 +110,7 @@ export function MapCanvas() {
   const embedLayer = useStore((s) => s.embedLayer)
   const setEmbedRect = useStore((s) => s.setEmbedRect)
   const setLayerImage = useStore((s) => s.setLayerImage)
+  const addCopies = useStore((s) => s.addCopies)
   const fitToViewRequest = useStore((s) => s.fitToViewRequest)
 
   /**
@@ -355,6 +357,164 @@ export function MapCanvas() {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [selectedIds, tableMode, entities, deleteEntity])
 
+  // Kartengroesse per Eck-Ziehpunkt aendern (nur wenn die Karte angeklickt/ausgewaehlt ist).
+  // Steht hier oben, weil auch das Kopieren daran haengt: markiert ist entweder eine Karte
+  // oder eine Reihe von Objekten.
+  const [mapSelected, setMapSelected] = useState(false)
+  // Welche eingebettete Karte ist gerade ausgewaehlt (zeigt ihre eigenen Eck-Ziehpunkte)?
+  const [selectedEmbedId, setSelectedEmbedId] = useState<string | null>(null)
+
+  // Letzte bekannte Zeigerstelle: Eingefuegt wird dort, wo die Maus steht - wie man es von
+  // jedem Zeichenprogramm kennt. Wird global mitgeschrieben, weil der Zeiger beim Einfuegen
+  // auch ueber einer Leiste stehen kann; ob er wirklich ueber der Karte ist, entscheidet
+  // erst das Einfuegen selbst.
+  const pointerPos = useRef<{ x: number; y: number } | null>(null)
+  useEffect(() => {
+    function onPointerMove(e: PointerEvent) {
+      pointerPos.current = { x: e.clientX, y: e.clientY }
+    }
+    window.addEventListener('pointermove', onPointerMove)
+    return () => window.removeEventListener('pointermove', onPointerMove)
+  }, [])
+
+  /** Kurze Rueckmeldung ueber der Karte ("3 Objekte kopiert"). */
+  const [flash, setFlash] = useState<string | null>(null)
+  const flashTimer = useRef<number | null>(null)
+  const showFlash = useCallback((text: string) => {
+    setFlash(text)
+    if (flashTimer.current) window.clearTimeout(flashTimer.current)
+    flashTimer.current = window.setTimeout(() => setFlash(null), 1800)
+  }, [])
+  useEffect(() => () => void (flashTimer.current && window.clearTimeout(flashTimer.current)), [])
+
+  /**
+   * Strg+C / Strg+V fuer Objekte und Karten.
+   *
+   * Kopiert wird, was markiert ist: eine angeklickte (eingebettete) Karte, sonst die
+   * markierten Objekte, sonst die Karte selbst. Eine kopierte Karte nimmt ihren ganzen
+   * Inhalt mit - ihre Objekte und ihre Unterkarten samt deren Objekten.
+   *
+   * Eingefuegt wird an der Zeigerstelle, und zwar in die Karte, die dort liegt (auch tief
+   * verschachtelt). Die Kopie einer Karte landet bewusst NICHT in ihrem Original, sondern
+   * daneben - sonst verschwaende sie beim Einfuegen im Inneren der Vorlage.
+   */
+  useEffect(() => {
+    /** Was gerade markiert ist in die Zwischenablage legen; false = da war nichts. */
+    function copySelection(): boolean {
+      const copiedLayerId = selectedEmbedId ?? (mapSelected ? layer.id : null)
+      if (copiedLayerId) {
+        const ids = collectWithDescendants(campaign.layers, copiedLayerId)
+        const inside = campaign.layers.filter((l) => l.id !== copiedLayerId && ids.has(l.id))
+        const source = campaign.layers.find((l) => l.id === copiedLayerId)
+        if (!source) return false
+        const content = entities.filter((e) => e.placement && ids.has(e.placement.layerId))
+        setClipboard({ layers: [source, ...inside], entities: content })
+        showFlash(`Karte "${source.name}" kopiert`)
+        return true
+      }
+      const chosen = entities.filter((e) => selectedIds.includes(e.id))
+      if (chosen.length === 0) return false
+      setClipboard({ layers: [], entities: chosen })
+      showFlash(chosen.length === 1 ? `"${chosen[0].name}" kopiert` : `${chosen.length} Objekte kopiert`)
+      return true
+    }
+
+    async function paste(): Promise<void> {
+      const bundle = getClipboard()
+      const el = containerRef.current
+      if (!bundle || !el) return
+      const rect = el.getBoundingClientRect()
+      const v = viewRef.current
+      const p = pointerPos.current
+      const overMap =
+        p != null && p.x >= rect.left && p.x <= rect.right && p.y >= rect.top && p.y <= rect.bottom
+      // Steht der Zeiger nicht ueber der Karte (Kopieren ueber eine Liste, Fenster gerade
+      // erst angeklickt), kommt die Kopie in die Bildmitte.
+      const sx = overMap ? p!.x - rect.left : el.clientWidth / 2
+      const sy = overMap ? p!.y - rect.top : el.clientHeight / 2
+      const wx = (sx - v.tx) / v.scale
+      const wy = (sy - v.ty) / v.scale
+      const exclude = bundle.layers.length > 0 ? new Set(bundle.layers.map((l) => l.id)) : undefined
+      const t = resolveDeepTarget(campaign.layers, layer.id, wx, wy, v.scale, exclude)
+
+      if (bundle.layers.length > 0) {
+        const source = bundle.layers[0]
+        const parent = campaign.layers.find((l) => l.id === t.layerId)
+        if (!parent) return
+        // In derselben Karte wie das Original bleibt die Kopie gleich gross; in einer
+        // anderen gibt es keinen gemeinsamen Massstab - dort gilt dasselbe Mass wie fuer
+        // jede neu platzierte Karte (ein Viertel der Elternkarte).
+        const same = source.embed?.parentLayerId === t.layerId
+        const w = same ? source.embed!.width : Math.max(MIN_EMBED_SIZE, parent.width * 0.25)
+        const h = same
+          ? source.embed!.height
+          : Math.max(MIN_EMBED_SIZE, w * (source.height / source.width))
+        const { layers, entities: copies } = await instantiate(bundle, {
+          layerId: t.layerId,
+          dx: 0,
+          dy: 0,
+          embed: {
+            parentLayerId: parent.id,
+            x: clamp(t.x - w / 2, 0, Math.max(0, parent.width - w)),
+            y: clamp(t.y - h / 2, 0, Math.max(0, parent.height - h)),
+            width: w,
+            height: h,
+          },
+        })
+        addCopies(layers, copies)
+        setMapSelected(false)
+        setSelectedEmbedId(layers[0].id)
+        showFlash(`Karte "${layers[0].name}" eingefuegt`)
+        return
+      }
+
+      // Objekte behalten ihre Abstaende zueinander; die Mitte der Gruppe kommt unter den Zeiger.
+      const placed = bundle.entities.filter((e) => e.placement)
+      const cx = placed.reduce((sum, e) => sum + e.placement!.x, 0) / (placed.length || 1)
+      const cy = placed.reduce((sum, e) => sum + e.placement!.y, 0) / (placed.length || 1)
+      const { layers, entities: copies } = await instantiate(bundle, {
+        layerId: t.layerId,
+        dx: t.x - cx,
+        dy: t.y - cy,
+      })
+      addCopies(layers, copies)
+      setSelectedIds(copies.map((e) => e.id))
+      showFlash(copies.length === 1 ? `"${copies[0].name}" eingefuegt` : `${copies.length} Objekte eingefuegt`)
+    }
+
+    function onKeyDown(e: KeyboardEvent) {
+      if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey) return
+      const key = e.key.toLowerCase()
+      if (key !== 'c' && key !== 'v') return
+      if (tableMode) return
+      const target = e.target as HTMLElement | null
+      const tag = target?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target?.isContentEditable) return
+      // Markierten Text nicht wegschnappen: Wer etwas ausgewaehlt hat, will genau das kopieren.
+      if (key === 'c') {
+        if ((window.getSelection()?.toString() ?? '') !== '') return
+        if (copySelection()) e.preventDefault()
+        return
+      }
+      if (!getClipboard()) return
+      e.preventDefault()
+      void paste()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [
+    campaign.layers,
+    entities,
+    layer.id,
+    selectedIds,
+    selectedEmbedId,
+    mapSelected,
+    tableMode,
+    addCopies,
+    setSelectedIds,
+    showFlash,
+  ])
+
   const onWheel = useCallback((e: React.WheelEvent) => {
     const el = containerRef.current
     if (!el) return
@@ -412,10 +572,6 @@ export function MapCanvas() {
   const [panning, setPanning] = useState(false)
   const painting = useRef(false)
 
-  // Kartengroesse per Eck-Ziehpunkt aendern (nur wenn die Karte angeklickt/ausgewaehlt ist).
-  const [mapSelected, setMapSelected] = useState(false)
-  // Welche eingebettete Karte ist gerade ausgewaehlt (zeigt ihre eigenen Eck-Ziehpunkte)?
-  const [selectedEmbedId, setSelectedEmbedId] = useState<string | null>(null)
   type ResizeHandle = 'nw' | 'ne' | 'sw' | 'se'
   const resize = useRef<{
     startWidth: number
@@ -1260,6 +1416,9 @@ export function MapCanvas() {
           ))}
         </>
       )}
+
+      {/* Rueckmeldung zum Kopieren/Einfuegen - verschwindet von selbst wieder. */}
+      {flash && !placingActive && <div className="map-banner map-banner--flash">{flash}</div>}
 
       {placingActive && (
         <div className="map-banner">

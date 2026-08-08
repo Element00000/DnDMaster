@@ -316,6 +316,12 @@ interface StoreState extends AppData {
 
   // Entitaeten (der aktiven Kampagne)
   addEntity: (input: { type: EntityType; placement?: Placement; name?: string; fields?: Record<string, string> }) => string
+  /**
+   * Fertige Kopien in die Kampagne uebernehmen (Strg+V, siehe utils/copyPaste). Erwartet
+   * Datensaetze, die schon eigene Ids und eigene Bilder haben - hier wird nichts mehr
+   * umgeschrieben, nur eingehaengt.
+   */
+  addCopies: (layers: MapLayer[], entities: Entity[]) => void
   updateEntity: (id: string, patch: Partial<Omit<Entity, 'id' | 'createdAt'>>) => void
   setEntityField: (id: string, key: string, value: string) => void
   deleteEntity: (id: string) => void
@@ -926,6 +932,13 @@ export const useStore = create<StoreState>()(
           set({ selectedEntityId: id, selectedIds: [id] })
           return id
         },
+
+        addCopies: (layers, entities) =>
+          patchActive((c) => ({
+            ...c,
+            layers: [...c.layers, ...layers],
+            entities: [...c.entities, ...entities],
+          })),
 
         updateEntity: (id, patch) =>
           patchActive((c) => ({

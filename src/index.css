@@ -2005,6 +2005,14 @@ button {
   z-index: 20;
 }
 
+/* Kurze Rueckmeldung (kopiert/eingefuegt): dieselbe Leiste, nur ruhiger - sie meldet
+   etwas Erledigtes, statt zu einer Handlung aufzufordern. */
+.map-banner--flash {
+  border-color: var(--border-strong);
+  color: var(--ink-dim);
+  pointer-events: none;
+}
+
 .map-banner__cancel {
   background: transparent;
   border: 1px solid var(--border);

@@ -17,6 +17,7 @@ npm run build    # Produktions-Build nach dist/
 - Pan (ziehen), Zoom (Mausrad zum Cursor, +/− Buttons), Einpassen (Doppelklick)
 - Objekt anlegen: Typ links wählen, dann auf die Karte klicken (oder „Ohne Karte anlegen")
 - Marker per Drag verschiebbar; anklicken öffnet das Detailpanel rechts
+- **Kopieren/Einfügen (Strg+C / Strg+V)**: markierte Objekte oder eine angeklickte Karte. Eine kopierte Karte nimmt ihren Inhalt mit (Objekte und Unterkarten samt deren Objekten). Eingefügt wird an der Mausposition, in die Karte, die dort liegt
 - Eigenes Kartenbild oben hochladbar (**PNG, JPG, WebP** – kein SVG nötig); sonst Platzhalterkarte
 - Persistenz über LocalStorage
 
