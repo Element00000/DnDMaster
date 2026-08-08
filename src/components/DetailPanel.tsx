@@ -14,7 +14,7 @@ import {
   parseSkills,
   serializeSkills,
 } from '../types'
-import type { Entity, ThumbCrop } from '../types'
+import type { Entity, FieldDef, ThumbCrop } from '../types'
 import { useStore } from '../store/useStore'
 import { placementAt } from '../utils/time'
 import { defaultThumbCrop, fileToScaledDataUrl } from '../utils/image'
@@ -28,6 +28,60 @@ import { EntityIcon } from './EntityIcon'
 
 /** Felder, die einem Spieler-Charakter nicht angeboten werden (siehe DetailPanel). */
 const PLAYER_HIDDEN_FIELDS = new Set(['rolle', 'motivation', 'quests'])
+
+/** Felder eines Charakters, die ans Ende des Panels gehoeren (siehe DetailPanel). */
+const LATE_FIELD_KEYS = new Set(['status'])
+
+/** Ein Feld aus FIELD_SCHEMA, je nach Art als Auswahl, mehrzeiliges oder einzeiliges Feld. */
+function SchemaField({
+  def,
+  value,
+  readOnly,
+  onChange,
+}: {
+  def: FieldDef
+  value: string
+  readOnly: boolean
+  onChange: (value: string) => void
+}) {
+  return (
+    <label className="field">
+      <span className="field__label">{def.label}</span>
+      {def.kind === 'select' ? (
+        <select
+          className="field__control"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          disabled={readOnly}
+        >
+          <option value="">&ndash;</option>
+          {def.options?.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+      ) : def.kind === 'textarea' ? (
+        <textarea
+          className="field__control field__textarea"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={def.placeholder}
+          rows={3}
+          disabled={readOnly}
+        />
+      ) : (
+        <input
+          className="field__control"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={def.placeholder}
+          disabled={readOnly}
+        />
+      )}
+    </label>
+  )
+}
 
 export function DetailPanel() {
   const campaign = useStore((s) => s.campaigns.find((c) => c.id === s.activeCampaignId) ?? s.campaigns[0])
@@ -149,9 +203,13 @@ export function DetailPanel() {
     // und Quests schreibt er sich selbst, ein Geheimnis vor sich selbst hat er nicht. Die
     // Felder blieben hier ohnehin leer stehen - siehe auch der Geheimnis-Block weiter unten.
     const player = isPlayer(marker)
-    const fields = player
-      ? FIELD_SCHEMA[marker.type].filter((f) => !PLAYER_HIDDEN_FIELDS.has(f.key))
-      : FIELD_SCHEMA[marker.type]
+    const schema = FIELD_SCHEMA[marker.type]
+    const hiddenField = (key: string) => player && PLAYER_HIDDEN_FIELDS.has(key)
+    // Der Zustand (lebendig/tot) rutscht bei Charakteren ans Ende des Panels: Er wird
+    // selten angefasst und soll oben nicht vor dem stehen, was man staendig braucht.
+    const lateField = (key: string) => marker.type === 'nsc' && LATE_FIELD_KEYS.has(key)
+    const fields = schema.filter((f) => !hiddenField(f.key) && !lateField(f.key))
+    const lateFields = schema.filter((f) => !hiddenField(f.key) && lateField(f.key))
 
     // Eine Beschreibung ist reiner Vorlesetext - sie bekommt kein Bild.
     const isReadAloud = marker.type === 'beschreibung'
@@ -200,41 +258,13 @@ export function DetailPanel() {
 
         {/* Typ-spezifische Felder */}
         {fields.map((f) => (
-          <label key={f.key} className="field">
-            <span className="field__label">{f.label}</span>
-            {f.kind === 'select' ? (
-              <select
-                className="field__control"
-                value={marker.fields[f.key] ?? ''}
-                onChange={(e) => setEntityField(marker.id, f.key, e.target.value)}
-                disabled={readOnly}
-              >
-                <option value="">&ndash;</option>
-                {f.options?.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-            ) : f.kind === 'textarea' ? (
-              <textarea
-                className="field__control field__textarea"
-                value={marker.fields[f.key] ?? ''}
-                onChange={(e) => setEntityField(marker.id, f.key, e.target.value)}
-                placeholder={f.placeholder}
-                rows={3}
-                disabled={readOnly}
-              />
-            ) : (
-              <input
-                className="field__control"
-                value={marker.fields[f.key] ?? ''}
-                onChange={(e) => setEntityField(marker.id, f.key, e.target.value)}
-                placeholder={f.placeholder}
-                disabled={readOnly}
-              />
-            )}
-          </label>
+          <SchemaField
+            key={f.key}
+            def={f}
+            value={marker.fields[f.key] ?? ''}
+            readOnly={readOnly}
+            onChange={(v) => setEntityField(marker.id, f.key, v)}
+          />
         ))}
 
         {/* Beim Objekt "Beschreibung" ist dieser Text der ganze Inhalt: das, was der DM der
@@ -376,6 +406,17 @@ export function DetailPanel() {
             Unterkarte oeffnen &rarr;
           </button>
         )}
+
+        {/* Zuletzt der Zustand (siehe lateField weiter oben) */}
+        {lateFields.map((f) => (
+          <SchemaField
+            key={f.key}
+            def={f}
+            value={marker.fields[f.key] ?? ''}
+            readOnly={readOnly}
+            onChange={(v) => setEntityField(marker.id, f.key, v)}
+          />
+        ))}
       </div>
 
       {!readOnly && (
