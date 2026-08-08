@@ -297,7 +297,6 @@ interface StoreState extends AppData {
   activeLayer: () => MapLayer
   setActiveLayer: (id: string) => void
   setLayerImage: (id: string, imageUrl: string, width: number, height: number) => void
-  resetLayerImage: (id: string) => void
   resizeLayer: (id: string, width: number, height: number) => void
   addLayer: (name: string) => string
   renameLayer: (id: string, name: string) => void
@@ -799,14 +798,6 @@ export const useStore = create<StoreState>()(
               layers: rescaled.layers.map((l) => (l.id === id ? { ...l, imageUrl, width, height } : l)),
             }
           }),
-
-        resetLayerImage: (id) =>
-          patchActive((c) => ({
-            ...c,
-            layers: c.layers.map((l) =>
-              l.id === id ? { ...l, imageUrl: null, width: 2000, height: 1400 } : l,
-            ),
-          })),
 
         /**
          * Kartengroesse per Eck-Ziehpunkt aendern; Markierungen, Nebel und darin eingebettete

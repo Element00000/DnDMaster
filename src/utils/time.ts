@@ -58,17 +58,6 @@ export function parseTime(value: string): number | null {
 }
 
 /**
- * Ist die aktuelle Uhrzeit im Zeitfenster? Fehlt das Fenster, gilt "immer".
- * Faenster mit start>end laufen ueber Mitternacht (z.B. 22:00-06:00).
- */
-export function inWindow(now: number, start: number | null, end: number | null): boolean {
-  if (start == null || end == null) return true
-  if (start === end) return true
-  if (start < end) return now >= start && now < end
-  return now >= start || now < end
-}
-
-/**
  * Alle Timestones, die am Kalendertag "day" gelten, chronologisch sortiert:
  * der Standard-Tagesablauf plus die Ausnahmen dieses Tages. Fallen beide auf dieselbe
  * Uhrzeit, steht die Ausnahme hinten und gewinnt damit in activeTimestone.
@@ -196,11 +185,6 @@ export function placementAt(
  */
 export function timestoneEndsAt(keys: Timestone[], index: number): number {
   return keys[index + 1]?.time ?? MINUTES_PER_DAY
-}
-
-/** Minuten auf 0..1439 normieren (auch fuer negative Werte). */
-export function wrapMinutes(minutes: number): number {
-  return ((Math.round(minutes) % MINUTES_PER_DAY) + MINUTES_PER_DAY) % MINUTES_PER_DAY
 }
 
 /**

@@ -15,7 +15,7 @@ npm run build    # Produktions-Build nach dist/
 
 **Karte (Phase 1)**
 - Pan (ziehen), Zoom (Mausrad zum Cursor, +/− Buttons), Einpassen (Doppelklick)
-- Objekt anlegen: Typ links wählen, dann auf die Karte klicken (oder „Ohne Karte anlegen")
+- Objekt anlegen: Typ links wählen, dann auf die Karte klicken – jedes Objekt gehört auf eine Karte
 - Marker per Drag verschiebbar; anklicken öffnet das Detailpanel rechts
 - **Kopieren/Einfügen (Strg+C / Strg+V)**: markierte Objekte oder eine angeklickte Karte. Eine kopierte Karte nimmt ihren Inhalt mit (Objekte und Unterkarten samt deren Objekten). Eingefügt wird an der Mausposition, in die Karte, die dort liegt
 - Eigenes Kartenbild oben hochladbar (**PNG, JPG, WebP** – kein SVG nötig); sonst Platzhalterkarte
@@ -23,20 +23,20 @@ npm run build    # Produktions-Build nach dist/
 
 **Datenmodell & Welten (Phase 2)**
 - **Mehrere Kampagnen / Welten** – Umschalter oben, jede mit eigener Karte und Objekten
-- **Echte Objekttypen** statt Freitext: Ort, Charakter, Fraktion, Ereignis, Quest, Gegenstand, Entscheidung, Beschreibung (+ Gefahr/Schatz), jeweils mit typ-spezifischen Feldern
+- **Echte Objekttypen** statt Freitext: Umgebung, Charakter, Ereignis, Gegenstand, Entscheidung, Beschreibung – jeweils mit typ-spezifischen Feldern. Dazu **Fraktion**, die nicht auf der Karte, sondern im Panel „Beziehungen" entsteht
 - **Beschreibung**: reiner Vorlesetext an einer Stelle der Karte – was der DM der Gruppe vorliest, wenn sie dort ankommt (Umgebung, Encounter-Einleitung)
 - **Geheimnisse** pro Objekt (nur DM sichtbar)
 - **Verknüpfungen** zwischen Objekten (z. B. „befindet sich in", „verbündet mit"), bidirektional angezeigt und klickbar zum Navigieren
 - **Spieler-Ansicht** (Schalter oben): blendet DM-Geheimnisse und noch nicht entdeckte Objekte aus – Grundlage für späteren Spielerzugang
 
 **Zeit (Phase 3)**
-- **Uhrzeit-Regler** über der Karte (24h): blendet Marker nach hinterlegtem Zeitfenster ein/aus (z. B. Markt 8–18 Uhr, Wache 22–6 Uhr über Mitternacht). Marker ohne Zeitfenster bleiben immer sichtbar
+- **Uhrzeit-Regler** über der Karte (24h): Objekte wandern gemäß ihrem Tagesablauf über die Karte
+- **Tagesablauf als Timestones**: ab welcher Uhrzeit ein Objekt wo steht – täglich wiederkehrend oder als Ausnahme an einem Kalendertag
 - Optionaler **Tag/Nacht-Modus**: färbt die Karte passend zur Uhrzeit ein
 - **Kampagnen-Zeitleiste** (Button oben): Ereignisse chronologisch nach Kalendertag, filterbar nach verknüpftem Objekt, Klick springt zum Objekt auf der Karte
-- Zeit-Felder pro Objekt im Detailpanel: Kalendertag + Zeitfenster (Von/Bis)
 
 **Verzweigte Handlungsstränge (Phase 4)**
-- Objekttyp **Entscheidung** mit 3–5 **Optionen** (Kurztitel + Beschreibung), optional an eine Situation (Ereignis/Quest) gebunden
+- Objekttyp **Entscheidung** mit 3–5 **Optionen** (Kurztitel + Beschreibung), optional an eine Situation (ein Ereignis) gebunden
 - Pro Option **Folgen** hinterlegbar: Status/Feld ändern, Objekt auf-/zudecken, Beziehung ändern, oder Freitext-Notiz
 - **„Als eingetreten markieren"** wendet die Folgen automatisch auf Karte, Objekte und Beziehungen an; erneutes Klicken oder „Wahl aufheben" macht sie sauber rückgängig
 - Nicht gewählte Optionen bleiben grau als Notiz erhalten

@@ -637,7 +637,7 @@ export interface DecisionOption {
 }
 
 export interface DecisionData {
-  /** Situation, zu der der Punkt gehoert (Ereignis oder Quest). */
+  /** Situation, zu der der Punkt gehoert (ein Ereignis). */
   situationId: string | null
   options: DecisionOption[]
   /** Aktuell eingetretene Option; null = noch offen. */
@@ -662,21 +662,11 @@ export const EVENT_KINDS: { kind: EventKind; label: string; icon: string }[] = [
   { kind: 'sozial', label: 'Sozial', icon: '\u{1F4AC}' },
 ]
 
-export function eventKindMeta(kind: EventKind) {
-  return EVENT_KINDS.find((k) => k.kind === kind) ?? EVENT_KINDS[0]
-}
-
 /** Anhaengbarer Inhaltsblock eines Ereignisses. */
 export type EventBlock =
   | { id: string; kind: 'text'; title: string; body: string }
   | { id: string; kind: 'loot'; title: string; body: string }
   | { id: string; kind: 'image'; title: string; url: string }
-
-export const BLOCK_KINDS: { kind: EventBlock['kind']; label: string; icon: string }[] = [
-  { kind: 'text', label: 'Text', icon: '\u{1F4DD}' },
-  { kind: 'loot', label: 'Loot', icon: '\u{1F4B0}' },
-  { kind: 'image', label: 'Bild', icon: '\u{1F5BC}' },
-]
 
 /** Eine Kreatur (Gegner oder SC) im Kampf. */
 export interface Creature {
