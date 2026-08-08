@@ -602,6 +602,18 @@ button {
   box-shadow: 0 0 60px rgba(0, 0, 0, 0.6);
 }
 
+/* Die Weltkarte laesst sich anklicken (das waehlt sie aus und zeigt ihre Eck-Griffe), also
+   sagt der Zeiger das auch - so wie bei eingebetteten Karten laengst. Nur die Karte selbst,
+   nicht die leere Flaeche daneben.
+
+   Ausgenommen sind die Zustaende, in denen ein Werkzeug etwas anderes vorhat: Objekt oder
+   Karte platzieren, Nebel malen, schwenken. Der Auswahlrahmen setzt sein Kreuz per
+   !important selbst durch und braucht hier keine Ausnahme. */
+.map-canvas:not([data-tool='add']):not([data-placing]):not([data-fog]):not([data-panning])
+  .map-world {
+  cursor: pointer;
+}
+
 .map-empty {
   display: flex;
   flex-direction: column;
