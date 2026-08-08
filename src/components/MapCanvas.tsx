@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from '../store/useStore'
 import { useActiveCampaign, useActiveLayer } from '../store/useActive'
 import type { DraftPos } from '../store/useStore'
-import { HOSTILE_COLOR, canSchedule, entityDisplayMeta, isDead, isHostile } from '../types'
+import { canSchedule, entityDisplayMeta, isDead, isHostile } from '../types'
 import type { Entity, MapLayer } from '../types'
 import type { PhaseContext } from '../utils/time'
 import {
@@ -2641,7 +2641,8 @@ function EmbeddedMap({
           screenX={x + w / 2}
           screenY={y + h / 2}
           icon="🗺"
-          color={hostileInside ? HOSTILE_COLOR : '#c9a227'}
+          color="#c9a227"
+          iconAlert={hostileInside}
           label={embLayer.name}
           selected={false}
           draggable={interactive && tool !== 'add'}
@@ -2665,7 +2666,8 @@ function EmbeddedMap({
             screenX={x + w / 2 + ghostShift.dx}
             screenY={y + h / 2 + ghostShift.dy}
             icon="🗺"
-            color={hostileInside ? HOSTILE_COLOR : '#c9a227'}
+            color="#c9a227"
+            iconAlert={hostileInside}
             label={embLayer.name}
             selected={false}
             draggable={false}

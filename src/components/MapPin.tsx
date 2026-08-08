@@ -20,6 +20,11 @@ interface Props {
   /** Icon weiss statt in Originalfarbe darstellen (z.B. Spieler-Charaktere). */
   iconInvert?: boolean
   /**
+   * Icon rot einfaerben als Warnung - bei Kartenpinnadeln, auf deren Karte Gegner stehen.
+   * Der Kopf behaelt dabei seine Farbe, damit die Nadel als Karte erkennbar bleibt.
+   */
+  iconAlert?: boolean
+  /**
    * Vorschau-Doppel eines Pins: zeigt eine erst vorgemerkte Position an, die noch nicht
    * gespeichert ist. Nimmt keine Klicks an - bedient wird immer das Original.
    */
@@ -69,6 +74,7 @@ export function MapPin({
   scale,
   isMapLink,
   iconInvert,
+  iconAlert,
   ghost,
   emphasized,
   dead,
@@ -152,7 +158,7 @@ export function MapPin({
 
   return (
     <div
-      className={`map-pin${selected ? ' is-selected' : ''}${draggable ? ' is-draggable' : ''}${isMapLink ? ' is-map-link' : ''}${iconInvert ? ' is-icon-invert' : ''}${image ? ' has-image' : ''}${ghost ? ' is-ghost' : ''}${emphasized ? ' is-emphasized' : ''}`}
+      className={`map-pin${selected ? ' is-selected' : ''}${draggable ? ' is-draggable' : ''}${isMapLink ? ' is-map-link' : ''}${iconInvert ? ' is-icon-invert' : ''}${iconAlert ? ' is-icon-alert' : ''}${image ? ' has-image' : ''}${ghost ? ' is-ghost' : ''}${emphasized ? ' is-emphasized' : ''}`}
       style={{ left: screenX, top: screenY, ['--pin-color' as string]: color }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}

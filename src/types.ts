@@ -138,13 +138,6 @@ export interface Entity {
 }
 
 /**
- * Rot fuer alles Feindliche - den Gegner selbst wie auch eine eingeklappte Karte, auf der
- * welche stehen. Beide Stellen muessen denselben Ton treffen, damit die Warnung als eine
- * gelesen wird.
- */
-export const HOSTILE_COLOR = '#c0392b'
-
-/**
  * Farbe fuer die Anzeige (Karte etc.), inkl. Ueberschreibung fuer Charaktere:
  * Freund gruen, Feind rot, Boss dunkelrot, neutral grau, Spieler dunkelgruen mit weissem
  * Icon. Das Icon selbst bleibt sonst immer das Charakter-Icon.
@@ -156,7 +149,7 @@ export function entityDisplayMeta(entity: Entity): EntityTypeMeta {
   if (isDead(entity)) return { ...meta, color: '#141414', iconInvert: true }
   if (entity.type === 'nsc') {
     if (entity.fields.gesinnung === 'freund') return { ...meta, color: '#3fa34d' }
-    if (entity.fields.gesinnung === 'feind') return { ...meta, color: HOSTILE_COLOR }
+    if (entity.fields.gesinnung === 'feind') return { ...meta, color: '#c0392b' }
     if (entity.fields.gesinnung === 'boss') return { ...meta, color: '#9b1b30', emphasized: true }
     if (entity.fields.gesinnung === 'neutral') return { ...meta, color: '#8a93a8' }
     if (entity.fields.gesinnung === 'spieler') {

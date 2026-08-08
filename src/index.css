@@ -790,6 +790,17 @@ button {
   filter: brightness(0) invert(1);
 }
 
+/* Warnung an einer Kartenpinnadel: Auf dieser Karte stehen Gegner. Der Kopf behaelt sein
+   Gold, damit die Nadel als Karte erkennbar bleibt - nur das Symbol darin wird rot.
+
+   Ein Emoji bringt seine eigenen Farben mit und laesst sich nicht ueber "color" faerben,
+   deshalb derselbe Weg wie beim weissen Icon darueber: Der Filter macht daraus erst eine
+   weisse Silhouette und faerbt die dann ein. Der Ton ist nicht auf den Hexwert genau, aber
+   ein deutliches Rot. */
+.map-pin.is-icon-alert .map-pin__icon {
+  filter: brightness(0) invert(1) sepia(1) saturate(24) hue-rotate(-32deg) brightness(0.92);
+}
+
 /* Portraet im Pin: rund im tropfenfoermigen Kopf, gegen dessen Drehung zurueckgedreht.
    Der farbige Kopf bleibt als Rahmen sichtbar und zeigt weiterhin die Gesinnung an. */
 /* Groesse ueber eine feste Differenz statt einen Faktor: 2 px Rahmen und 1 px Luft je
