@@ -6,11 +6,12 @@ import {
 } from '../types'
 import type { DecisionOption, Effect, Entity, RelationType } from '../types'
 import { useStore } from '../store/useStore'
+import { useActiveCampaign } from '../store/useActive'
 import { uid } from '../utils/id'
 
 /** Editor fuer eine Entscheidung: Optionen, Folgen, Wahl, Verkettung. */
 export function DecisionEditor({ entity, readOnly }: { entity: Entity; readOnly: boolean }) {
-  const campaign = useStore((s) => s.campaigns.find((c) => c.id === s.activeCampaignId) ?? s.campaigns[0])
+  const campaign = useActiveCampaign()
   const updateDecision = useStore((s) => s.updateDecision)
   const addOption = useStore((s) => s.addOption)
   const removeOption = useStore((s) => s.removeOption)

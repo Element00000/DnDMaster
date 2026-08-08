@@ -1,10 +1,11 @@
 import { entityDisplayMeta } from '../types'
 import type { Entity } from '../types'
 import { useStore } from '../store/useStore'
+import { useActiveCampaign } from '../store/useActive'
 
 /** Handlungsbaum: Entscheidungen nach Verkettungstiefe in Spalten. */
 export function StoryTree() {
-  const campaign = useStore((s) => s.campaigns.find((c) => c.id === s.activeCampaignId) ?? s.campaigns[0])
+  const campaign = useActiveCampaign()
   const tableMode = useStore((s) => s.tableMode)
   const selectEntity = useStore((s) => s.selectEntity)
 

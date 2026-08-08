@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from '../store/useStore'
+import { useActiveCampaign, useActiveLayer } from '../store/useActive'
 import type { DraftPos } from '../store/useStore'
 import { canSchedule, entityDisplayMeta, isDead } from '../types'
 import type { Entity, MapLayer } from '../types'
@@ -21,6 +22,7 @@ import { DayPicker } from './DayPicker'
 import { fileToScaledDataUrl } from '../utils/image'
 import { deleteAsset, putAsset } from '../utils/assets'
 import { getClipboard, instantiate, setClipboard } from '../utils/copyPaste'
+import { isTextEntry } from '../utils/keys'
 
 interface View {
   scale: number
@@ -68,8 +70,8 @@ export function MapCanvas() {
   const viewAnim = useRef<number | null>(null)
   const [fitted, setFitted] = useState(false)
 
-  const campaign = useStore((s) => s.campaigns.find((c) => c.id === s.activeCampaignId) ?? s.campaigns[0])
-  const layer = campaign.layers.find((l) => l.id === campaign.activeLayerId) ?? campaign.layers[0]
+  const campaign = useActiveCampaign()
+  const layer = useActiveLayer()
   const entities = campaign.entities
   const tool = useStore((s) => s.tool)
   const pendingType = useStore((s) => s.pendingEntityType)
@@ -342,10 +344,7 @@ export function MapCanvas() {
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if (e.key !== 'Delete' && e.key !== 'Backspace') return
-      if (tableMode || selectedIds.length === 0) return
-      const target = e.target as HTMLElement | null
-      const tag = target?.tagName
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target?.isContentEditable) return
+      if (tableMode || selectedIds.length === 0 || isTextEntry(e.target)) return
       e.preventDefault()
       const names = selectedIds.map((id) => entities.find((x) => x.id === id)?.name ?? 'Objekt')
       const question =
@@ -486,10 +485,7 @@ export function MapCanvas() {
       if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey) return
       const key = e.key.toLowerCase()
       if (key !== 'c' && key !== 'v') return
-      if (tableMode) return
-      const target = e.target as HTMLElement | null
-      const tag = target?.tagName
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target?.isContentEditable) return
+      if (tableMode || isTextEntry(e.target)) return
       // Markierten Text nicht wegschnappen: Wer etwas ausgewaehlt hat, will genau das kopieren.
       if (key === 'c') {
         if ((window.getSelection()?.toString() ?? '') !== '') return

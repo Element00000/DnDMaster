@@ -7,6 +7,7 @@ import { BottomBar } from './components/BottomBar'
 import { BottomPanel } from './components/BottomPanel'
 import { FightMode } from './components/FightMode'
 import { useStore } from './store/useStore'
+import { isTextEntry } from './utils/keys'
 
 export default function App() {
   const tableMode = useStore((s) => s.tableMode)
@@ -18,10 +19,7 @@ export default function App() {
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z') {
-        if (tableMode) return
-        const target = e.target as HTMLElement | null
-        const tag = target?.tagName
-        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target?.isContentEditable) return
+        if (tableMode || isTextEntry(e.target)) return
         e.preventDefault()
         undo()
       }

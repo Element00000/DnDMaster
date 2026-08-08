@@ -16,6 +16,7 @@ import {
 } from '../types'
 import type { Entity, FieldDef, ThumbCrop } from '../types'
 import { useStore } from '../store/useStore'
+import { useActiveCampaign, useActiveLayer } from '../store/useActive'
 import { placementAt } from '../utils/time'
 import { defaultThumbCrop, fileToScaledDataUrl } from '../utils/image'
 import { deleteAsset } from '../utils/assets'
@@ -84,8 +85,8 @@ function SchemaField({
 }
 
 export function DetailPanel() {
-  const campaign = useStore((s) => s.campaigns.find((c) => c.id === s.activeCampaignId) ?? s.campaigns[0])
-  const activeLayer = campaign.layers.find((l) => l.id === campaign.activeLayerId) ?? campaign.layers[0]
+  const campaign = useActiveCampaign()
+  const activeLayer = useActiveLayer()
   const viewLayerId = useStore((s) => s.viewLayerId)
   const timeOfDay = useStore((s) => s.timeOfDay)
   const currentDay = useStore((s) => s.currentDay)

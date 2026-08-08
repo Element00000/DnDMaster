@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from '../store/useStore'
+import { useActiveCampaign } from '../store/useActive'
 import { entityDisplayMeta, relationMeta } from '../types'
 import type { Entity, RelationType } from '../types'
 import { useAsset } from '../useAsset'
@@ -20,7 +21,7 @@ interface Pos {
 
 /** Beziehungsgraph: Netzwerkansicht der Objekte und ihrer Verknuepfungen. */
 export function RelationGraph() {
-  const campaign = useStore((s) => s.campaigns.find((c) => c.id === s.activeCampaignId) ?? s.campaigns[0])
+  const campaign = useActiveCampaign()
   const tableMode = useStore((s) => s.tableMode)
   const selectEntity = useStore((s) => s.selectEntity)
   const goToEntity = useStore((s) => s.goToEntity)

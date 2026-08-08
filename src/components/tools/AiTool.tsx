@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useStore } from '../../store/useStore'
+import { useActiveCampaign, useActiveLayer } from '../../store/useActive'
 import { AI_MODELS, IMAGE_PROVIDERS, useAiStore } from '../../store/useAiStore'
 import type { AiModel, ImageProvider } from '../../store/useAiStore'
 import { generateSvgDataUrl, generateText } from '../../utils/ai'
@@ -19,8 +20,8 @@ export function AiTool() {
   const setImageProvider = useAiStore((s) => s.setImageProvider)
   const setImageKey = useAiStore((s) => s.setImageKey)
 
-  const campaign = useStore((s) => s.campaigns.find((c) => c.id === s.activeCampaignId) ?? s.campaigns[0])
-  const layer = campaign.layers.find((l) => l.id === campaign.activeLayerId) ?? campaign.layers[0]
+  const campaign = useActiveCampaign()
+  const layer = useActiveLayer()
   const selected = useStore((s) => s.campaigns.find((c) => c.id === s.activeCampaignId)?.entities.find((e) => e.id === s.selectedEntityId) ?? null)
   const updateEntity = useStore((s) => s.updateEntity)
   const setLayerImage = useStore((s) => s.setLayerImage)

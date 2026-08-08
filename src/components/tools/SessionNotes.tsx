@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { useStore } from '../../store/useStore'
+import { useActiveCampaign } from '../../store/useActive'
 import { entityDisplayMeta, entityMeta } from '../../types'
 import { EntityIcon } from '../EntityIcon'
 
 export function SessionNotes() {
-  const campaign = useStore((s) => s.campaigns.find((c) => c.id === s.activeCampaignId) ?? s.campaigns[0])
+  const campaign = useActiveCampaign()
   const addSession = useStore((s) => s.addSession)
   const updateSession = useStore((s) => s.updateSession)
   const deleteSession = useStore((s) => s.deleteSession)

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { canSchedule, entityDisplayMeta, entityMeta, isDead, phaseAt } from '../types'
 import type { Entity } from '../types'
 import { useStore } from '../store/useStore'
+import { useActiveCampaign } from '../store/useActive'
 import { formatTime } from '../utils/time'
 import { DaySchedule } from './DaySchedule'
 import { EntityIcon } from './EntityIcon'
@@ -22,7 +23,7 @@ const SCHEDULE_HELP =
  * aller datierten Objekte.
  */
 export function Timeline() {
-  const campaign = useStore((s) => s.campaigns.find((c) => c.id === s.activeCampaignId) ?? s.campaigns[0])
+  const campaign = useActiveCampaign()
   const selectedIds = useStore((s) => s.selectedIds)
   const [tab, setTab] = useState<Tab>('objekt')
 
@@ -228,7 +229,7 @@ function ObjectSchedule({ entities }: { entities: Entity[] }) {
 
 /** Bisherige Kampagnen-Zeitleiste: alle Objekte mit Kalendertag, nach Tag gruppiert. */
 function CampaignDays() {
-  const campaign = useStore((s) => s.campaigns.find((c) => c.id === s.activeCampaignId) ?? s.campaigns[0])
+  const campaign = useActiveCampaign()
   const tableMode = useStore((s) => s.tableMode)
   const currentDay = useStore((s) => s.currentDay)
   const selectEntity = useStore((s) => s.selectEntity)

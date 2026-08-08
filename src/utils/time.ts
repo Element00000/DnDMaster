@@ -24,10 +24,6 @@ export function scheduleOfPhase(
   day: number,
   ctx?: PhaseContext,
 ): Timestone[] {
-  return ofPhase(schedule, day, ctx)
-}
-
-function ofPhase(schedule: Timestone[], day: number, ctx?: PhaseContext): Timestone[] {
   // Ohne Phasen gilt der ganze Ablauf - so verhaelt sich eine Kampagne, die nie geteilt
   // wurde, genau wie vorher.
   if (!ctx?.phases?.length) return schedule
@@ -63,7 +59,7 @@ export function parseTime(value: string): number | null {
  * Uhrzeit, steht die Ausnahme hinten und gewinnt damit in activeTimestone.
  */
 export function scheduleForDay(schedule: Timestone[], day: number, ctx?: PhaseContext): Timestone[] {
-  return ofPhase(schedule, day, ctx)
+  return scheduleOfPhase(schedule, day, ctx)
     .filter((s) => s.day == null || s.day === day)
     .slice()
     .sort((a, b) => a.time - b.time || (a.day == null ? 0 : 1) - (b.day == null ? 0 : 1))
@@ -131,7 +127,7 @@ export function activeTimestone(
   day: number,
   ctx?: PhaseContext,
 ): Timestone | undefined {
-  const own = ofPhase(schedule, day, ctx)
+  const own = scheduleOfPhase(schedule, day, ctx)
   const routine = own.filter((s) => s.day == null).sort((a, b) => a.time - b.time)
   const dated = own.filter((s) => s.day != null).sort((a, b) => a.day! - b.day! || a.time - b.time)
 

@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { ENTITY_TYPES, GESINNUNG_GROUPS, ITEM_ART_OPTIONS } from '../types'
 import type { EntityType, MapLayer } from '../types'
 import { useStore } from '../store/useStore'
+import { useActiveCampaign, useActiveLayer } from '../store/useActive'
 import type { ToolTab } from '../store/useStore'
 import { fileToScaledDataUrl } from '../utils/image'
 import { deleteAsset, putAsset } from '../utils/assets'
@@ -32,8 +33,8 @@ const PICKER_POPUPS: Partial<
 }
 
 export function Sidebar() {
-  const campaign = useStore((s) => s.campaigns.find((c) => c.id === s.activeCampaignId) ?? s.campaigns[0])
-  const layer = campaign.layers.find((l) => l.id === campaign.activeLayerId) ?? campaign.layers[0]
+  const campaign = useActiveCampaign()
+  const layer = useActiveLayer()
   const tool = useStore((s) => s.tool)
   const pendingType = useStore((s) => s.pendingEntityType)
   const tableMode = useStore((s) => s.tableMode)

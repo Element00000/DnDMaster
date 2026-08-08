@@ -1,9 +1,9 @@
 import { useStore } from '../store/useStore'
+import { useActiveLayer } from '../store/useActive'
 
 /** Nebel-des-Krieges-Steuerung, oben links auf der Karte. */
 export function LayerBar() {
-  const campaign = useStore((s) => s.campaigns.find((c) => c.id === s.activeCampaignId) ?? s.campaigns[0])
-  const layer = campaign.layers.find((l) => l.id === campaign.activeLayerId) ?? campaign.layers[0]
+  const layer = useActiveLayer()
   const tableMode = useStore((s) => s.tableMode)
   const setLayerFog = useStore((s) => s.setLayerFog)
   const clearReveals = useStore((s) => s.clearReveals)

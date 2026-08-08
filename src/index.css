@@ -3667,7 +3667,7 @@ button {
   padding: 14px 10px;
 }
 
-/* WÃ¼rfel-Ablage + einzelne WÃ¼rfel */
+/* Würfel-Ablage + einzelne Würfel */
 .dice__tray {
   display: flex;
   flex-wrap: wrap;

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useStore } from '../store/useStore'
+import { useActiveCampaign } from '../store/useActive'
 import type { Creature } from '../types'
 import { rollDie } from '../utils/tools'
 import { AssetImg } from './AssetImg'
@@ -8,7 +9,7 @@ import { useAsset } from '../useAsset'
 /** Kampf-Modus: Kampfkarte links, nach Initiative sortierte Kampftabelle rechts. */
 export function FightMode() {
   const fightEventId = useStore((s) => s.fightEventId)
-  const campaign = useStore((s) => s.campaigns.find((c) => c.id === s.activeCampaignId) ?? s.campaigns[0])
+  const campaign = useActiveCampaign()
   const setFightEvent = useStore((s) => s.setFightEvent)
   const updateCreature = useStore((s) => s.updateCreature)
   const addCreature = useStore((s) => s.addCreature)

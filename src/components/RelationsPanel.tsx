@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useStore } from '../store/useStore'
+import { useActiveCampaign } from '../store/useActive'
 import { EntityRelations } from './EntityRelations'
 import { RelationGraph } from './RelationGraph'
 
@@ -11,7 +12,7 @@ type Tab = 'objekt' | 'netzwerk'
  * bei der Zeitleiste, damit sich beide Panels gleich anfuehlen.
  */
 export function RelationsPanel() {
-  const campaign = useStore((s) => s.campaigns.find((c) => c.id === s.activeCampaignId) ?? s.campaigns[0])
+  const campaign = useActiveCampaign()
   const selectedEntityId = useStore((s) => s.selectedEntityId)
   const [tab, setTab] = useState<Tab>('objekt')
 

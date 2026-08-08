@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useStore } from '../../store/useStore'
+import { useActiveCampaign } from '../../store/useActive'
 import { toSpotifyEmbed } from '../../utils/spotify'
 
 /**
@@ -18,7 +19,7 @@ const FULL_TRACKS_HELP =
   'Werbeblocker wie AdGuard fuer diese Seite abschalten.'
 
 export function MusicTool() {
-  const campaign = useStore((s) => s.campaigns.find((c) => c.id === s.activeCampaignId) ?? s.campaigns[0])
+  const campaign = useActiveCampaign()
   const addMusicEntry = useStore((s) => s.addMusicEntry)
   const removeMusicEntry = useStore((s) => s.removeMusicEntry)
 

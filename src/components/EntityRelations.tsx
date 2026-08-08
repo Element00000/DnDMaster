@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { RELATIONS, entityDisplayMeta, entityMeta, relationMeta } from '../types'
-import type { Entity, Placement, RelationType } from '../types'
+import type { Campaign, Entity, Placement, RelationType } from '../types'
 import { useStore } from '../store/useStore'
+import { activeLayerOf, useActiveCampaign } from '../store/useActive'
 import { EntityIcon } from './EntityIcon'
 
 /**
@@ -10,7 +11,7 @@ import { EntityIcon } from './EntityIcon'
  * kaum Platz, und beides gehoert sachlich zum Beziehungsgeflecht der Kampagne.
  */
 export function EntityRelations({ entity }: { entity: Entity }) {
-  const campaign = useStore((s) => s.campaigns.find((c) => c.id === s.activeCampaignId) ?? s.campaigns[0])
+  const campaign = useActiveCampaign()
   const tableMode = useStore((s) => s.tableMode)
   const addEntity = useStore((s) => s.addEntity)
   const addLink = useStore((s) => s.addLink)
@@ -72,11 +73,11 @@ export function EntityRelations({ entity }: { entity: Entity }) {
 }
 
 /** Startposition einer neu angelegten Fraktion: neben dem Charakter, sonst Kartenmitte. */
-function newFactionSpot(entity: Entity, campaign: { layers: { id: string; width: number; height: number }[]; activeLayerId: string }): Placement {
+function newFactionSpot(entity: Entity, campaign: Campaign): Placement {
   if (entity.placement) {
     return { ...entity.placement, x: entity.placement.x + 40, y: entity.placement.y + 40 }
   }
-  const layer = campaign.layers.find((l) => l.id === campaign.activeLayerId) ?? campaign.layers[0]
+  const layer = activeLayerOf(campaign)
   return { layerId: layer.id, x: layer.width / 2, y: layer.height / 2 }
 }
 
