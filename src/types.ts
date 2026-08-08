@@ -21,6 +21,7 @@ export type EntityType =
   | 'entscheidung'
   | 'gefahr'
   | 'schatz'
+  | 'beschreibung'
 
 export interface EntityTypeMeta {
   type: EntityType
@@ -44,6 +45,9 @@ export const ENTITY_TYPES: EntityTypeMeta[] = [
   { type: 'entscheidung', label: 'Entscheidung', plural: 'Entscheidungen', icon: '\u{1F500}', color: '#d98c1f' },
   { type: 'gefahr', label: 'Gefahr', plural: 'Gefahren', icon: '\u{2620}', color: '#c0392b' },
   { type: 'schatz', label: 'Schatz', plural: 'Schaetze', icon: '\u{1F48E}', color: '#8e44ad' },
+  // Reiner Vorlesetext an einer Stelle der Karte: Was der DM der Gruppe vorliest, wenn sie
+  // hier ankommt. Der Text steht in description - siehe Vorlesetext-Feld im Detailpanel.
+  { type: 'beschreibung', label: 'Beschreibung', plural: 'Beschreibungen', icon: '\u{1F4D6}', color: '#2f8f8a' },
 ]
 
 export function entityMeta(type: EntityType): EntityTypeMeta {
@@ -582,6 +586,8 @@ export const FIELD_SCHEMA: Record<EntityType, FieldDef[]> = {
   schatz: [
     { key: 'wert', label: 'Wert / Inhalt', kind: 'text' },
   ],
+  // Der Vorlesetext selbst ist die Beschreibung des Objekts - eigene Felder braucht es nicht.
+  beschreibung: [],
 }
 
 // ---------- Verknuepfungsarten ----------

@@ -22,7 +22,8 @@ npm run build    # Produktions-Build nach dist/
 
 **Datenmodell & Welten (Phase 2)**
 - **Mehrere Kampagnen / Welten** – Umschalter oben, jede mit eigener Karte und Objekten
-- **Echte Objekttypen** statt Freitext: Ort, Charakter, Fraktion, Ereignis, Quest, Gegenstand, Entscheidung (+ Gefahr/Schatz), jeweils mit typ-spezifischen Feldern
+- **Echte Objekttypen** statt Freitext: Ort, Charakter, Fraktion, Ereignis, Quest, Gegenstand, Entscheidung, Beschreibung (+ Gefahr/Schatz), jeweils mit typ-spezifischen Feldern
+- **Beschreibung**: reiner Vorlesetext an einer Stelle der Karte – was der DM der Gruppe vorliest, wenn sie dort ankommt (Umgebung, Encounter-Einleitung)
 - **Geheimnisse** pro Objekt (nur DM sichtbar)
 - **Verknüpfungen** zwischen Objekten (z. B. „befindet sich in", „verbündet mit"), bidirektional angezeigt und klickbar zum Navigieren
 - **Spieler-Ansicht** (Schalter oben): blendet DM-Geheimnisse und noch nicht entdeckte Objekte aus – Grundlage für späteren Spielerzugang

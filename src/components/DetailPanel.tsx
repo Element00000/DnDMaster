@@ -155,6 +155,7 @@ export function DetailPanel() {
     // des Kampfmodus gar nicht auf. Gilt fuer alle Charaktere, nicht nur die Gegner: Auch
     // Verbuendete schlagen im Kampf zu.
     const inCombat = marker.type === 'nsc'
+    const isReadAloud = marker.type === 'beschreibung'
     detailContent = combatMode && inCombat ? (
       <div className="detail__panel" style={{ ['--chip-color' as string]: meta.color }}>
         <div className="detail__body">
@@ -225,14 +226,21 @@ export function DetailPanel() {
           </label>
         ))}
 
+        {/* Beim Objekt "Beschreibung" ist dieser Text der ganze Inhalt: das, was der DM der
+            Gruppe vorliest. Darum bekommt er dort einen eigenen Namen, mehr Platz und die
+            Aufmachung eines Vorlesekastens - gespeichert wird er wie ueberall in description. */}
         <label className="field">
-          <span className="field__label">Beschreibung</span>
+          <span className="field__label">{isReadAloud ? 'Vorlesetext' : 'Beschreibung'}</span>
           <textarea
-            className="field__control field__textarea"
+            className={`field__control field__textarea${isReadAloud ? ' field__textarea--read' : ''}`}
             value={marker.description}
             onChange={(e) => updateEntity(marker.id, { description: e.target.value })}
-            placeholder="Beschreibung, sichtbar auch fuer Spieler wenn entdeckt ..."
-            rows={5}
+            placeholder={
+              isReadAloud
+                ? 'Text zum Vorlesen: Was die Gruppe sieht, hoert und riecht, wenn sie hier ankommt ...'
+                : 'Beschreibung, sichtbar auch fuer Spieler wenn entdeckt ...'
+            }
+            rows={isReadAloud ? 12 : 5}
             disabled={readOnly}
           />
         </label>

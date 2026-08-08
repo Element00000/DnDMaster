@@ -1467,6 +1467,17 @@ button {
   line-height: 1.5;
 }
 
+/* Vorlesetext (Objekt "Beschreibung"): sieht aus wie der Kasten im Abenteuerbuch, den der
+   DM vorliest - ruhiger Hintergrund, groessere Zeilen, damit man beim Vorlesen die Zeile
+   nicht verliert. */
+.field__textarea--read {
+  border-color: rgba(47, 143, 138, 0.35);
+  background: rgba(47, 143, 138, 0.07);
+  border-left: 3px solid rgba(47, 143, 138, 0.55);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
 /* ---------- Kampfwerte (Feind-Charakter, Kampfmodus-Spalten) ---------- */
 .statgrid {
   display: grid;

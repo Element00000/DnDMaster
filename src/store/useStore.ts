@@ -1792,6 +1792,7 @@ function standardName(type: EntityType, existing: Entity[], fields?: Record<stri
     entscheidung: 'Neue Entscheidung',
     gefahr: 'Neue Gefahr',
     schatz: 'Neuer Schatz',
+    beschreibung: 'Neue Beschreibung',
   }
   return `${labels[type]} ${count}`
 }
