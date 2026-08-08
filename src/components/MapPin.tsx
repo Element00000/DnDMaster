@@ -32,8 +32,18 @@ interface Props {
   /** Doppelklick auf den Pin. Ohne Angabe bleibt er wirkungslos. */
   onDoubleClick?: () => void
   onMove: (dxWorld: number, dyWorld: number) => void
-  /** Nach einem Ziehen (nicht bei einem reinen Klick): Bildschirmkoordinaten des Loslassens. */
-  onDragEnd?: (clientX: number, clientY: number) => void
+  /**
+   * Nach einem Ziehen (nicht bei einem reinen Klick): Bildschirmkoordinaten des Loslassens.
+   *
+   * "drag" traegt nach, was der Aufrufer selbst nicht wissen kann: ob die Alt-Taste gehalten
+   * wurde (dann ist Duplizieren gemeint) und wie weit der Pin insgesamt gewandert ist - damit
+   * sich das Original genau um diese Strecke zuruecksetzen laesst.
+   */
+  onDragEnd?: (
+    clientX: number,
+    clientY: number,
+    drag: { alt: boolean; totalDx: number; totalDy: number },
+  ) => void
 }
 
 /**
@@ -60,14 +70,21 @@ export function MapPin({
   onMove,
   onDragEnd,
 }: Props) {
-  const state = useRef<{ lastX: number; lastY: number; moved: boolean } | null>(null)
+  const state = useRef<{
+    lastX: number
+    lastY: number
+    moved: boolean
+    /** Summe aller Schritte in Weltkoordinaten - siehe onDragEnd. */
+    totalDx: number
+    totalDy: number
+  } | null>(null)
   const image = useAsset(imageRef)
 
   function onPointerDown(e: React.PointerEvent) {
     if (e.button !== 0) return
     e.stopPropagation()
     ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
-    state.current = { lastX: e.clientX, lastY: e.clientY, moved: false }
+    state.current = { lastX: e.clientX, lastY: e.clientY, moved: false, totalDx: 0, totalDy: 0 }
   }
 
   function onPointerMove(e: React.PointerEvent) {
@@ -79,6 +96,8 @@ export function MapPin({
     if (s.moved) {
       s.lastX = e.clientX
       s.lastY = e.clientY
+      s.totalDx += dx / scale
+      s.totalDy += dy / scale
       onMove(dx / scale, dy / scale)
     }
   }
@@ -91,7 +110,7 @@ export function MapPin({
       ;(e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId)
     }
     if (!s || !s.moved) onClick(e)
-    else onDragEnd?.(e.clientX, e.clientY)
+    else onDragEnd?.(e.clientX, e.clientY, { alt: e.altKey, totalDx: s.totalDx, totalDy: s.totalDy })
   }
 
   // Bei verlorener Zeigererfassung (z.B. wenn der Pin waehrend des Ziehens durch eine

@@ -18,6 +18,7 @@ npm run build    # Produktions-Build nach dist/
 - Objekt anlegen: Typ links wählen, dann auf die Karte klicken – jedes Objekt gehört auf eine Karte
 - Marker per Drag verschiebbar; anklicken öffnet das Detailpanel rechts
 - **Kopieren/Einfügen (Strg+C / Strg+V)**: markierte Objekte oder eine angeklickte Karte. Eine kopierte Karte nimmt ihren Inhalt mit (Objekte und Unterkarten samt deren Objekten). Eingefügt wird an der Mausposition, in die Karte, die dort liegt
+- **Duplizieren per Alt+Ziehen**: Alt halten und ein Objekt oder eine eingebettete Karte an eine andere Stelle ziehen – dort entsteht die Kopie, das Original bleibt an seinem Platz. Der Zeiger zeigt es an, solange Alt gehalten wird
 - Eigenes Kartenbild oben hochladbar (**PNG, JPG, WebP** – kein SVG nötig); sonst Platzhalterkarte
 - Persistenz über LocalStorage
 

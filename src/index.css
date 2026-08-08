@@ -2007,6 +2007,14 @@ button {
   cursor: grabbing;
 }
 
+/* Alt gehalten: Ziehen verdoppelt, statt zu verschieben. Der Zeiger sagt das vorher an -
+   sonst merkt man es erst am Ergebnis. */
+.map-canvas[data-duplicate='true'] .map-pin.is-draggable,
+.map-canvas[data-duplicate='true'] .map-pin.is-draggable:active,
+.map-canvas[data-duplicate='true'] .embedded-map {
+  cursor: copy;
+}
+
 /* ---------- Uhrzeit-Regler ---------- */
 /* Sitzt in der oberen Leiste. Absolut zentriert statt im Fluss, damit er wirklich mittig
    steht und nicht von der Breite seiner Nachbarn abhaengt. */
