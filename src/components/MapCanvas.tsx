@@ -22,6 +22,7 @@ import { DayPicker } from './DayPicker'
 import { MAP_IMAGE, replaceImageAsset } from '../utils/assets'
 import { getClipboard, instantiate, setClipboard } from '../utils/copyPaste'
 import { isTextEntry } from '../utils/keys'
+import { setViewCenterReader } from '../utils/viewport'
 
 interface View {
   scale: number
@@ -43,7 +44,7 @@ const DRAG_THRESHOLD = 4
  */
 const MARQUEE_HOLD_MS = 280
 /** Ab dieser Bildschirmgroesse (kuerzere Seite, px) wird eine eingebettete Karte aufgedeckt. */
-const REVEAL_THRESHOLD = 160
+export const REVEAL_THRESHOLD = 160
 /** Minimale Kantenlaenge einer Einbettung, in Weltkoordinaten der Eltern-Ebene. */
 export const MIN_EMBED_SIZE = 20
 /** Dauer einer Kartenfahrt (Sprung zu einer Karte/einem Objekt, Einpassen) in ms. */
@@ -326,6 +327,33 @@ export function MapCanvas() {
     if (fitToViewRequest > 0) fitToView()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fitToViewRequest])
+
+  // Den aktuellen Ausschnitt abfragbar machen: "+ Neue Karte" in der Seitenleiste legt die
+  // neue Karte dorthin, wo man gerade hinschaut. Die Ansicht selbst bleibt lokaler Zustand -
+  // gemeldet wird nur die Abfragefunktion, damit kein Zoom-Schritt durch den Store laeuft.
+  useEffect(() => {
+    setViewCenterReader(() => {
+      const el = containerRef.current
+      if (!el) return null
+      const cw = el.clientWidth
+      const ch = el.clientHeight
+      if (cw === 0 || ch === 0) return null
+      const v = viewRef.current
+      const wx = (cw / 2 - v.tx) / v.scale
+      const wy = (ch / 2 - v.ty) / v.scale
+      // Unter der Bildmitte kann eine eingebettete Karte liegen - dann ist sie gemeint.
+      const t = resolveDeepTarget(campaign.layers, layer.id, wx, wy, v.scale)
+      return {
+        layerId: t.layerId,
+        x: t.x,
+        y: t.y,
+        width: cw / t.effScale,
+        height: ch / t.effScale,
+        scale: t.effScale,
+      }
+    })
+    return () => setViewCenterReader(null)
+  }, [campaign.layers, layer.id])
 
   // Kartenauswahl (Eck-Ziehpunkte zum Skalieren) automatisch aufheben, sobald
   // ein anderes Werkzeug/Modus aktiv wird.

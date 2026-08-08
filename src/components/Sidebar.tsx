@@ -6,7 +6,8 @@ import { useStore } from '../store/useStore'
 import { useActiveCampaign, useActiveLayer } from '../store/useActive'
 import type { ToolTab } from '../store/useStore'
 import { MAP_IMAGE, replaceImageAsset } from '../utils/assets'
-import { MIN_EMBED_SIZE } from './MapCanvas'
+import { viewCenter } from '../utils/viewport'
+import { MIN_EMBED_SIZE, REVEAL_THRESHOLD } from './MapCanvas'
 import { DiceTool } from './tools/DiceTool'
 import { SessionNotes } from './tools/SessionNotes'
 import { MusicTool } from './tools/MusicTool'
@@ -109,9 +110,11 @@ export function Sidebar() {
   }
 
   // "+ Neue Karte": oeffnet direkt den Datei-Dialog. Der Dateiname (ohne Endung) wird als
-  // Kartenname uebernommen - ueber das Bearbeiten-Symbol spaeter jederzeit anpassbar. Die
-  // neue Karte wird sofort hierarchisch in die Karte eingebettet, die man gerade betrachtet
-  // (viewLayerId, sonst die Wurzelkarte selbst) - zentriert, in einem Viertel von deren Groesse.
+  // Kartenname uebernommen - ueber das Bearbeiten-Symbol spaeter jederzeit anpassbar.
+  //
+  // Die neue Karte landet dort, wo man gerade hinschaut: mitten im sichtbaren Ausschnitt und
+  // gross genug, um sofort ins Auge zu fallen. Frueher kam sie in die Mitte der Elternkarte -
+  // wer herangezoomt arbeitete, sah von seiner neuen Karte nichts und musste sie erst suchen.
   async function onNewLayerFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     e.target.value = ''
@@ -120,15 +123,54 @@ export function Sidebar() {
     const id = addLayer(name)
     const { ref, width, height } = await replaceImageAsset(file, null, MAP_IMAGE)
     setLayerImage(id, ref, width, height)
-    const parentId = viewLayerId ?? layer.id
+
+    const view = viewCenter()
+    const parentId = view?.layerId ?? viewLayerId ?? layer.id
     const parent = campaign.layers.find((l) => l.id === parentId)
-    if (parent) {
-      const w = Math.max(MIN_EMBED_SIZE, parent.width * 0.25)
-      const h = Math.max(MIN_EMBED_SIZE, w * (height / width))
-      const x = Math.max(0, Math.min(parent.width - w, (parent.width - w) / 2))
-      const y = Math.max(0, Math.min(parent.height - h, (parent.height - h) / 2))
-      embedLayer(id, { parentLayerId: parentId, x, y, width: w, height: h })
+    if (!parent) return
+
+    // Zielfeld, in das die Karte unter Wahrung ihres Seitenverhaeltnisses eingepasst wird:
+    // knapp die Haelfte des Sichtfelds. Ohne Ausschnitt (Karte noch nicht gezeichnet) bleibt
+    // es beim bisherigen Mass, einem Viertel der Elternkarte.
+    const boxW = view ? view.width * 0.45 : parent.width * 0.25
+    const boxH = view ? view.height * 0.45 : parent.height * 0.25
+    const fit = Math.min(boxW / width, boxH / height)
+    let w = width * fit
+    let h = height * fit
+    // Unterhalb der Aufdeck-Schwelle klappt eine eingebettete Karte zur Pinnadel ein. Bei
+    // sehr breiten oder sehr hohen Bildern bliebe die kurze Seite darunter - dann lieber
+    // groesser einsetzen, damit man die Karte auch wirklich sieht.
+    if (view) {
+      const needed = (REVEAL_THRESHOLD * 1.25) / view.scale
+      const shortSide = Math.min(w, h)
+      if (shortSide > 0 && shortSide < needed) {
+        const grow = needed / shortSide
+        w *= grow
+        h *= grow
+      }
     }
+    w = Math.min(parent.width, Math.max(MIN_EMBED_SIZE, w))
+    h = Math.min(parent.height, Math.max(MIN_EMBED_SIZE, h))
+
+    // Hat man neben die Elternkarte geschwenkt, liegt die Bildmitte ausserhalb von ihr. Dann
+    // zaehlt die Mitte des Bereichs, in dem sich Bild und Elternkarte ueberhaupt ueberdecken -
+    // sonst landete die neue Karte an einem Rand, den man gerade nicht ansieht.
+    const overlapCenter = (c: number, span: number, max: number) => {
+      const from = Math.max(0, c - span / 2)
+      const to = Math.min(max, c + span / 2)
+      return to > from ? (from + to) / 2 : Math.max(0, Math.min(max, c))
+    }
+    const cx = view ? overlapCenter(view.x, view.width, parent.width) : parent.width / 2
+    const cy = view ? overlapCenter(view.y, view.height, parent.height) : parent.height / 2
+    embedLayer(id, {
+      parentLayerId: parentId,
+      // In die Elternkarte hinein klemmen: Eine Karte, die halb darueber hinausragt, waere
+      // nicht mehr vollstaendig zu sehen.
+      x: Math.max(0, Math.min(parent.width - w, cx - w / 2)),
+      y: Math.max(0, Math.min(parent.height - h, cy - h / 2)),
+      width: w,
+      height: h,
+    })
   }
 
   function onRenameLayer(l: MapLayer) {
