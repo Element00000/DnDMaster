@@ -2621,19 +2621,18 @@ function EmbeddedMap({
   if (!revealed) {
     /**
      * Lauern hier Gegner? Dann warnt schon die Pinnadel - eingeklappt sieht man sonst nicht,
-     * was einen auf der Karte erwartet. Zaehlt auch, was auf ihren Unterkarten steht: Die
-     * Nadel vertritt die Karte samt allem, was darin steckt.
+     * was einen auf der Karte erwartet. Es zaehlt nur, wer unmittelbar auf dieser Karte
+     * steht: Was auf einer Unterkarte lauert, meldet deren eigene Nadel.
      *
      * Tote zaehlen nicht mehr, und am Spieltisch nur, was die Gruppe schon entdeckt hat -
      * sonst verriete die Farbe einen Hinterhalt, bevor er stattfindet.
      */
-    const inside = collectWithDescendants(layers, embLayer.id)
     const hostileInside = entities.some(
       (e) =>
         isHostile(e) &&
         !isDead(e, currentDay) &&
         (!tableMode || e.visibility === 'spieler') &&
-        inside.has(placementAt(e, timeOfDay, currentDay, campaign)?.layerId ?? ''),
+        placementAt(e, timeOfDay, currentDay, campaign)?.layerId === embLayer.id,
     )
     return (
       <>
