@@ -48,18 +48,6 @@ export function entityMeta(type: EntityType): EntityTypeMeta {
   return ENTITY_TYPES.find((m) => m.type === type) ?? ENTITY_TYPES[0]
 }
 
-/** Berufs-/Rollenkategorien fuer freundliche Charaktere (nsc, Gesinnung 'freund'). */
-export const FREUND_BERUFE: { value: string; label: string }[] = [
-  { value: 'haendler', label: 'Haendler' },
-  { value: 'wirt', label: 'Wirt' },
-  { value: 'handwerker', label: 'Handwerker' },
-  { value: 'waechter', label: 'Waechter' },
-  { value: 'adliger', label: 'Adliger' },
-  { value: 'gelehrter', label: 'Gelehrter' },
-  { value: 'heiler', label: 'Heiler' },
-  { value: 'sonstiges', label: 'Sonstiges' },
-]
-
 /** Sichtbarkeit fuer Nebel des Krieges / Spielerzugang. */
 export type Visibility = 'dm' | 'spieler'
 
@@ -542,7 +530,7 @@ export const FIELD_SCHEMA: Record<EntityType, FieldDef[]> = {
         { value: 'tot', label: 'Tot' },
       ],
     },
-    { key: 'rolle', label: 'Rolle', kind: 'text', placeholder: 'z.B. Wirtin, Hauptmann ...' },
+    { key: 'rolle', label: 'Beruf / Rolle', kind: 'text', placeholder: 'z.B. Wirtin, Hauptmann, Haendlerin ...' },
     { key: 'motivation', label: 'Motivation', kind: 'textarea', placeholder: 'Was treibt die Figur an?' },
     { key: 'gesinnung', label: 'Gesinnung', kind: 'select', options: GESINNUNG_OPTIONS },
     { key: 'quests', label: 'Quests', kind: 'textarea', placeholder: 'Auftraege/Quests, die diese Figur betreffen ...' },

@@ -1504,9 +1504,9 @@ export const useStore = create<StoreState>()(
       name: 'dnd-weltkarte',
       // Bei jeder Erweiterung des Datenmodells hochzaehlen: Nur bei abweichender Version
       // laeuft migrate, und nur dort werden fehlende Felder ergaenzt. Version 12 schafft die
-      // Objekttypen Quest, Gefahr und Schatz ab - ohne sie blieben Altobjekte ohne gueltigen
-      // Typ zurueck (siehe RETIRED_TYPES).
-      version: 12,
+      // Objekttypen Quest, Gefahr und Schatz ab (siehe RETIRED_TYPES), Version 13 das eigene
+      // Feld "Beruf" - ohne sie bliebe der eingetragene Beruf unsichtbar liegen.
+      version: 13,
       // Nur Daten persistieren, keinen fluechtigen UI-Zustand. Uhrzeit und Kampagnentag
       // gehoeren dazu: Sie sind der Spielstand der laufenden Sitzung, kein Fensterzustand -
       // nach einem Neuladen soll die Runde dort weitergehen, wo sie stand.
@@ -1608,6 +1608,30 @@ const RETIRED_TYPES: Record<string, { type: EntityType; fields?: Record<string, 
   gefahr: { type: 'ereignis' },
 }
 
+/**
+ * Der frueher eigene Beruf freundlicher Charaktere - eine Auswahlliste - ist im Textfeld
+ * "Beruf / Rolle" aufgegangen. Beim Uebernehmen zaehlt die Beschriftung, nicht der
+ * gespeicherte Schluessel: Im Textfeld soll "Haendler" stehen, nicht "haendler".
+ */
+const FORMER_BERUF_LABELS: Record<string, string> = {
+  haendler: 'Haendler',
+  wirt: 'Wirt',
+  handwerker: 'Handwerker',
+  waechter: 'Waechter',
+  adliger: 'Adliger',
+  gelehrter: 'Gelehrter',
+  heiler: 'Heiler',
+  sonstiges: 'Sonstiges',
+}
+
+/** Beruf in die Rolle ueberfuehren, ohne eine bereits eingetragene Rolle zu ueberschreiben. */
+function mergeBeruf(fields: Record<string, string>): Record<string, string> {
+  const { beruf, ...rest } = fields
+  if (!beruf) return rest
+  const label = FORMER_BERUF_LABELS[beruf] ?? beruf
+  return { ...rest, rolle: rest.rolle?.trim() ? rest.rolle : label }
+}
+
 /** Fuellt fehlende Felder einer (evtl. aelteren) Entitaet mit Standardwerten. */
 function normalizeEntity(e: Partial<Entity> & { id: string; type: EntityType; name: string }): Entity {
   const retired = RETIRED_TYPES[e.type]
@@ -1628,7 +1652,7 @@ function normalizeEntity(e: Partial<Entity> & { id: string; type: EntityType; na
     thumbCrop: e.thumbCrop ?? null,
     links: e.links ?? [],
     // Was der Nachfolgetyp mitbringt, gilt nur, wo das Objekt selbst nichts gespeichert hat.
-    fields: { ...retired?.fields, ...e.fields },
+    fields: mergeBeruf({ ...retired?.fields, ...e.fields }),
     decision: e.decision ?? (type === 'entscheidung' ? emptyDecision() : null),
     event: e.event ?? (type === 'ereignis' ? emptyEvent() : null),
     day: e.day ?? null,
