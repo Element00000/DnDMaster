@@ -10,6 +10,7 @@ import {
   entityDisplayMeta,
   isDead,
   isHostile,
+  isPlayer,
   parseSkills,
   serializeSkills,
 } from '../types'
@@ -24,6 +25,9 @@ import { rollDie } from '../utils/tools'
 import { DecisionEditor } from './DecisionEditor'
 import { EventEditor } from './EventEditor'
 import { EntityIcon } from './EntityIcon'
+
+/** Felder, die einem Spieler-Charakter nicht angeboten werden (siehe DetailPanel). */
+const PLAYER_HIDDEN_FIELDS = new Set(['rolle', 'motivation', 'quests'])
 
 export function DetailPanel() {
   const campaign = useStore((s) => s.campaigns.find((c) => c.id === s.activeCampaignId) ?? s.campaigns[0])
@@ -141,7 +145,13 @@ export function DetailPanel() {
   let detailContent: React.ReactNode = null
   if (marker) {
     const meta = entityDisplayMeta(marker)
-    const fields = FIELD_SCHEMA[marker.type]
+    // Ein Spieler-Charakter gehoert dem Spieler am Tisch, nicht dem DM: Rolle, Motivation
+    // und Quests schreibt er sich selbst, ein Geheimnis vor sich selbst hat er nicht. Die
+    // Felder blieben hier ohnehin leer stehen - siehe auch der Geheimnis-Block weiter unten.
+    const player = isPlayer(marker)
+    const fields = player
+      ? FIELD_SCHEMA[marker.type].filter((f) => !PLAYER_HIDDEN_FIELDS.has(f.key))
+      : FIELD_SCHEMA[marker.type]
 
     // Eine Beschreibung ist reiner Vorlesetext - sie bekommt kein Bild.
     const isReadAloud = marker.type === 'beschreibung'
@@ -246,8 +256,8 @@ export function DetailPanel() {
           />
         </label>
 
-        {/* Geheimnisse: nur DM */}
-        {!tableMode && (
+        {/* Geheimnisse: nur DM - und nicht bei Spieler-Charakteren (siehe oben) */}
+        {!tableMode && !player && (
           <label className="field">
             <span className="field__label field__label--secret">Geheimnis (nur DM)</span>
             <textarea
