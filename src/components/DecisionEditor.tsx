@@ -26,14 +26,14 @@ export function DecisionEditor({ entity, readOnly }: { entity: Entity; readOnly:
   if (!d) return null
 
   const others = campaign.entities.filter((e) => e.id !== entity.id)
-  const situations = others.filter((e) => e.type === 'ereignis' || e.type === 'quest')
+  const situations = others.filter((e) => e.type === 'ereignis')
   const decisions = others.filter((e) => e.type === 'entscheidung')
 
   return (
     <div className="decision">
       {!readOnly && (
         <label className="field">
-          <span className="field__label">Situation (Ereignis/Quest)</span>
+          <span className="field__label">Situation (Ereignis)</span>
           <select
             className="field__control"
             value={d.situationId ?? ''}

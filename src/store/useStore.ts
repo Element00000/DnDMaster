@@ -42,7 +42,6 @@ function makeCampaign(name: string): Campaign {
   return {
     id: uid('camp-'),
     name,
-    description: '',
     createdAt: Date.now(),
     layers: [layer],
     activeLayerId: layer.id,
@@ -283,7 +282,6 @@ interface StoreState extends AppData {
   activeCampaign: () => Campaign
   addCampaign: (name: string) => void
   renameCampaign: (id: string, name: string) => void
-  updateCampaignDescription: (id: string, description: string) => void
   deleteCampaign: (id: string) => void
   setActiveCampaign: (id: string) => void
   /** Eine importierte Kampagne hinzufuegen (neue ID bei Kollision) und aktiv setzen. */
@@ -692,11 +690,6 @@ export const useStore = create<StoreState>()(
         renameCampaign: (id, name) =>
           set((s) => ({
             campaigns: s.campaigns.map((c) => (c.id === id ? { ...c, name } : c)),
-          })),
-
-        updateCampaignDescription: (id, description) =>
-          set((s) => ({
-            campaigns: s.campaigns.map((c) => (c.id === id ? { ...c, description } : c)),
           })),
 
         deleteCampaign: (id) =>
@@ -1519,9 +1512,10 @@ export const useStore = create<StoreState>()(
     {
       name: 'dnd-weltkarte',
       // Bei jeder Erweiterung des Datenmodells hochzaehlen: Nur bei abweichender Version
-      // laeuft migrate, und nur dort werden fehlende Felder ergaenzt. Version 11 bringt die
-      // Phasen - ohne sie stuenden gespeicherte Kampagnen ganz ohne Phase da.
-      version: 11,
+      // laeuft migrate, und nur dort werden fehlende Felder ergaenzt. Version 12 schafft die
+      // Objekttypen Quest, Gefahr und Schatz ab - ohne sie blieben Altobjekte ohne gueltigen
+      // Typ zurueck (siehe RETIRED_TYPES).
+      version: 12,
       // Nur Daten persistieren, keinen fluechtigen UI-Zustand. Uhrzeit und Kampagnentag
       // gehoeren dazu: Sie sind der Spielstand der laufenden Sitzung, kein Fensterzustand -
       // nach einem Neuladen soll die Runde dort weitergehen, wo sie stand.
@@ -1553,7 +1547,6 @@ export const useStore = create<StoreState>()(
           const campaign: Campaign = {
             id: uid('camp-'),
             name: 'Meine Kampagne',
-            description: '',
             createdAt: Date.now(),
             layers,
             activeLayerId,
@@ -1612,11 +1605,25 @@ function normalizeTimestone(s: Partial<Timestone> & { timeStart?: number }): Tim
   }
 }
 
+/**
+ * Abgeschaffte Objekttypen und ihre Nachfolger. Ein Schatz war immer schon dasselbe wie ein
+ * Gegenstand der Art "Schatz"; Quests und Gefahren waren Situationen und werden zu
+ * Ereignissen. Die eigenen Felder der alten Typen (Status, Gefahrenstufe, Wert) bleiben am
+ * Objekt gespeichert - sie haben nur keine Eingabemaske mehr.
+ */
+const RETIRED_TYPES: Record<string, { type: EntityType; fields?: Record<string, string> }> = {
+  schatz: { type: 'item', fields: { art: 'schatz' } },
+  quest: { type: 'ereignis' },
+  gefahr: { type: 'ereignis' },
+}
+
 /** Fuellt fehlende Felder einer (evtl. aelteren) Entitaet mit Standardwerten. */
 function normalizeEntity(e: Partial<Entity> & { id: string; type: EntityType; name: string }): Entity {
+  const retired = RETIRED_TYPES[e.type]
+  const type = retired?.type ?? e.type
   return {
     id: e.id,
-    type: e.type,
+    type,
     name: e.name,
     description: e.description ?? '',
     secret: e.secret ?? '',
@@ -1629,9 +1636,10 @@ function normalizeEntity(e: Partial<Entity> & { id: string; type: EntityType; na
     thumbUrl: e.thumbUrl ?? null,
     thumbCrop: e.thumbCrop ?? null,
     links: e.links ?? [],
-    fields: e.fields ?? {},
-    decision: e.decision ?? (e.type === 'entscheidung' ? emptyDecision() : null),
-    event: e.event ?? (e.type === 'ereignis' ? emptyEvent() : null),
+    // Was der Nachfolgetyp mitbringt, gilt nur, wo das Objekt selbst nichts gespeichert hat.
+    fields: { ...retired?.fields, ...e.fields },
+    decision: e.decision ?? (type === 'entscheidung' ? emptyDecision() : null),
+    event: e.event ?? (type === 'ereignis' ? emptyEvent() : null),
     day: e.day ?? null,
     schedule: (e.schedule ?? []).map(normalizeTimestone),
     createdAt: e.createdAt ?? Date.now(),
@@ -1800,11 +1808,8 @@ function standardName(type: EntityType, existing: Entity[], fields?: Record<stri
     nsc: 'Neuer Charakter',
     fraktion: 'Neue Fraktion',
     ereignis: 'Neues Ereignis',
-    quest: 'Neue Quest',
     item: 'Neuer Gegenstand',
     entscheidung: 'Neue Entscheidung',
-    gefahr: 'Neue Gefahr',
-    schatz: 'Neuer Schatz',
     beschreibung: 'Neue Beschreibung',
   }
   return `${labels[type]} ${count}`

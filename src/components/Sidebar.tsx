@@ -364,7 +364,9 @@ export function Sidebar() {
               : 'Typ waehlen, dann auf die Karte klicken.'}
           </p>
           <div className="type-grid">
-            {ENTITY_TYPES.filter((t) => t.type !== 'fraktion' && t.type !== 'quest' && t.type !== 'gefahr' && t.type !== 'schatz').map((t) => {
+            {/* Fraktionen entstehen nicht auf der Karte, sondern im Panel "Beziehungen" -
+                darum fehlen sie hier bewusst. */}
+            {ENTITY_TYPES.filter((t) => t.type !== 'fraktion').map((t) => {
               const picker = PICKER_POPUPS[t.type]
               return (
                 <button

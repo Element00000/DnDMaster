@@ -52,7 +52,6 @@ function entityLine(e: Entity, campaign: Campaign): string {
 export function buildCampaignContext(campaign: Campaign, selected: Entity | null): string {
   const lines: string[] = []
   lines.push(`KAMPAGNE: ${campaign.name}`)
-  if (campaign.description) lines.push(`Beschreibung: ${clip(campaign.description, 300)}`)
 
   // Objekte nach Typ, auf sinnvolle Menge begrenzt.
   const others = campaign.entities.filter((e) => e.id !== selected?.id).slice(0, 60)

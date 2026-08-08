@@ -16,11 +16,8 @@ export type EntityType =
   | 'nsc'
   | 'fraktion'
   | 'ereignis'
-  | 'quest'
   | 'item'
   | 'entscheidung'
-  | 'gefahr'
-  | 'schatz'
   | 'beschreibung'
 
 export interface EntityTypeMeta {
@@ -40,11 +37,8 @@ export const ENTITY_TYPES: EntityTypeMeta[] = [
   { type: 'nsc', label: 'Charakter', plural: 'Charaktere', icon: '\u{1F464}', color: '#4f9d69' },
   { type: 'fraktion', label: 'Fraktion', plural: 'Fraktionen', icon: '\u{2694}', color: '#a3572b' },
   { type: 'ereignis', label: 'Ereignis', plural: 'Ereignisse', icon: '\u{1F4C5}', color: '#3b7dd8' },
-  { type: 'quest', label: 'Quest', plural: 'Quests', icon: '\u{1F4DC}', color: '#c98a1f' },
   { type: 'item', label: 'Gegenstand', plural: 'Gegenstaende', icon: '\u{1F5DD}', color: '#8e7cc3' },
   { type: 'entscheidung', label: 'Entscheidung', plural: 'Entscheidungen', icon: '\u{1F500}', color: '#d98c1f' },
-  { type: 'gefahr', label: 'Gefahr', plural: 'Gefahren', icon: '\u{2620}', color: '#c0392b' },
-  { type: 'schatz', label: 'Schatz', plural: 'Schaetze', icon: '\u{1F48E}', color: '#8e44ad' },
   // Reiner Vorlesetext an einer Stelle der Karte: Was der DM der Gruppe vorliest, wenn sie
   // hier ankommt. Der Text steht in description - siehe Vorlesetext-Feld im Detailpanel.
   { type: 'beschreibung', label: 'Beschreibung', plural: 'Beschreibungen', icon: '\u{1F4D6}', color: '#2f8f8a' },
@@ -371,7 +365,6 @@ export interface Phase {
 export interface Campaign {
   id: string
   name: string
-  description: string
   createdAt: number
   layers: MapLayer[]
   activeLayerId: string
@@ -561,31 +554,12 @@ export const FIELD_SCHEMA: Record<EntityType, FieldDef[]> = {
   ereignis: [
     { key: 'zeitpunkt', label: 'Zeitpunkt / Zeitraum', kind: 'text', placeholder: 'z.B. Tag 12, Mitternacht' },
   ],
-  quest: [
-    {
-      key: 'status',
-      label: 'Status',
-      kind: 'select',
-      options: [
-        { value: 'offen', label: 'Offen' },
-        { value: 'aktiv', label: 'Aktiv' },
-        { value: 'abgeschlossen', label: 'Abgeschlossen' },
-        { value: 'gescheitert', label: 'Gescheitert' },
-      ],
-    },
-  ],
   item: [
     { key: 'art', label: 'Art', kind: 'select', options: ITEM_ART_OPTIONS },
     { key: 'besitzer', label: 'Besitzer / Fundort', kind: 'text' },
     { key: 'bedeutung', label: 'Bedeutung', kind: 'textarea' },
   ],
   entscheidung: [],
-  gefahr: [
-    { key: 'gefahrenstufe', label: 'Gefahrenstufe', kind: 'text' },
-  ],
-  schatz: [
-    { key: 'wert', label: 'Wert / Inhalt', kind: 'text' },
-  ],
   // Der Vorlesetext selbst ist die Beschreibung des Objekts - eigene Felder braucht es nicht.
   beschreibung: [],
 }
