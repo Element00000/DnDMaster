@@ -21,6 +21,7 @@ import { defaultThumbCrop, fileToScaledDataUrl } from '../utils/image'
 import { deleteAsset } from '../utils/assets'
 import { discardEntityImage, restoreEntityThumb, storeEntityImage } from '../utils/entityImage'
 import { useAsset } from '../useAsset'
+import { isTextEntry } from '../utils/keys'
 import { rollDie } from '../utils/tools'
 import { DecisionEditor } from './DecisionEditor'
 import { EventEditor } from './EventEditor'
@@ -1117,34 +1118,40 @@ function SkillPicker({
 const DOUBLE_CLICK_GRACE_MS = 260
 
 /**
- * Trennt Einfach- von Doppelklick auf demselben Element: Der Einfachklick wird kurz
- * zurueckgehalten und verworfen, sobald ein Doppelklick folgt.
+ * Trennt Einfach- von Doppelklick: Der Einfachklick wird kurz zurueckgehalten und verworfen,
+ * sobald ein zweiter Klick folgt.
+ *
+ * Erkannt wird der zweite Klick an "detail" - der Browser zaehlt die Klickfolge selbst, nach
+ * Zeit und Zeigerstelle. Das dblclick-Ereignis taugt hier nicht: Es verlangt zweimal
+ * dasselbe Element, und genau das ist nicht gesichert, wenn der erste Klick die Liste umbaut
+ * (das Objekt klappt auf, die Zeile wird neu gezeichnet). Dann blieb der Doppelklick aus und
+ * es sah so aus, als markiere er nur den Namen.
  */
 function useClickOrDouble(onClick: () => void, onDoubleClick: () => void) {
   const timer = useRef<number | null>(null)
 
-  useEffect(
-    () => () => {
-      if (timer.current != null) clearTimeout(timer.current)
-    },
-    [],
-  )
+  function stopTimer() {
+    if (timer.current != null) {
+      clearTimeout(timer.current)
+      timer.current = null
+    }
+  }
+
+  useEffect(() => stopTimer, [])
 
   return {
-    onClick: () => {
-      // Zweiter Klick innerhalb der Frist: nichts tun, gleich kommt der Doppelklick.
+    onClick: (e: React.MouseEvent) => {
+      if (e.detail >= 2) {
+        stopTimer()
+        onDoubleClick()
+        return
+      }
+      // Erster Klick: kurz abwarten, ob noch ein zweiter kommt.
       if (timer.current != null) return
       timer.current = window.setTimeout(() => {
         timer.current = null
         onClick()
       }, DOUBLE_CLICK_GRACE_MS)
-    },
-    onDoubleClick: () => {
-      if (timer.current != null) {
-        clearTimeout(timer.current)
-        timer.current = null
-      }
-      onDoubleClick()
     },
   }
 }
@@ -1192,11 +1199,7 @@ function RowName({ entity, onSelect }: { entity: Entity; onSelect: (id: string) 
       title="Doppelklick zum Umbenennen"
       onClick={(e) => {
         e.stopPropagation()
-        handlers.onClick()
-      }}
-      onDoubleClick={(e) => {
-        e.stopPropagation()
-        handlers.onDoubleClick()
+        handlers.onClick(e)
       }}
     >
       {entity.name}
@@ -1228,6 +1231,10 @@ function EntityRow({
         role="button"
         tabIndex={0}
         onKeyDown={(e) => {
+          // Wer gerade im Umbenennen-Feld tippt, meint mit der Leertaste ein Leerzeichen und
+          // mit Enter das Uebernehmen - nicht die Zeile darunter. Ohne diese Abfrage schluckte
+          // die Zeile das Leerzeichen und waehlte sich stattdessen selbst aus.
+          if (isTextEntry(e.target)) return
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault()
             onSelect(entity.id)
