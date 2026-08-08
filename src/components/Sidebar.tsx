@@ -1,17 +1,20 @@
-import { useEffect, useRef, useState } from 'react'
+import { Suspense, lazy, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { ENTITY_TYPES, GESINNUNG_GROUPS, ITEM_ART_OPTIONS } from '../types'
 import type { EntityType, MapLayer } from '../types'
 import { useStore } from '../store/useStore'
 import { useActiveCampaign, useActiveLayer } from '../store/useActive'
 import type { ToolTab } from '../store/useStore'
-import { fileToScaledDataUrl } from '../utils/image'
-import { deleteAsset, putAsset } from '../utils/assets'
+import { MAP_IMAGE, replaceImageAsset } from '../utils/assets'
 import { MIN_EMBED_SIZE } from './MapCanvas'
 import { DiceTool } from './tools/DiceTool'
 import { SessionNotes } from './tools/SessionNotes'
-import { AiTool } from './tools/AiTool'
 import { MusicTool } from './tools/MusicTool'
+
+// Das KI-Werkzeug bringt die Anthropic-Bibliothek mit und ist damit schwerer als der ganze
+// Rest der Anwendung zusammen. Es wird erst geholt, wenn man das Panel oeffnet - bis dahin
+// startet die Karte deutlich schneller.
+const AiTool = lazy(() => import('./tools/AiTool').then((m) => ({ default: m.AiTool })))
 
 const TOOL_ITEMS: { tab: ToolTab; label: string; icon: string }[] = [
   { tab: 'wuerfel', label: 'Wuerfel', icon: '\u{1F3B2}' },
@@ -101,10 +104,8 @@ export function Sidebar() {
     setImageSwapTargetId(null)
     if (!file || !targetId) return
     const prev = campaign.layers.find((l) => l.id === targetId)?.imageUrl ?? null
-    const { url, width, height } = await fileToScaledDataUrl(file, { maxDim: 2400, quality: 0.85 })
-    const ref = await putAsset(url)
+    const { ref, width, height } = await replaceImageAsset(file, prev, MAP_IMAGE)
     setLayerImage(targetId, ref, width, height)
-    void deleteAsset(prev)
   }
 
   // "+ Neue Karte": oeffnet direkt den Datei-Dialog. Der Dateiname (ohne Endung) wird als
@@ -117,8 +118,7 @@ export function Sidebar() {
     if (!file) return
     const name = file.name.replace(/\.[^./\\]+$/, '').trim() || 'Neue Karte'
     const id = addLayer(name)
-    const { url, width, height } = await fileToScaledDataUrl(file, { maxDim: 2400, quality: 0.85 })
-    const ref = await putAsset(url)
+    const { ref, width, height } = await replaceImageAsset(file, null, MAP_IMAGE)
     setLayerImage(id, ref, width, height)
     const parentId = viewLayerId ?? layer.id
     const parent = campaign.layers.find((l) => l.id === parentId)
@@ -465,7 +465,11 @@ export function Sidebar() {
             <div className="sidebar-tool__body">
               {toolsTab === 'wuerfel' && <DiceTool />}
               {toolsTab === 'notizen' && <SessionNotes />}
-              {toolsTab === 'ki' && <AiTool />}
+              {toolsTab === 'ki' && (
+                <Suspense fallback={<p className="sidebar__hint">KI-Werkzeug wird geladen …</p>}>
+                  <AiTool />
+                </Suspense>
+              )}
               {toolsTab === 'musik' && <MusicTool />}
             </div>
           </div>

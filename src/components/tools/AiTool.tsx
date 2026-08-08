@@ -22,7 +22,8 @@ export function AiTool() {
 
   const campaign = useActiveCampaign()
   const layer = useActiveLayer()
-  const selected = useStore((s) => s.campaigns.find((c) => c.id === s.activeCampaignId)?.entities.find((e) => e.id === s.selectedEntityId) ?? null)
+  const selectedId = useStore((s) => s.selectedEntityId)
+  const selected = campaign.entities.find((e) => e.id === selectedId) ?? null
   const updateEntity = useStore((s) => s.updateEntity)
   const setLayerImage = useStore((s) => s.setLayerImage)
 

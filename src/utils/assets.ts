@@ -3,6 +3,7 @@
 // abwaertskompatibel (Passthrough).
 
 import type { Campaign } from '../types'
+import { fileToScaledDataUrl } from './image'
 
 const DB_NAME = 'dnd-weltkarte'
 const STORE = 'assets'
@@ -65,6 +66,38 @@ export function getCachedAsset(ref: string | null | undefined): string | null | 
   if (!ref) return null
   if (!isAssetRef(ref)) return ref
   return cache.get(ref)
+}
+
+/**
+ * Wie stark ein Bild je nach Verwendung verkleinert wird. Eine Karte wird herangezoomt und
+ * braucht Reserve, ein Kreaturen-Bildchen steht dauerhaft klein in der Liste.
+ */
+export const MAP_IMAGE = { maxDim: 2400, quality: 0.85 }
+export const BATTLE_MAP_IMAGE = { maxDim: 1600 }
+export const CONTENT_IMAGE = { maxDim: 900 }
+export const CREATURE_IMAGE = { maxDim: 400 }
+
+/**
+ * Eine gewaehlte Bilddatei uebernehmen: verkleinern, als Asset ablegen und das bisherige
+ * Bild wegraeumen. Genau diese Reihenfolge stand an sechs Stellen einzeln geschrieben -
+ * wurde dabei das Aufraeumen vergessen, blieb das alte Bild fuer immer im Speicher liegen.
+ *
+ * Liefert die Bildmasse mit: Karten ziehen ihre Groesse daran nach.
+ */
+export async function replaceImageAsset(
+  file: File,
+  prev: string | null | undefined,
+  opts: { maxDim: number; quality?: number },
+): Promise<{ ref: string; width: number; height: number }> {
+  const { url, width, height } = await fileToScaledDataUrl(file, {
+    maxDim: opts.maxDim,
+    quality: opts.quality ?? 0.82,
+  })
+  const ref = await putAsset(url)
+  // Erst wegraeumen, wenn das neue Bild sicher liegt - sonst stuende bei einem Fehler
+  // ueberhaupt kein Bild mehr da.
+  void deleteAsset(prev)
+  return { ref, width, height }
 }
 
 export async function deleteAsset(ref: string | null | undefined): Promise<void> {

@@ -3,8 +3,13 @@ import { EVENT_KINDS } from '../types'
 import type { Creature, Entity, EventBlock, EventKind } from '../types'
 import { useStore } from '../store/useStore'
 import { uid } from '../utils/id'
-import { fileToScaledDataUrl } from '../utils/image'
-import { deleteAsset, putAsset } from '../utils/assets'
+import {
+  BATTLE_MAP_IMAGE,
+  CONTENT_IMAGE,
+  CREATURE_IMAGE,
+  deleteAsset,
+  replaceImageAsset,
+} from '../utils/assets'
 import { AssetImg } from './AssetImg'
 
 /** Editor fuer ein reiches Ereignis: Art, Inhaltsbloecke, Kampfkarte, Kreaturen. */
@@ -157,11 +162,8 @@ function BlockEditor({
     const file = e.target.files?.[0]
     e.target.value = ''
     if (!file || block.kind !== 'image') return
-    const prev = block.url
-    const { url } = await fileToScaledDataUrl(file, { maxDim: 900, quality: 0.82 })
-    const ref = await putAsset(url)
+    const { ref } = await replaceImageAsset(file, block.url, CONTENT_IMAGE)
     onChange({ ...block, url: ref })
-    void deleteAsset(prev)
   }
 
   return (
@@ -209,10 +211,8 @@ function BattleMapField({ url, onSet }: { url: string | null; onSet: (url: strin
     const file = e.target.files?.[0]
     e.target.value = ''
     if (!file) return
-    const { url: dataUrl } = await fileToScaledDataUrl(file, { maxDim: 1600, quality: 0.82 })
-    const ref = await putAsset(dataUrl)
+    const { ref } = await replaceImageAsset(file, url, BATTLE_MAP_IMAGE)
     onSet(ref)
-    void deleteAsset(url)
   }
 
   return (
@@ -259,11 +259,8 @@ function CreatureEditor({
     const file = e.target.files?.[0]
     e.target.value = ''
     if (!file) return
-    const prev = creature.imageUrl
-    const { url } = await fileToScaledDataUrl(file, { maxDim: 400, quality: 0.82 })
-    const ref = await putAsset(url)
+    const { ref } = await replaceImageAsset(file, creature.imageUrl, CREATURE_IMAGE)
     onChange({ imageUrl: ref })
-    void deleteAsset(prev)
   }
 
   return (

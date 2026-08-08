@@ -19,8 +19,7 @@ import { useBottomPanelOffset } from '../useBottomPanelOffset'
 import { PlaceholderMap } from './PlaceholderMap'
 import { MapPin } from './MapPin'
 import { DayPicker } from './DayPicker'
-import { fileToScaledDataUrl } from '../utils/image'
-import { deleteAsset, putAsset } from '../utils/assets'
+import { MAP_IMAGE, replaceImageAsset } from '../utils/assets'
 import { getClipboard, instantiate, setClipboard } from '../utils/copyPaste'
 import { isTextEntry } from '../utils/keys'
 
@@ -132,11 +131,8 @@ export function MapCanvas() {
     const file = e.target.files?.[0]
     e.target.value = ''
     if (!file) return
-    const prev = layer.imageUrl
-    const { url, width: w, height: h } = await fileToScaledDataUrl(file, { maxDim: 2400, quality: 0.85 })
-    const ref = await putAsset(url)
-    setLayerImage(layer.id, ref, w, h)
-    void deleteAsset(prev)
+    const { ref, width, height } = await replaceImageAsset(file, layer.imageUrl, MAP_IMAGE)
+    setLayerImage(layer.id, ref, width, height)
   }
 
   // Auf dieser Ebene eingebettete Karten (andere Ebenen mit embed.parentLayerId === layer.id).
